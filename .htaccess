@@ -1,0 +1,17 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # If deployed in a subfolder (e.g. /app), set RewriteBase
+    # RewriteBase /
+
+    # 1. Exclude Backend/API paths from React Routing
+    # This prevents React from trying to handle API requests.
+    # If the request starts with 'php_server/' or 'api/', stop processing rules here.
+    RewriteRule ^(php_server|api)/ - [L]
+
+    # 2. Handle React Routes (Single Page App)
+    # If the request is NOT for a real file or directory, serve index.html
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.html [L]
+</IfModule>
