@@ -1,0 +1,14 @@
+export { About } from "./About";
+export { BarcodeGenerator } from "./BarcodeGenerator";
+export { CustomerHistory } from "./CustomerHistory";
+export { Dashboard } from "./Dashboard";
+export { Finance } from "./Finance";
+export { POS } from "./POS";
+export { People } from "./People";
+export { Products } from "./Products";
+export { RealStockCheck } from "./RealStockCheck";
+export { ReturnHistory } from "./ReturnHistory";
+export { Settings } from "./Settings";
+export { SoldItems } from "./SoldItems";
+export { SupplierHistory } from "./SupplierHistory";
+export { TransferHistory } from "./TransferHistory";

@@ -54,6 +54,12 @@ Desktop.ini
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
 
+# Next.js
+.next
+
+# Local editor / backup files
+*.backup
+
 # Linux
 *~
 .fuse_hidden*
