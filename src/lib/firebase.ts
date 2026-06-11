@@ -7,18 +7,22 @@ import { getAuth } from "firebase/auth";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyDN81-3pL_Vgo3o9qgAqFntGze4bZ9O49c",
-  authDomain: "rep-pos-app.firebaseapp.com",
-  projectId: "rep-pos-app",
-  storageBucket: "rep-pos-app.firebasestorage.app",
-  messagingSenderId: "387307851193",
-  appId: "1:387307851193:web:947e1a29e6c0fde8b0ba68",
-  measurementId: "G-N1YVW5QSFX",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+const analytics =
+  typeof window !== "undefined" &&
+  process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    ? getAnalytics(app)
+    : null;
 // Pola Singleton untuk mencegah inisialisasi ulang aplikasi Firebase selama Hot Reloading
 const db = getFirestore(app);
 const auth = getAuth(app);
