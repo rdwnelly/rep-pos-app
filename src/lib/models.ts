@@ -1,5 +1,5 @@
 import { DataTypes } from 'sequelize';
-import sequelize from '../config/database.js';
+import { sequelize } from './db';
 
 const Product = sequelize.define('Product', {
     id: { type: DataTypes.STRING, primaryKey: true },
@@ -147,7 +147,6 @@ const StockAdjustment = sequelize.define('StockAdjustment', {
 }, { tableName: 'stock_adjustments' });
 
 export {
-    sequelize,
     Product,
     Category,
     Customer,
