@@ -2,9 +2,8 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { TransactionType, UserRole, User } from '../types';
-import { formatIDR, exportToCSV } from '../utils';
+import { formatIDR, exportToCSV, exportToExcel } from '../utils';
 import { Download, Search, Filter, RotateCcw, X, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, ShoppingBag, Printer, Calendar } from 'lucide-react';
-import * as XLSX from 'xlsx';
 
 interface SoldItemsProps {
     currentUser: User | null;
@@ -277,12 +276,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
             return item;
         });
 
-        const worksheet = XLSX.utils.json_to_sheet(data);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Barang Terjual");
-
-        // Auto-width
-        worksheet['!cols'] = [
+        const cols = [
             { wch: 15 }, // ID
             { wch: 20 }, // Faktur
             { wch: 12 }, // Tanggal
@@ -298,7 +292,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
             { wch: 15 }  // Status
         ];
 
-        XLSX.writeFile(workbook, `Laporan_Barang_Terjual_${new Date().toISOString().split('T')[0]}.xlsx`);
+        exportToExcel(data, "Laporan_Barang_Terjual", "Barang Terjual", cols);
     };
 
     return (

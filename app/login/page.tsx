@@ -62,7 +62,8 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md border-t-4 border-amber-600">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-800">Kasir REP</h1>
+          <img src="/icon-192x192.png" alt="Logo Kasir REP" className="mx-auto h-20 w-20 mb-4 rounded-full shadow-sm" />
+          <h1 className="text-2xl font-bold text-gray-800">Selamat Datang di Kasir REP</h1>
           <p className="text-sm text-gray-500 mt-2">
             Yaswar Cafe & Toko Souvenir
             <br />

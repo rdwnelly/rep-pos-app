@@ -3,8 +3,7 @@ import { createPortal } from 'react-dom';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Product, Category, UserRole } from '../types';
-import { formatIDR, exportToCSV, generateSKU, compressImage } from '../utils';
-import * as XLSX from 'xlsx';
+import { formatIDR, exportToCSV, generateSKU, compressImage, exportToExcel } from '../utils';
 import { Edit2, Trash2, Plus, X, Download, Upload, Tag, Barcode, Image as ImageIcon, Search, Printer, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, FileSpreadsheet, Package } from 'lucide-react';
 
 export const Products: React.FC = () => {
@@ -197,10 +196,6 @@ export const Products: React.FC = () => {
       return row;
     });
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Daftar Produk");
-
     // Auto-width columns
     const cols = [
       { wch: 15 }, // ID
@@ -220,9 +215,7 @@ export const Products: React.FC = () => {
       { wch: 15 }  // Promo
     );
 
-    worksheet['!cols'] = cols;
-
-    XLSX.writeFile(workbook, `Produk_${new Date().toISOString().split('T')[0]}.xlsx`);
+    exportToExcel(data, "Produk", "Daftar Produk", cols);
   };
 
   const handlePrint = () => {

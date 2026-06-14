@@ -3,8 +3,7 @@ import { ApiService } from '../services/api';
 import { PaymentMethod, User } from '../types';
 import { Loading } from '../components/Loading';
 import { ArrowRightLeft, Search, Calendar, ArrowUpRight, ArrowDownLeft, Printer, FileSpreadsheet, Download, Filter, RotateCcw, X } from 'lucide-react';
-import { formatIDR, formatDate, exportToCSV } from '../utils';
-import * as XLSX from 'xlsx';
+import { formatIDR, formatDate, exportToCSV, exportToExcel } from '../utils';
 
 interface TransferHistoryProps {
     currentUser: User;
@@ -144,12 +143,7 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
             'Jumlah': item.amount
         }));
 
-        const worksheet = XLSX.utils.json_to_sheet(data);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Transfer");
-
-        // Auto-width
-        worksheet['!cols'] = [
+        const cols = [
             { wch: 20 }, // Tanggal
             { wch: 15 }, // ID
             { wch: 20 }, // Tipe
@@ -159,7 +153,7 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
             { wch: 15 }  // Jumlah
         ];
 
-        XLSX.writeFile(workbook, `Riwayat_Transfer_${new Date().toISOString().split('T')[0]}.xlsx`);
+        exportToExcel(data, "Riwayat_Transfer", "Riwayat Transfer", cols);
     };
 
     const handlePrint = () => {
