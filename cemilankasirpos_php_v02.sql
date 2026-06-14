@@ -866,7 +866,7 @@ CREATE TABLE `storesettings` (
 --
 
 INSERT INTO `storesettings` (`id`, `name`, `jargon`, `address`, `phone`, `bankAccount`, `footerMessage`, `notes`, `showAddress`, `showJargon`, `showBank`, `printerType`, `createdAt`, `updatedAt`) VALUES
-('settings', 'Cemilan KasirPOS Nusantara', 'Pusat Jajanan & Snack Kiloan Terlengkap', 'Jl. Raya Nusantara No. 123, Jakarta Selatan', '0812-3456-7890', 'BCA 8820123456 a.n Cemilan Nusantara\nBRI 1234-01-000001-50-1 a.n Cemilan Nusantara', 'Terima kasih telah berbelanja di Cemilan Nusantara!\nBarang yang sudah dibeli tidak dapat ditukar/dikembalikan.', 'Toko Buka Setiap Hari: 08.00 - 21.00 WIB', 1, 1, 1, 'A4', '2025-11-21 03:21:02', '2025-11-24 05:57:11');
+('settings', 'Kasir REP', 'Yayasan Rumah Etnik Papua', 'Jl. Raya Sentani', '0812-3456-7890', 'BCA 8820123456 a.n REP\nBRI 1234-01-000001-50-1 a.n REP', 'Terima kasih telah berkunjung ke Yaswar Cafe & Toko Souvenir REP!\n', '', 1, 1, 1, '58mm', '2025-11-21 03:21:02', '2025-11-24 05:57:11');
 
 -- --------------------------------------------------------
 

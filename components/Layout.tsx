@@ -126,7 +126,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
         <div className="p-6 border-b border-white/10 flex items-center justify-between h-[72px]">
           {(isSidebarOpen || mobileMenuOpen) && (
             <h1 className="text-2xl font-bold text-white tracking-tighter whitespace-nowrap transition-opacity duration-150">
-              Cemilan_
+              Kasir REP
             </h1>
           )}
 
@@ -185,7 +185,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
             >
               <Menu size={24} />
             </button>
-            <span className="font-bold text-slate-800 text-lg">CemilanKasirPOS</span>
+            <span className="font-bold text-slate-800 text-lg">Kasir REP</span>
           </div>
           {/* Optional: Add user avatar or other mobile actions here */}
         </div>

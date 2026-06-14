@@ -3,10 +3,9 @@ import { createPortal } from 'react-dom';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Transaction, PaymentStatus, Customer, UserRole, User, PaymentMethod, StoreSettings, TransactionType } from '../types';
-import { formatIDR, formatDate, exportToCSV } from '../utils';
+import { formatIDR, formatDate, exportToCSV, exportToExcel } from '../utils';
 import { generatePrintTransactionDetail } from '../utils/printHelpers';
 import { Download, Search, Filter, RotateCcw, X, Eye, FileText, Printer, FileSpreadsheet, UserCheck, Calendar } from 'lucide-react';
-import * as XLSX from 'xlsx';
 
 interface CustomerHistoryProps {
     currentUser: User | null;
@@ -177,12 +176,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             };
         });
 
-        const worksheet = XLSX.utils.json_to_sheet(data);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Pelanggan");
-
-        // Auto-width
-        worksheet['!cols'] = [
+        const cols = [
             { wch: 15 }, // ID
             { wch: 20 }, // Faktur
             { wch: 15 }, // Tanggal
@@ -196,7 +190,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             { wch: 15 }  // Kasir
         ];
 
-        XLSX.writeFile(workbook, `Riwayat_Pelanggan_${selectedCustomer?.name || 'All'}_${new Date().toISOString().split('T')[0]}.xlsx`);
+        exportToExcel(data, `Riwayat_Pelanggan_${selectedCustomer?.name || 'All'}`, "Riwayat Pelanggan", cols);
     };
 
     const handlePrint = () => {
@@ -276,7 +270,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
     };
 
     const printTransactionDetail = (tx: Transaction) => {
-        const settings = storeSettings || { name: 'Cemilan KasirPOS' } as StoreSettings;
+        const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
         const w = window.open('', '', 'width=800,height=600');
         if (!w) return;
 

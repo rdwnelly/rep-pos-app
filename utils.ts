@@ -86,7 +86,14 @@ export const toMySQLDate = (date: Date): string => {
 };
 
 export const exportToCSV = (filename: string, headers: string[], rows: any[][]) => {
+  const customHeaders = [
+    ['Kasir REP'],
+    ['Yayasan Rumah Etnik Papua'],
+    []
+  ];
+
   const csvContent = [
+    ...customHeaders.map(e => e.join(',')),
     headers.join(','),
     ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
   ].join('\n');
@@ -95,12 +102,44 @@ export const exportToCSV = (filename: string, headers: string[], rows: any[][]) 
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
 
+  const finalFilename = filename.startsWith('Laporan_Harian_Kasir_REP_') ? filename : `Laporan_Harian_Kasir_REP_${filename}`;
+
   link.setAttribute('href', url);
-  link.setAttribute('download', filename);
+  link.setAttribute('download', finalFilename);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+};
+
+export const exportToExcel = (data: any[], fileNamePrefix: string, sheetName: string, cols?: any[]) => {
+  import('xlsx').then(XLSX => {
+    const worksheet = XLSX.utils.json_to_sheet([]);
+    
+    // Add custom header for Kasir REP
+    XLSX.utils.sheet_add_aoa(worksheet, [
+        ["Kasir REP"],
+        ["Yayasan Rumah Etnik Papua"],
+        []
+    ], { origin: "A1" });
+    
+    XLSX.utils.sheet_add_json(worksheet, data, { origin: "A4", skipHeader: false });
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+    if (cols && cols.length > 0) {
+        worksheet['!cols'] = cols;
+    }
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    let finalPrefix = fileNamePrefix;
+    if (!finalPrefix.startsWith('Laporan_Harian_Kasir_REP_')) {
+       finalPrefix = 'Laporan_Harian_Kasir_REP_' + finalPrefix;
+    }
+    const finalName = `${finalPrefix}_${dateStr}.xlsx`;
+    XLSX.writeFile(workbook, finalName);
+  });
 };
 
 export const compressImage = (file: File, size: number = 150): Promise<string> => {

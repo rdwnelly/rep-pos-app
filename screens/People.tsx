@@ -4,8 +4,7 @@ import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Customer, Supplier, PriceType, UserRole } from '../types';
 import { Plus, Edit2, Trash2, Phone, MapPin, Search, User, Truck, Download, Printer, Upload, X, FileSpreadsheet, Users, Mail, ArrowUpDown } from 'lucide-react';
-import { exportToCSV, generateUUID, compressImage } from '../utils';
-import * as XLSX from 'xlsx';
+import { exportToCSV, generateUUID, compressImage, exportToExcel } from '../utils';
 
 export const People: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'customers' | 'suppliers'>('customers');
@@ -127,13 +126,7 @@ export const People: React.FC = () => {
             ...(activeTab === 'customers' ? { 'Harga Default': (d as Customer).defaultPriceType || 'ECERAN' } : {})
         }));
 
-        const worksheet = XLSX.utils.json_to_sheet(exportData);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-
-        // Auto-width
-        const max_width = exportData.reduce((w, r) => Math.max(w, r['Nama'].length), 10);
-        worksheet['!cols'] = [
+        const cols = [
             { wch: 15 }, // ID
             { wch: 30 }, // Nama
             { wch: 15 }, // Telepon
@@ -142,7 +135,7 @@ export const People: React.FC = () => {
             ...(activeTab === 'customers' ? [{ wch: 15 }] : []) // Harga Default
         ];
 
-        XLSX.writeFile(workbook, `${fileNamePrefix}_${new Date().toISOString().split('T')[0]}.xlsx`);
+        exportToExcel(exportData, fileNamePrefix, sheetName, cols);
     };
 
     const handlePrint = () => {

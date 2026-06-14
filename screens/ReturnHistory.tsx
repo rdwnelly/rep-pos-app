@@ -3,8 +3,7 @@ import { ApiService } from '../services/api';
 import { Transaction, Purchase, User, TransactionType, PurchaseType } from '../types';
 import { Loading } from '../components/Loading';
 import { Undo2, Search, Calendar, Package, ShoppingCart, Printer, FileSpreadsheet, Download, Filter, RotateCcw, X } from 'lucide-react';
-import { formatIDR, formatDate, exportToCSV } from '../utils';
-import * as XLSX from 'xlsx';
+import { formatIDR, formatDate, exportToCSV, exportToExcel } from '../utils';
 
 interface ReturnHistoryProps {
     currentUser: User;
@@ -104,12 +103,7 @@ export const ReturnHistory: React.FC<ReturnHistoryProps> = ({ currentUser }) => 
             'Nilai Retur': Math.abs(item.totalAmount)
         }));
 
-        const worksheet = XLSX.utils.json_to_sheet(data);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, `Retur ${isSales ? 'Penjualan' : 'Pembelian'}`);
-
-        // Auto-width
-        worksheet['!cols'] = [
+        const cols = [
             { wch: 20 }, // Tanggal
             { wch: 15 }, // ID
             { wch: 20 }, // Faktur
@@ -119,7 +113,7 @@ export const ReturnHistory: React.FC<ReturnHistoryProps> = ({ currentUser }) => 
             { wch: 15 }  // Nilai
         ];
 
-        XLSX.writeFile(workbook, `Riwayat_Retur_${activeTab}_${new Date().toISOString().split('T')[0]}.xlsx`);
+        exportToExcel(data, `Riwayat_Retur_${activeTab}`, `Retur ${isSales ? 'Penjualan' : 'Pembelian'}`, cols);
     };
 
     const handlePrint = () => {

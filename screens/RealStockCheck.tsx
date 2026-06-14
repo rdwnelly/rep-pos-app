@@ -2,9 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Product, StockAdjustment, User } from '../types';
-import { formatDate, generateUUID, formatIDR, exportToCSV } from '../utils';
+import { formatDate, generateUUID, formatIDR, exportToCSV, exportToExcel } from '../utils';
 import { Search, Filter, RotateCcw, Save, Package, TrendingUp, TrendingDown, FileText, Printer, Download, FileSpreadsheet, Calendar, X } from 'lucide-react';
-import * as XLSX from 'xlsx';
 
 interface RealStockCheckProps {
     currentUser: User | null;
@@ -181,10 +180,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
             'Catatan': item.note
         }));
 
-        const worksheet = XLSX.utils.json_to_sheet(data);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Stok Adjustments");
-        XLSX.writeFile(workbook, `Cek_Stok_Real_${new Date().toISOString().split('T')[0]}.xlsx`);
+        exportToExcel(data, fileNamePrefix || 'Laporan', sheetName || 'Data', cols || undefined);
     };
 
     const handlePrint = () => {

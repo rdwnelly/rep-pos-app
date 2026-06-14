@@ -3,11 +3,10 @@ import { createPortal } from 'react-dom';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Transaction, PaymentStatus, CashFlow, CashFlowType, Purchase, Supplier, PaymentMethod, CashFlow as CashFlowTypeInterface, StoreSettings, BankAccount, User, UserRole, TransactionType, PurchaseType } from '../types';
-import { formatIDR, formatDate, exportToCSV, generateId } from '../utils';
+import { formatIDR, formatDate, exportToCSV, generateId, exportToExcel } from '../utils';
 import { generatePrintInvoice, generatePrintGoodsNote, generatePrintSuratJalan, generatePrintTransactionDetail, generatePrintPurchaseDetail, generatePrintPurchaseNote } from '../utils/printHelpers';
 import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet } from 'lucide-react';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
-import * as XLSX from 'xlsx';
 
 interface FinanceProps {
     currentUser: User | null;
@@ -1444,15 +1443,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             return;
         }
 
-        const worksheet = XLSX.utils.json_to_sheet(data);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-
-        if (cols.length > 0) {
-            worksheet['!cols'] = cols;
-        }
-
-        XLSX.writeFile(workbook, `${fileNamePrefix}_${new Date().toISOString().split('T')[0]}.xlsx`);
+        exportToExcel(data, fileNamePrefix || 'Laporan', sheetName || 'Data', cols || undefined);
     };
 
     const handleCleanPrint = () => {
@@ -1770,7 +1761,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     };
 
     const printInvoice = (tx: Transaction) => {
-        const settings = storeSettings || { name: 'KasirPintar' } as StoreSettings;
+        const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
         const w = window.open('', '', 'width=800,height=600');
         if (!w) return;
 
@@ -1789,7 +1780,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     };
 
     const printGoodsNote = (tx: Transaction) => {
-        const settings = storeSettings || { name: 'KasirPintar' } as StoreSettings;
+        const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
         const w = window.open('', '', 'width=800,height=600');
         if (!w) return;
 
@@ -1808,7 +1799,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     };
 
     const printSuratJalan = (tx: Transaction) => {
-        const settings = storeSettings || { name: 'KasirPintar' } as StoreSettings;
+        const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
         const w = window.open('', '', 'width=800,height=600');
         if (!w) return;
 
@@ -1827,7 +1818,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     };
 
     const printTransactionDetail = (tx: Transaction) => {
-        const settings = storeSettings || { name: 'KasirPintar' } as StoreSettings;
+        const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
         const w = window.open('', '', 'width=800,height=600');
         if (!w) return;
 
@@ -1837,7 +1828,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     };
 
     const printPurchaseDetail = (purchase: Purchase) => {
-        const settings = storeSettings || { name: 'KasirPintar' } as StoreSettings;
+        const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
         const w = window.open('', '', 'width=800,height=600');
         if (!w) return;
 
@@ -1847,7 +1838,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     };
 
     const printPurchaseNote = (purchase: Purchase) => {
-        const settings = storeSettings || { name: 'KasirPintar' } as StoreSettings;
+        const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
         const w = window.open('', '', 'width=800,height=600');
         if (!w) return;
 

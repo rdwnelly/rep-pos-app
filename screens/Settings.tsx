@@ -4,8 +4,7 @@ import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { User, UserRole, StoreSettings, BankAccount, PrinterType } from '../types';
 import { Trash2, Plus, User as UserIcon, Shield, ShieldAlert, Edit2, Save, X, Store, Upload, CreditCard, Printer, AlertTriangle, Download, FileSpreadsheet, Settings as SettingsIcon, History as HistoryIcon, Palette } from 'lucide-react';
-import { exportToCSV, compressImage } from '../utils';
-import * as XLSX from 'xlsx';
+import { exportToCSV, compressImage, exportToExcel } from '../utils';
 import { useTheme } from '../hooks/useTheme';
 
 // Default store settings - defined outside component to avoid recreation
@@ -107,19 +106,14 @@ export const Settings: React.FC = () => {
             'Atas Nama': b.holderName
         }));
 
-        const worksheet = XLSX.utils.json_to_sheet(data);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Data Bank");
-
-        // Auto-width
-        worksheet['!cols'] = [
+        const cols = [
             { wch: 15 }, // ID
             { wch: 20 }, // Nama Bank
             { wch: 20 }, // No Rek
             { wch: 20 }  // Atas Nama
         ];
 
-        XLSX.writeFile(workbook, `Data_Bank_${new Date().toISOString().split('T')[0]}.xlsx`);
+        exportToExcel(data, "Data_Bank", "Data Bank", cols);
     };
 
     const handlePrintBank = () => {

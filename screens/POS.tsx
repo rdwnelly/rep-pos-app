@@ -241,17 +241,17 @@ export const POS: React.FC = () => {
       change: paid - totalAmount,
       paymentStatus: status,
       paymentMethod: paymentMethod,
-      paymentNote: paymentNote,
-      bankId: selectedBankId,
-      bankName: selectedBank?.bankName,
-      customerId: selectedCustomerId || undefined,
+      paymentNote: paymentNote || '',
+      bankId: selectedBankId || '',
+      bankName: selectedBank?.bankName || '',
+      customerId: selectedCustomerId || '',
       customerName: customerName || 'Pelanggan Umum',
-      customerAddress: selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.address : undefined,
+      customerAddress: selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.address || '' : '',
       cashierId: currentUser.id || 'unknown',
       cashierName: currentUser.name || 'Kasir',
-      discount: discount > 0 ? discount : undefined,
-      discountType: discount > 0 ? discountType : undefined,
-      discountAmount: discountAmountValue > 0 ? discountAmountValue : undefined
+      discount: discount > 0 ? discount : 0,
+      discountType: discount > 0 ? discountType : 'FIXED',
+      discountAmount: discountAmountValue > 0 ? discountAmountValue : 0
     };
 
     try {
@@ -286,7 +286,7 @@ export const POS: React.FC = () => {
       setCustomerName('Pelanggan Umum');
       setShowPaymentModal(false);
       searchInputRef.current?.focus();
-      alert('Transaksi berhasil!');
+      alert('Transaksi Kasir REP Berhasil!');
     } catch (error) {
       console.error(error);
       alert('Gagal memproses transaksi. Silakan coba lagi.');

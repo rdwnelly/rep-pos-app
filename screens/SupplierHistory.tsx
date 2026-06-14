@@ -3,10 +3,9 @@ import { createPortal } from 'react-dom';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Purchase, PaymentStatus, Supplier, UserRole, User, PaymentMethod, StoreSettings, PurchaseType } from '../types';
-import { formatIDR, formatDate, exportToCSV } from '../utils';
+import { formatIDR, formatDate, exportToCSV, exportToExcel } from '../utils';
 import { generatePrintPurchaseDetail } from '../utils/printHelpers';
 import { Download, Search, Filter, RotateCcw, X, Eye, Printer, FileSpreadsheet, Truck as TruckIcon, Calendar } from 'lucide-react';
-import * as XLSX from 'xlsx';
 
 interface SupplierHistoryProps {
     currentUser: User | null;
@@ -160,12 +159,7 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
             'Metode': p.paymentMethod
         }));
 
-        const worksheet = XLSX.utils.json_to_sheet(data);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Supplier");
-
-        // Auto-width
-        worksheet['!cols'] = [
+        const cols = [
             { wch: 15 }, // ID
             { wch: 20 }, // Faktur
             { wch: 15 }, // Tanggal
@@ -178,7 +172,7 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
             { wch: 15 }  // Metode
         ];
 
-        XLSX.writeFile(workbook, `Riwayat_Supplier_${selectedSupplier?.name || 'All'}_${new Date().toISOString().split('T')[0]}.xlsx`);
+        exportToExcel(data, `Riwayat_Supplier_${selectedSupplier?.name || 'All'}`, "Riwayat Supplier", cols);
     };
 
     const handlePrint = () => {
@@ -251,7 +245,7 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
     };
 
     const printPurchaseDetail = (purchase: Purchase) => {
-        const settings = storeSettings || { name: 'Cemilan KasirPOS' } as StoreSettings;
+        const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
         const w = window.open('', '', 'width=800,height=600');
         if (!w) return;
 
