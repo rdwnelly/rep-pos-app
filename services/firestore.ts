@@ -68,6 +68,19 @@ const deleteCollection = async (name: string) => {
   await batch.commit();
 };
 
+const cleanUndefined = (obj: any): any => {
+  if (Array.isArray(obj)) {
+    return obj.map(cleanUndefined);
+  } else if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj)
+        .filter(([_, v]) => v !== undefined)
+        .map(([k, v]) => [k, cleanUndefined(v)])
+    );
+  }
+  return obj;
+};
+
 const saveEntity = async <T extends { id?: string }>(
   name: string,
   entity: T,
@@ -75,7 +88,7 @@ const saveEntity = async <T extends { id?: string }>(
   const ref = entity.id
     ? doc(collectionRef(name), entity.id)
     : doc(collectionRef(name));
-  await setDoc(ref, { ...entity, id: ref.id }, { merge: true });
+  await setDoc(ref, cleanUndefined({ ...entity, id: ref.id }), { merge: true });
 };
 
 const saveEntityBulk = async <T extends { id?: string }>(
@@ -87,7 +100,7 @@ const saveEntityBulk = async <T extends { id?: string }>(
     const ref = entity.id
       ? doc(collectionRef(name), entity.id)
       : doc(collectionRef(name));
-    batch.set(ref, { ...entity, id: ref.id }, { merge: true });
+    batch.set(ref, cleanUndefined({ ...entity, id: ref.id }), { merge: true });
   });
   await batch.commit();
 };
@@ -120,7 +133,7 @@ const applyTransactionStock = async (
       id: txRef.id,
       type: transaction.type || TransactionType.SALE,
     };
-    tx.set(txRef, savedTx, { merge: true });
+    tx.set(txRef, cleanUndefined(savedTx), { merge: true });
 
     for (const item of transaction.items) {
       const productRef = doc(collectionRef("products"), item.id);
@@ -281,7 +294,7 @@ export const FirestoreService = {
       type: purchase.type || PurchaseType.PURCHASE,
     };
     await runTransaction(db, async (tx) => {
-      tx.set(purRef, purData, { merge: true });
+      tx.set(purRef, cleanUndefined(purData), { merge: true });
       for (const item of purData.items || []) {
         const productRef = doc(collectionRef("products"), item.id);
         const productSnapshot = await tx.get(productRef);

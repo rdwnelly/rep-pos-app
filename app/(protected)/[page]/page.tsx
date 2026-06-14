@@ -1,5 +1,6 @@
 "use client";
 
+import React, { use } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import {
   About,
@@ -53,14 +54,15 @@ const pageMap: Record<
 };
 
 interface PageProps {
-  params: {
+  params: Promise<{
     page: string;
-  };
+  }>;
 }
 
 export default function Page({ params }: PageProps) {
+  const unwrappedParams = use(params);
   const { user } = useAuth();
-  const pageEntry = pageMap[params.page];
+  const pageEntry = pageMap[unwrappedParams.page];
 
   if (!pageEntry) {
     return (
