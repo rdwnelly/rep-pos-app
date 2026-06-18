@@ -180,7 +180,18 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
             'Catatan': item.note
         }));
 
-        exportToExcel(data, fileNamePrefix || 'Laporan', sheetName || 'Data', cols || undefined);
+        exportToExcel(data, 'Riwayat_Cek_Stok', 'Data', [
+            { wch: 15 }, // Tanggal
+            { wch: 10 }, // Jam
+            { wch: 25 }, // Produk
+            { wch: 15 }, // Tipe
+            { wch: 20 }, // Alasan
+            { wch: 10 }, // Stok Awal
+            { wch: 10 }, // Qty
+            { wch: 10 }, // Stok Akhir
+            { wch: 15 }, // User
+            { wch: 20 }  // Catatan
+        ]);
     };
 
     const handlePrint = () => {
