@@ -81,9 +81,10 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
         }
 
         // Cashier Filter
-        if (currentUser && currentUser.role === UserRole.CASHIER) {
-            items = items.filter(t => t.cashierId === currentUser.id);
-        }
+        // Removed strict cashierId filter so cashiers can view all transactions for reprints/returns
+        // if (currentUser && currentUser.role === UserRole.CASHIER) {
+        //     items = items.filter(t => t.cashierId === currentUser.id);
+        // }
 
         // Sort
         // Sort (Date Descending)

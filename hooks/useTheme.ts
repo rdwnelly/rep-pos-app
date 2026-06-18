@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 
-const DEFAULT_HUE = 348;
-const DEFAULT_SATURATION = 90;
-const DEFAULT_LIGHTNESS = 56;
+const DEFAULT_HUE = 28;
+const DEFAULT_SATURATION = 75;
+const DEFAULT_LIGHTNESS = 45;
 
 export const useTheme = () => {
     const [hue, setHue] = useState(() => {

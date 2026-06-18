@@ -1,4 +1,4 @@
-import { Product, Transaction, User, CashFlow, Category, Customer, Supplier, Purchase, StoreSettings, BankAccount, SyncQueueItem } from "../types";
+import { Product, Transaction, User, CashFlow, Category, Customer, Supplier, Purchase, StoreSettings, BankAccount, SyncQueueItem, HoldBill } from "../types";
 import { ApiService } from "./api";
 
 // Simple Event Bus for Data Changes
@@ -36,6 +36,20 @@ export const StorageService = {
   saveStoreSettings: async (settings: StoreSettings) => {
     await ApiService.saveStoreSettings(settings);
     notifyListeners('settings');
+  },
+
+  // Hold Bills (Local Only)
+  getHoldBills: async (): Promise<HoldBill[]> => {
+    try {
+      const data = localStorage.getItem('pos_hold_bills');
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  },
+  saveHoldBills: async (bills: HoldBill[]) => {
+    localStorage.setItem('pos_hold_bills', JSON.stringify(bills));
+    notifyListeners('hold_bills');
   },
 
   // Banks

@@ -16,10 +16,10 @@ export default {
                 'primary-hover': 'hsl(var(--primary-h) var(--primary-s) var(--primary-l-hover) / <alpha-value>)',
                 'primary-active': 'hsl(var(--primary-h) var(--primary-s) var(--primary-l-active) / <alpha-value>)',
                 secondary: '#334155', // Slate 700
-                accent: 'hsl(var(--primary-h) var(--primary-s) var(--primary-l) / <alpha-value>)', // Matching Dynamic
-                success: '#10b981', // Emerald 500
-                warning: '#f59e0b', // Amber 500
-                danger: '#ef4444', // Red 500
+                accent: '#FFD700', // Kuning Cendrawasih
+                success: '#1B4D3E', // Hijau Rimba
+                warning: '#FFD700', // Kuning Cendrawasih
+                danger: '#9B2226', // Merah Pinang
             },
             keyframes: {
                 fadeIn: {

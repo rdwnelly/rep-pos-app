@@ -39,10 +39,11 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
     const filteredTransactions = useMemo(() => {
         let items = transactions;
 
-        // 1. Cashier Filter
-        if (currentUser && currentUser.role === UserRole.CASHIER) {
-            items = items.filter(item => item.cashierId === currentUser.id);
-        }
+        // Cashier Filter
+        // Removed to allow cashier to see all sold items across shifts
+        // if (currentUser && currentUser.role === UserRole.CASHIER) {
+        //     items = items.filter(item => item.cashierId === currentUser.id);
+        // }
 
         // 2. Date Filter
         if (startDate || endDate) {

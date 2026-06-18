@@ -117,18 +117,27 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 bg-primary text-white flex flex-col shadow-xl transition-all duration-300 ease-in-out md:static md:translate-x-0 
+        className={`fixed inset-y-0 left-0 z-50 bg-primary text-white flex flex-col shadow-xl transition-all duration-300 ease-in-out md:static md:translate-x-0 relative overflow-hidden
         ${mobileMenuOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} 
         ${isSidebarOpen ? 'md:w-64' : 'md:w-24'}
         `}
         style={{ contain: 'layout style paint' }}
       >
-        <div className="p-6 border-b border-white/10 flex items-center justify-between h-[72px]">
-          {(isSidebarOpen || mobileMenuOpen) && (
-            <h1 className="text-2xl font-bold text-white tracking-tighter whitespace-nowrap transition-opacity duration-150">
-              Kasir REP
-            </h1>
-          )}
+        {/* Watermark Background */}
+        <div 
+          className="absolute bottom-0 left-0 right-0 h-96 bg-repeat-x bg-bottom opacity-[0.05] pointer-events-none"
+          style={{ backgroundImage: 'url("/sidebar-watermark.png")', backgroundSize: '150px' }}
+        ></div>
+
+        <div className="p-6 border-b border-white/10 flex items-center justify-between h-[72px] relative z-10">
+          <div className="flex items-center gap-3">
+            <img src="/logokasir.jpg" alt="Logo" className="w-10 h-10 rounded-xl shadow-md border-2 border-white/20" />
+            {(isSidebarOpen || mobileMenuOpen) && (
+              <h1 className="text-2xl font-bold text-white tracking-tighter whitespace-nowrap transition-opacity duration-150">
+                Kasir REP
+              </h1>
+            )}
+          </div>
 
           {/* Desktop Toggle */}
           <button
