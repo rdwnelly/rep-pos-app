@@ -24,19 +24,19 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
     let containerCss = '';
 
     if (type === '80mm') {
-        containerCss = `font-family: 'Courier New', monospace; font-size: 12px; padding: 10px; width: 78mm; color: #000; text-align: left;`;
+        containerCss = `font-family: 'Inter', monospace; font-size: 12px; padding: 10px; width: 78mm; color: #000; text-align: left;`;
         css = `${bodyBase} .print-page { ${containerCss} box-sizing: border-box; }`;
     } else if (isA4) {
-        containerCss = `font-family: Arial, sans-serif; font-size: 10pt; padding: 2px 10px; width: 100%; max-width: 210mm; color: #000; line-height: 1; text-align: left;`;
+        containerCss = `font-family: 'Inter', sans-serif; font-size: 10pt; padding: 2px 10px; width: 100%; max-width: 210mm; color: #000; line-height: 1; text-align: left;`;
         css = `
             ${bodyBase}
             .print-page { ${containerCss} box-sizing: border-box; }
-            .header-title { text-align: center; font-size: 12pt; font-weight: bold; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px; }
+            .header-title { font-family: 'Lora', serif; text-align: center; font-size: 12pt; font-weight: bold; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px; }
             .header-grid { display: flex; justify-content: space-between; margin-bottom: 5px; align-items: flex-start; }
             .store-info { width: 50%; }
             .customer-info { width: 45%; }
             
-            .store-name { font-size: 12pt; font-weight: bold; margin: 0 0 4px 0; }
+            .store-name { font-family: 'Lora', serif; font-size: 12pt; font-weight: bold; margin: 0 0 4px 0; }
             .store-jargon { font-style: italic; color: #000; font-size: 9pt; margin: 0 0 4px 0; }
             .info-text { margin: 0 0 4px 0; font-size: 10pt; }
             
@@ -70,7 +70,7 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
             .date-row { text-align: right; margin: 0; }
         `;
     } else {
-        containerCss = `font-family: 'Courier New', monospace; font-size: 11px; padding: 5px; width: 56mm; color: #000; text-align: left;`;
+        containerCss = `font-family: 'Inter', monospace; font-size: 11px; padding: 5px; width: 56mm; color: #000; text-align: left;`;
         css = `${bodyBase} .print-page { ${containerCss} box-sizing: border-box; }`;
     }
 
@@ -123,6 +123,7 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
         return `
         <html>
             <head>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Faktur Penjualan #${tx.invoiceNumber || tx.id.substring(0, 8)}</title>
                 <style>${css}</style>
             </head>
@@ -233,47 +234,97 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
         </html>
         `;
     } else {
-        // ... (Existing Thermal POS Layout)
         let headerHtml = `
-            <div style="text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 5px;">
-                <h3 style="margin:0; font-size: 14px;">${settings.name}</h3>
-                ${settings.showJargon ? `<p style="margin:2px 0; font-style:italic;">${settings.jargon}</p>` : ''}
-                ${settings.showAddress ? `<p style="margin:2px 0;">${settings.address}</p>` : ''}
-                <p style="margin:2px 0;">${settings.phone}</p>
+            <div style="text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px;">
+                <img src="/logokasir.jpg" alt="Logo" style="width: 60px; height: 60px; border-radius: 8px; margin-bottom: 5px; object-fit: cover;" />
+                <h3 style="font-family: 'Lora', serif; margin: 0; font-size: 14px; text-transform: uppercase;">YAYASAN RUMAH ETNIK PAPUA</h3>
+                <p style="margin: 2px 0; font-size: 10px;">Jl. Baru Aimas - Klamono Km. 21, Malawili, Kec. Aimas, Kab. Sorong, Papua Barat Daya.</p>
+                <p style="margin: 2px 0; font-size: 10px;">WA: 0821-9986-7918</p>
+                <p style="margin: 2px 0; font-size: 10px;">IG: @rumah_etnik_papua | TikTok: Rumah Etnik Papua</p>
             </div>
-            <div style="margin-bottom: 10px; font-size: 90%;">
-                <div>Tgl: ${formatDate(tx.date)}</div>
-                <div>No: ${tx.invoiceNumber || tx.id.substring(0, 8)}</div>
-                <div>Kasir: ${tx.cashierName}</div>
-                <div>Plg: ${tx.customerName}</div>
+            <div style="margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px;">
+                <table style="width: 100%; border: none; font-size: 9px; border-collapse: collapse;" cellspacing="0" cellpadding="0">
+                    <tr><td style="width: 35%; border: none; padding: 1px 0; vertical-align: top;">No. Struk</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.invoiceNumber || tx.id.substring(0, 8)}</td></tr>
+                    <tr><td style="border: none; padding: 1px 0; vertical-align: top;">Tanggal</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${formatDate(tx.date)}</td></tr>
+                    <tr><td style="border: none; padding: 1px 0; vertical-align: top;">Kasir</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.cashierName}</td></tr>
+                    <tr><td style="border: none; padding: 1px 0; vertical-align: top;">Pesanan</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.customerName || '-'}</td></tr>
+                </table>
             </div>
         `;
 
         const bankInfo = settings.showBank && settings.bankAccount ? settings.bankAccount.replace(/\n/g, '<br/>') : '';
 
-        let contentHtml = `
-            <div style="margin-top: 5px; border-top: 1px dashed #000; padding-top: 5px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><strong>TOTAL</strong> <strong>${formatIDR(tx.totalAmount)}</strong></div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">BAYAR (${tx.paymentMethod}) <span>${formatIDR(tx.amountPaid)}</span></div>
-                ${tx.change > 0 ? `<div style="display: flex; justify-content: space-between; margin-bottom: 2px;">KEMBALIAN <span>${formatIDR(tx.change)}</span></div>` : ''}
-                ${tx.change < 0 ? `<div style="display: flex; justify-content: space-between; margin-bottom: 2px;">SISA UTANG <span>${formatIDR(Math.abs(tx.change))}</span></div>` : ''}
+        // Items HTML specific to thermal layout
+        let thermalItemsHtml = `
+            <div style="margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px;">
+                ${tx.items.map(item => `
+                    <div style="display: flex; flex-direction: column; margin-bottom: 5px; font-size: 10px;">
+                        <div style="font-weight: bold;">${item.name}</div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>${item.qty} ${item.unit || 'x'} ${formatIDR(item.finalPrice)}</span>
+                            <span>${formatIDR(item.finalPrice * item.qty)}</span>
+                        </div>
+                    </div>
+                `).join('')}
             </div>
-            <div class="footer">
-                ${settings.showBank && bankInfo ? `<p style="margin:5px 0;">${bankInfo}</p>` : ''}
-                <p style="margin:5px 0;">${settings.footerMessage}</p>
+        `;
+
+        let contentHtml = `
+            <div style="margin-bottom: 10px; font-size: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                    <span>Subtotal</span>
+                    <span>${formatIDR(subTotal)}</span>
+                </div>
+                ${discountAmount > 0 ? `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                    <span>Diskon</span>
+                    <span>-${formatIDR(discountAmount)}</span>
+                </div>` : ''}
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 12px; font-weight: bold; margin-top: 5px;">
+                    <span>GRAND TOTAL</span>
+                    <span>${formatIDR(tx.totalAmount)}</span>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 10px; font-size: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                    <span>Metode Bayar</span>
+                    <span>${tx.paymentMethod}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                    <span>Tunai / Diterima</span>
+                    <span>${formatIDR(tx.amountPaid)}</span>
+                </div>
+                ${tx.change >= 0 ? `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                    <span>Kembalian</span>
+                    <span>${formatIDR(tx.change)}</span>
+                </div>` : ''}
+                ${tx.change < 0 ? `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                    <span>Sisa Utang</span>
+                    <span>${formatIDR(Math.abs(tx.change))}</span>
+                </div>` : ''}
+            </div>
+            
+            <div class="footer" style="text-align: center; font-size: 10px; margin-top: 15px;">
+                <p style="margin: 2px 0; font-weight: bold;">Terima kasih atas kunjungan Anda.</p>
+                <p style="margin: 2px 0; font-style: italic;">"Papua Punya Cerita, Kami Sajikan dalam Rasa"</p>
+                ${settings.showBank && bankInfo ? `<p style="margin:10px 0 0 0; text-align: left;">Info Transfer:<br/>${bankInfo}</p>` : ''}
             </div>
         `;
 
         return `
         <html>
             <head>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Nota #${tx.id.substring(0, 8)}</title>
                 <style>${css}</style>
             </head>
             <body>
                 <div class="print-page">
                     ${headerHtml}
-                    ${itemsHtml}
+                    ${thermalItemsHtml}
                     ${contentHtml}
                 </div>
                 <script>window.print(); setTimeout(function(){ window.close(); }, 1000);</script>
@@ -297,19 +348,19 @@ export const generatePrintGoodsNote = (tx: Transaction, settings: StoreSettings,
     let containerCss = '';
 
     if (type === '80mm') {
-        containerCss = `font-family: 'Courier New', monospace; font-size: 12px; padding: 10px; width: 78mm; color: #000; text-align: left;`;
+        containerCss = `font-family: 'Inter', monospace; font-size: 12px; padding: 10px; width: 78mm; color: #000; text-align: left;`;
         css = `${bodyBase} .print-page { ${containerCss} box-sizing: border-box; }`;
     } else if (isA4) {
-        containerCss = `font-family: Arial, sans-serif; font-size: 10pt; padding: 2px 10px; width: 100%; max-width: 210mm; color: #000; line-height: 1; text-align: left;`;
+        containerCss = `font-family: 'Inter', sans-serif; font-size: 10pt; padding: 2px 10px; width: 100%; max-width: 210mm; color: #000; line-height: 1; text-align: left;`;
         css = `
             ${bodyBase}
             .print-page { ${containerCss} box-sizing: border-box; }
-            .header-title { text-align: center; font-size: 12pt; font-weight: bold; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px; }
+            .header-title { font-family: 'Lora', serif; text-align: center; font-size: 12pt; font-weight: bold; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px; }
             .header-grid { display: flex; justify-content: space-between; margin-bottom: 5px; align-items: flex-start; }
             .store-info { width: 50%; }
             .customer-info { width: 45%; }
             
-            .store-name { font-size: 12pt; font-weight: bold; margin: 0 0 4px 0; }
+            .store-name { font-family: 'Lora', serif; font-size: 12pt; font-weight: bold; margin: 0 0 4px 0; }
             .store-jargon { font-style: italic; color: #000; font-size: 9pt; margin: 0 0 4px 0; }
             .info-text { margin: 0 0 4px 0; font-size: 10pt; }
             
@@ -341,7 +392,7 @@ export const generatePrintGoodsNote = (tx: Transaction, settings: StoreSettings,
             .date-row { text-align: right; margin: 0; }
         `;
     } else {
-        containerCss = `font-family: 'Courier New', monospace; font-size: 11px; padding: 5px; width: 56mm; color: #000; text-align: left;`;
+        containerCss = `font-family: 'Inter', monospace; font-size: 11px; padding: 5px; width: 56mm; color: #000; text-align: left;`;
         css = `${bodyBase} .print-page { ${containerCss} box-sizing: border-box; }`;
     }
 
@@ -388,6 +439,7 @@ export const generatePrintGoodsNote = (tx: Transaction, settings: StoreSettings,
         return `
         <html>
             <head>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Nota Barang #${tx.invoiceNumber || tx.id.substring(0, 8)}</title>
                 <style>${css}</style>
             </head>
@@ -476,7 +528,7 @@ export const generatePrintGoodsNote = (tx: Transaction, settings: StoreSettings,
     // Fallback POS
     let headerHtml = `
             <div style="text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 5px;">
-                <h3 style="margin:0; font-size: 14px;">${settings.name}</h3>
+                <h3 style="font-family: \'Lora\', serif; margin:0; font-size: 14px;">${settings.name}</h3>
                 <p style="margin-top: 5px; font-weight: bold;">NOTA BARANG</p>
             </div>
             <div style="margin-bottom: 10px; font-size: 90%;">
@@ -504,6 +556,7 @@ export const generatePrintGoodsNote = (tx: Transaction, settings: StoreSettings,
     return `
         <html>
             <head>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Nota Barang #${tx.id.substring(0, 8)}</title>
                 <style>${css}</style>
             </head>
@@ -525,17 +578,17 @@ export const generatePrintSuratJalan = (tx: Transaction, settings: StoreSettings
     const subTotal = tx.totalAmount + discountAmount;
 
     const bodyBase = `body { width: 100%; margin: 0; padding: 0; background-color: #fff; display: flex; justify-content: center; }`;
-    const containerCss = `font-family: Arial, sans-serif; font-size: 10pt; padding: 2px 10px; width: 100%; max-width: 210mm; color: #000; line-height: 1; text-align: left;`;
+    const containerCss = `font-family: 'Inter', sans-serif; font-size: 10pt; padding: 2px 10px; width: 100%; max-width: 210mm; color: #000; line-height: 1; text-align: left;`;
 
     const css = `
         ${bodyBase}
         .print-page { ${containerCss} box-sizing: border-box; }
-        .header-title { text-align: center; font-size: 12pt; font-weight: bold; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px; }
+        .header-title { font-family: 'Lora', serif; text-align: center; font-size: 12pt; font-weight: bold; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px; }
         .header-grid { display: flex; justify-content: space-between; margin-bottom: 5px; align-items: flex-start; }
         .store-info { width: 50%; }
         .customer-info { width: 45%; }
         
-        .store-name { font-size: 12pt; font-weight: bold; margin: 0 0 4px 0; }
+        .store-name { font-family: 'Lora', serif; font-size: 12pt; font-weight: bold; margin: 0 0 4px 0; }
         .store-jargon { font-style: italic; color: #000; font-size: 9pt; margin: 0 0 4px 0; }
         .info-text { margin: 0 0 4px 0; font-size: 10pt; }
         
@@ -579,6 +632,7 @@ export const generatePrintSuratJalan = (tx: Transaction, settings: StoreSettings
     return `
         <html>
             <head>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Surat Jalan #${tx.invoiceNumber || tx.id.substring(0, 8)}</title>
                 <style>${css}</style>
             </head>
@@ -669,7 +723,7 @@ export const generatePrintSuratJalan = (tx: Transaction, settings: StoreSettings
 
 export const generatePrintTransactionDetail = (tx: Transaction, settings: StoreSettings, formatIDR: (val: number) => string, formatDate: (date: string) => string) => {
     const css = `
-        body { font-family: Arial, sans-serif; font-size: 12px; padding: 20px; max-width: 210mm; margin: 0 auto; color: #000; }
+        body { font-family: 'Inter', sans-serif; font-size: 12px; padding: 20px; max-width: 210mm; margin: 0 auto; color: #000; }
         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
         h2 { margin: 0 0 3px 0; }
         .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
@@ -718,12 +772,13 @@ export const generatePrintTransactionDetail = (tx: Transaction, settings: StoreS
     return `
         <html>
             <head>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Detail Transaksi #${tx.id}</title>
                 <style>${css}</style>
             </head>
             <body>
                 <div class="header">
-                    <h2>${settings.name}</h2>
+                    <h2 style="font-family: \'Lora\', serif;">${settings.name}</h2>
                     <p>Laporan Detail Transaksi</p>
                 </div>
 
@@ -803,7 +858,7 @@ export const generatePrintTransactionDetail = (tx: Transaction, settings: StoreS
 
 export const generatePrintPurchaseDetail = (purchase: Purchase, settings: StoreSettings, formatIDR: (val: number) => string, formatDate: (date: string) => string) => {
     const css = `
-        body { font-family: Arial, sans-serif; font-size: 12px; padding: 20px; max-width: 210mm; margin: 0 auto; color: #000; }
+        body { font-family: 'Inter', sans-serif; font-size: 12px; padding: 20px; max-width: 210mm; margin: 0 auto; color: #000; }
         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
         h2 { margin: 0 0 3px 0; }
         .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
@@ -852,12 +907,13 @@ export const generatePrintPurchaseDetail = (purchase: Purchase, settings: StoreS
     return `
         <html>
             <head>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Detail Pembelian #${purchase.id}</title>
                 <style>${css}</style>
             </head>
             <body>
                 <div class="header">
-                    <h2>${settings.name}</h2>
+                    <h2 style="font-family: \'Lora\', serif;">${settings.name}</h2>
                     <p>Laporan Detail Pembelian Stok</p>
                 </div>
 
@@ -946,10 +1002,10 @@ export const generatePrintPurchaseNote = (purchase: Purchase, settings: StoreSet
     // CSS based on printer type
     let css = '';
     if (type === '80mm') {
-        css = `body { font-family: 'Courier New', monospace; font-size: 12px; padding: 10px; width: 78mm; margin: 0 auto; color: #000; }`;
+        css = `body { font-family: 'Inter', monospace; font-size: 12px; padding: 10px; width: 78mm; margin: 0 auto; color: #000; }`;
     } else if (isA4) {
         css = `
-            body { font-family: Arial, sans-serif; font-size: 11px; padding: 20px; max-width: 210mm; margin: 0 auto; color: #000; }
+            body { font-family: 'Inter', sans-serif; font-size: 11px; padding: 20px; max-width: 210mm; margin: 0 auto; color: #000; }
             .header-container { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 2px solid #333; padding-bottom: 5px; }
             .store-info { width: 50%; }
             .supplier-info { width: 40%; text-align: right; }
@@ -967,7 +1023,7 @@ export const generatePrintPurchaseNote = (purchase: Purchase, settings: StoreSet
             .footer { margin-top: 15px; text-align: center; font-size: 10px; border-top: 1px dashed #ccc; padding-top: 5px; }
         `;
     } else {
-        css = `body { font-family: 'Courier New', monospace; font-size: 11px; padding: 5px; width: 56mm; margin: 0 auto; color: #000; }`;
+        css = `body { font-family: 'Inter', monospace; font-size: 11px; padding: 5px; width: 56mm; margin: 0 auto; color: #000; }`;
     }
 
     // Items HTML
@@ -1027,7 +1083,7 @@ export const generatePrintPurchaseNote = (purchase: Purchase, settings: StoreSet
     } else {
         headerHtml = `
             <div style="text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 5px;">
-                <h3 style="margin:0; font-size: 14px;">${settings.name}</h3>
+                <h3 style="font-family: \'Lora\', serif; margin:0; font-size: 14px;">${settings.name}</h3>
                 <p style="margin-top: 5px; font-weight: bold;">NOTA PEMBELIAN</p>
             </div>
             <div style="margin-bottom: 10px; font-size: 90%;">
@@ -1083,6 +1139,7 @@ export const generatePrintPurchaseNote = (purchase: Purchase, settings: StoreSet
     return `
         <html>
             <head>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Nota Pembelian #${purchase.id.substring(0, 8)}</title>
                 <style>${css}</style>
             </head>
@@ -1214,6 +1271,7 @@ export const generatePrintDashboard = (
     return `
     <html>
         <head>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
             <title>Laporan Dashboard - ${settings.name}</title>
             <style>${css}</style>
         </head>

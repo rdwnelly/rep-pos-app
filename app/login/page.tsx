@@ -45,10 +45,11 @@ export default function Login() {
     }
   };
 
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
       </div>
     );
   }
@@ -59,12 +60,18 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md border-t-4 border-amber-600">
+    <div 
+      className="min-h-screen flex items-center justify-center bg-gray-900 bg-cover bg-center relative"
+      style={{ backgroundImage: 'url("/bg-login.png")' }}
+    >
+      {/* Dark filter overlay */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"></div>
+
+      <div className="bg-white/95 backdrop-blur-md p-8 rounded-xl shadow-2xl w-full max-w-md border-t-4 border-accent relative z-10">
         <div className="text-center mb-8">
-          <img src="/icon-192x192.png" alt="Logo Kasir REP" className="mx-auto h-20 w-20 mb-4 rounded-full shadow-sm" />
+          <img src="/logokasir.jpg" alt="Logo Kasir REP" className="mx-auto h-24 w-24 mb-4 rounded-xl shadow-lg border-2 border-accent" />
           <h1 className="text-2xl font-bold text-gray-800">Selamat Datang di Kasir REP</h1>
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-sm text-gray-600 mt-2">
             Yaswar Cafe & Toko Souvenir
             <br />
             Yayasan Rumah Etnik Papua
@@ -86,7 +93,7 @@ export default function Login() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 block w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-md focus:ring-amber-500 focus:border-amber-500 transition-colors"
+              className="mt-1 block w-full px-4 py-2 bg-white/80 border border-gray-300 rounded-md focus:ring-accent focus:border-accent transition-colors text-slate-800 placeholder-gray-400"
               placeholder="kasir@rumahetnikpapua.com"
               required
             />
@@ -100,7 +107,7 @@ export default function Login() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-md focus:ring-amber-500 focus:border-amber-500 transition-colors"
+              className="mt-1 block w-full px-4 py-2 bg-white/80 border border-gray-300 rounded-md focus:ring-accent focus:border-accent transition-colors text-slate-800 placeholder-gray-400"
               placeholder="••••••••"
               required
             />
@@ -109,14 +116,16 @@ export default function Login() {
           <button
             type="submit"
             disabled={isLoading}
-            className={`w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+            className={`w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-md text-sm font-bold ${
               isLoading
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-amber-600 hover:bg-amber-700"
+                ? "bg-gray-400 text-white cursor-not-allowed"
+                : "bg-accent hover:bg-accent/90 text-slate-900"
             } transition-colors`}
           >
             {isLoading ? "Memproses..." : "Masuk ke Mesin Kasir"}
           </button>
+
+
         </form>
       </div>
     </div>

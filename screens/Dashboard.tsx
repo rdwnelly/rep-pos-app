@@ -313,7 +313,7 @@ export const Dashboard: React.FC = () => {
     });
   }, [filteredTxs]);
 
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1'];
+  const COLORS = ['#FFD700', '#1B4D3E', '#9B2226', '#E67E22', '#5A3B22', '#2C3E50'];
 
   const handleGenerateInsight = async () => {
     setLoadingAI(true);
@@ -676,8 +676,8 @@ export const Dashboard: React.FC = () => {
             <AreaChart data={revenueTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#FFD700" stopOpacity={0.6} />
+                  <stop offset="95%" stopColor="#FFD700" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
@@ -690,7 +690,7 @@ export const Dashboard: React.FC = () => {
               <Area
                 type="monotone"
                 dataKey="total"
-                stroke="#3b82f6"
+                stroke="#5A3B22"
                 strokeWidth={3}
                 fillOpacity={1}
                 fill="url(#colorTotal)"
@@ -709,8 +709,8 @@ export const Dashboard: React.FC = () => {
             <AreaChart data={itemsSoldTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorItems" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#1B4D3E" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#1B4D3E" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
@@ -723,7 +723,7 @@ export const Dashboard: React.FC = () => {
               <Area
                 type="monotone"
                 dataKey="total"
-                stroke="#10b981"
+                stroke="#1B4D3E"
                 strokeWidth={3}
                 fillOpacity={1}
                 fill="url(#colorItems)"
@@ -785,7 +785,7 @@ export const Dashboard: React.FC = () => {
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                 />
-                <Bar dataKey="qty" fill="#ee712e" radius={[0, 4, 4, 0]} barSize={30} name="Terjual" isAnimationActive={true} />
+                <Bar dataKey="qty" fill="#FFD700" radius={[0, 4, 4, 0]} barSize={30} name="Terjual" isAnimationActive={true} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -804,7 +804,7 @@ export const Dashboard: React.FC = () => {
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                 />
-                <Bar dataKey="qty" fill="#10b981" radius={[0, 4, 4, 0]} barSize={30} name="Terjual" isAnimationActive={true} />
+                <Bar dataKey="qty" fill="#1B4D3E" radius={[0, 4, 4, 0]} barSize={30} name="Terjual" isAnimationActive={true} />
               </BarChart>
             </ResponsiveContainer>
           </div>

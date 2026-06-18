@@ -10,6 +10,7 @@ export interface User {
   id: string;
   name: string;
   username: string;
+  email: string;
   password: string;
   role: UserRole;
   image?: string; // Base64 string
@@ -233,4 +234,14 @@ export interface StockAdjustment {
   note?: string;
   userId?: string;
   userName?: string;
+}
+
+export interface HoldBill {
+  id: string;
+  tableName: string;
+  cart: CartItem[];
+  customerId: string;
+  customerName: string;
+  defaultPriceType: PriceType;
+  timestamp: number;
 }

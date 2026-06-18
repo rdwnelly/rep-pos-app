@@ -13,9 +13,9 @@ body {
 
 /* Global Scrollbar */
 :root {
-    --primary-h: 348;
-    --primary-s: 90%;
-    --primary-l: 56%;
+    --primary-h: 27;
+    --primary-s: 42%;
+    --primary-l: 24%;
 }
 
 ::-webkit-scrollbar {

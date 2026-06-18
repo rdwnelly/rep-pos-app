@@ -6,6 +6,9 @@ import { User, UserRole, StoreSettings, BankAccount, PrinterType } from '../type
 import { Trash2, Plus, User as UserIcon, Shield, ShieldAlert, Edit2, Save, X, Store, Upload, CreditCard, Printer, AlertTriangle, Download, FileSpreadsheet, Settings as SettingsIcon, History as HistoryIcon, Palette } from 'lucide-react';
 import { exportToCSV, compressImage, exportToExcel } from '../utils';
 import { useTheme } from '../hooks/useTheme';
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { firebaseConfig } from '../src/lib/firebase';
 
 // Default store settings - defined outside component to avoid recreation
 const DEFAULT_STORE_SETTINGS: StoreSettings = {
@@ -31,7 +34,7 @@ export const Settings: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [userForm, setUserForm] = useState<Partial<User>>({
-        name: '', username: '', password: '', role: UserRole.CASHIER, image: ''
+        name: '', username: '', email: '', password: '', role: UserRole.CASHIER, image: ''
     });
 
     // Store State
@@ -170,18 +173,18 @@ export const Settings: React.FC = () => {
     const handleOpenModal = (user?: User) => {
         if (user) {
             setEditingId(user.id);
-            setUserForm({ name: user.name, username: user.username, password: '', role: user.role, image: user.image });
+            setUserForm({ name: user.name, username: user.username, email: user.email || '', password: '', role: user.role, image: user.image });
         } else {
             setEditingId(null);
-            setUserForm({ name: '', username: '', password: '', role: UserRole.CASHIER, image: '' });
+            setUserForm({ name: '', username: '', email: '', password: '', role: UserRole.CASHIER, image: '' });
         }
         setIsModalOpen(true);
     };
 
     const handleSaveUser = async () => {
         // Validation: Name and Username are always required
-        if (!userForm.username || !userForm.name) {
-            alert('Nama dan Username wajib diisi');
+        if (!userForm.username || !userForm.name || !userForm.email) {
+            alert('Nama, Username, dan Email wajib diisi');
             return;
         }
 
@@ -191,24 +194,36 @@ export const Settings: React.FC = () => {
             return;
         }
 
-        const payload = {
-            ...userForm,
-            id: editingId || undefined
-        } as User;
-
-        // If editing and password is empty, remove it from payload to keep existing password
-        if (editingId && !userForm.password) {
-            delete (payload as any).password;
-        }
-
         try {
+            let uid = editingId;
+
+            // If creating a new user, register them in Firebase Auth first
+            if (!editingId) {
+                // Initialize secondary app to avoid logging out the current superadmin
+                const secondaryApp = getApps().find(app => app.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
+                const secondaryAuth = getAuth(secondaryApp);
+                const userCredential = await createUserWithEmailAndPassword(secondaryAuth, userForm.email!, userForm.password!);
+                uid = userCredential.user.uid;
+                await secondaryAuth.signOut(); // Clean up
+            }
+
+            const payload = {
+                ...userForm,
+                id: uid
+            } as User;
+
+            // If editing and password is empty, remove it from payload to keep existing password
+            if (editingId && !userForm.password) {
+                delete (payload as any).password;
+            }
+
             await StorageService.saveUser(payload);
             setIsModalOpen(false);
             setEditingId(null);
             alert('User berhasil disimpan!');
         } catch (error: any) {
             console.error(error);
-            let errorMessage = error.message || 'Pastikan username belum digunakan.';
+            let errorMessage = error.message || 'Pastikan email belum digunakan.';
             if (errorMessage.includes('Validation failed')) {
                 errorMessage += ' (Password minimal 6 karakter)';
             }
@@ -715,7 +730,7 @@ export const Settings: React.FC = () => {
                                             onClick={resetTheme}
                                             className="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors"
                                         >
-                                            Reset ke Default (Nuansa Cemilan)
+                                            Reset ke Default (Nuansa Papua)
                                         </button>
                                     </div>
                                 </div>
@@ -1016,7 +1031,11 @@ export const Settings: React.FC = () => {
                                     <input id="userName" name="userName" type="text" autoComplete="name" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={userForm.name} onChange={e => setUserForm({ ...userForm, name: e.target.value })} />
                                 </div>
                                 <div>
-                                    <label htmlFor="userUsername" className="block text-sm font-medium text-slate-700 mb-1">Username</label>
+                                    <label htmlFor="userEmail" className="block text-sm font-medium text-slate-700 mb-1">Email (Untuk Login)</label>
+                                    <input id="userEmail" name="userEmail" type="email" autoComplete="email" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={userForm.email} onChange={e => setUserForm({ ...userForm, email: e.target.value })} disabled={!!editingId} title={editingId ? "Email tidak dapat diubah setelah dibuat" : ""} />
+                                </div>
+                                <div>
+                                    <label htmlFor="userUsername" className="block text-sm font-medium text-slate-700 mb-1">Username (Opsional/Internal)</label>
                                     <input id="userUsername" name="userUsername" type="text" autoComplete="username" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={userForm.username} onChange={e => setUserForm({ ...userForm, username: e.target.value })} />
                                 </div>
                                 <div>

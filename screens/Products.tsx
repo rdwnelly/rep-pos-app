@@ -4,7 +4,8 @@ import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Product, Category, UserRole } from '../types';
 import { formatIDR, exportToCSV, generateSKU, compressImage, exportToExcel } from '../utils';
-import { Edit2, Trash2, Plus, X, Download, Upload, Tag, Barcode, Image as ImageIcon, Search, Printer, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, FileSpreadsheet, Package } from 'lucide-react';
+import { Edit2, Trash2, Plus, X, Download, Upload, Tag, Barcode, Image as ImageIcon, Search, Printer, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, FileSpreadsheet, Package, Sparkles } from 'lucide-react';
+import { HPPCalculatorModal } from '../components/HPPCalculatorModal';
 
 export const Products: React.FC = () => {
   const products = useData(() => StorageService.getProducts(), [], 'products') || [];
@@ -17,6 +18,7 @@ export const Products: React.FC = () => {
   // Modals
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isHPPModalOpen, setIsHPPModalOpen] = useState(false);
 
   // Sort State
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -113,6 +115,22 @@ export const Products: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     setFormData({ ...formData, image: '' });
+  };
+
+  const handleApplyHPP = (hpp: number, selectedPrice: number, allSuggestions: any[]) => {
+    const eko = allSuggestions.find(s => s.tier === 'Ekonomis')?.price || selectedPrice;
+    const std = allSuggestions.find(s => s.tier === 'Standar')?.price || selectedPrice;
+    const prem = allSuggestions.find(s => s.tier === 'Premium')?.price || 0;
+
+    setFormData(prev => ({
+      ...prev,
+      hpp: hpp,
+      priceRetail: std,
+      priceGeneral: std,
+      priceWholesale: eko,
+      pricePromo: prem > 0 ? prem : prev.pricePromo
+    }));
+    setIsHPPModalOpen(false);
   };
 
   // Helper for numeric input
@@ -490,8 +508,8 @@ export const Products: React.FC = () => {
             <Tag size={16} /> Kategori
           </button>
 
-          {/* Hide Import CSV for Cashier, Warehouse, and Admin */}
-          {['CASHIER', 'GUDANG', 'ADMIN'].indexOf((JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role) === -1 && (
+          {/* Hide Import CSV for Cashier and Warehouse */}
+          {['CASHIER', 'GUDANG'].indexOf((JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role) === -1 && (
             <label className="bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 cursor-pointer text-sm font-medium">
               <Upload size={16} /> Import CSV
               <input id="csvProductImport" name="csvProductImport" type="file" accept=".csv" className="hidden" onChange={handleImport} />
@@ -596,8 +614,9 @@ export const Products: React.FC = () => {
               <th className="p-4 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('stock')}>
                 Stok <SortIcon column="stock" />
               </th>
-              {/* Hide HPP for Cashier, Admin, Warehouse */}
-              {['CASHIER', 'ADMIN', 'GUDANG'].indexOf((JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role) === -1 && (
+              {/* Hide HPP for Cashier, Warehouse */}
+              {/* Hide HPP removed temporarily so all roles can see it */}
+{true && (
                 <th className="p-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('hpp')}>
                   HPP (Modal) <SortIcon column="hpp" />
                 </th>
@@ -633,8 +652,9 @@ export const Products: React.FC = () => {
                     {p.stock}
                   </span>
                 </td>
-                {/* Hide HPP for Cashier, Admin, Warehouse, Owner */}
-                {['CASHIER', 'ADMIN', 'GUDANG', 'OWNER'].indexOf((JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role) === -1 && (
+                {/* Hide HPP for Cashier, Warehouse */}
+                {/* Hide HPP removed temporarily so all roles can see it */}
+{true && (
                   <td className="p-4 text-slate-500 font-medium">{formatIDR(p.hpp || 0)}</td>
                 )}
                 <td className="p-4 text-center text-slate-500 text-xs">{p.unit || 'Pcs'}</td>
@@ -750,10 +770,16 @@ export const Products: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {/* Hide HPP for Cashier */}
-                  {/* Hide HPP for Cashier and Admin and Warehouse */}
-                  {['CASHIER', 'ADMIN', 'GUDANG'].indexOf((JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role) === -1 && (
+                  {/* Hide HPP for Cashier and Warehouse */}
+                  {/* Hide HPP removed temporarily so all roles can see it */}
+{true && (
                     <div className="col-span-2 md:col-span-4 mb-2">
-                      <label htmlFor="hpp" className="block text-xs font-bold text-red-500 mb-1">HPP (Harga Modal)</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label htmlFor="hpp" className="block text-xs font-bold text-red-500">HPP (Harga Modal)</label>
+                        <button onClick={(e) => { e.preventDefault(); setIsHPPModalOpen(true); }} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md font-bold hover:bg-indigo-200 flex items-center gap-1 transition-colors">
+                          <Sparkles size={12} /> Kalkulator AI
+                        </button>
+                      </div>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">Rp</span>
                         <input id="hpp" name="hpp" type="text" className="w-full border border-red-200 bg-red-50/50 p-2 pl-8 rounded-lg focus:ring-2 focus:ring-red-500 outline-none" value={formData.hpp} onChange={e => handleNumericInput('hpp', e.target.value)} />
@@ -798,23 +824,12 @@ export const Products: React.FC = () => {
             </div>
             <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2">
               <label htmlFor="newCategoryName" className="sr-only">Nama Kategori Baru</label>
-              <input
-                id="newCategoryName"
-                name="newCategoryName"
-                type="text"
-                className="flex-1 border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
-                placeholder="Nama Kategori Baru"
-                value={categoryFormName}
-                onChange={e => setCategoryFormName(e.target.value)}
-              />
-              <button onClick={handleSaveCategory} className="bg-primary text-white px-4 rounded-lg text-sm font-bold">
-                {editingId ? 'Update' : 'Tambah'}
-              </button>
+              <input id="newCategoryName" name="newCategoryName" type="text" className="flex-1 border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={categoryFormName} onChange={e => setCategoryFormName(e.target.value)} placeholder="Nama kategori baru..." onKeyDown={e => e.key === 'Enter' && handleSaveCategory()} />
+              <button onClick={handleSaveCategory} className="px-4 bg-primary text-white rounded-lg hover:bg-primary-hover font-bold shadow-md shadow-primary/20 transition-all"><Plus size={20} /></button>
             </div>
-            <div className="max-h-[300px] overflow-y-auto p-2">
-              {categories.length === 0 && <p className="text-center text-slate-400 py-4 text-sm">Belum ada kategori.</p>}
+            <div className="max-h-64 overflow-y-auto p-4 space-y-2">
               {categories.map(c => (
-                <div key={c.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg group">
+                <div key={c.id} className="flex justify-between items-center border border-slate-100 p-3 rounded-lg bg-white shadow-sm">
                   <span className="font-medium text-slate-700">{c.name}</span>
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100">
                     <button onClick={() => { setCategoryFormName(c.name); setEditingId(c.id); }} className="text-primary hover:bg-primary/10 p-1 rounded"><Edit2 size={14} /></button>
@@ -827,6 +842,15 @@ export const Products: React.FC = () => {
         </div>,
         document.body
       )}
+
+      {/* HPP Calculator Modal */}
+      <HPPCalculatorModal 
+        isOpen={isHPPModalOpen}
+        onClose={() => setIsHPPModalOpen(false)}
+        productName={formData.name || ''}
+        categoryName={categories.find(c => c.id === formData.categoryId)?.name || ''}
+        onApply={handleApplyHPP}
+      />
     </div>
   );
 };
