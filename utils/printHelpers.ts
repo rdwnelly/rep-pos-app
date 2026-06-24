@@ -123,7 +123,6 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
         return `
         <html>
             <head>
-                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Faktur Penjualan #${tx.invoiceNumber || tx.id.substring(0, 8)}</title>
                 <style>${css}</style>
             </head>
@@ -229,7 +228,7 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                     </div>
                 </div>
                 
-                <script>window.print(); setTimeout(function(){ window.close(); }, 1000);</script>
+                <script>window.addEventListener('afterprint', function() { window.close(); }); window.print();</script>
             </body>
         </html>
         `;
@@ -317,7 +316,6 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
         return `
         <html>
             <head>
-                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Nota #${tx.id.substring(0, 8)}</title>
                 <style>${css}</style>
             </head>
@@ -327,7 +325,7 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                     ${thermalItemsHtml}
                     ${contentHtml}
                 </div>
-                <script>window.print(); setTimeout(function(){ window.close(); }, 1000);</script>
+                <script>window.addEventListener('afterprint', function() { window.close(); }); window.print();</script>
             </body>
         </html>
         `;
@@ -439,7 +437,6 @@ export const generatePrintGoodsNote = (tx: Transaction, settings: StoreSettings,
         return `
         <html>
             <head>
-                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Nota Barang #${tx.invoiceNumber || tx.id.substring(0, 8)}</title>
                 <style>${css}</style>
             </head>
@@ -519,7 +516,7 @@ export const generatePrintGoodsNote = (tx: Transaction, settings: StoreSettings,
 
                 </div>
 
-                <script>window.print(); setTimeout(function(){ window.close(); }, 1000);</script>
+                <script>window.addEventListener('afterprint', function() { window.close(); }); window.print();</script>
             </body>
         </html>
         `;
@@ -556,7 +553,6 @@ export const generatePrintGoodsNote = (tx: Transaction, settings: StoreSettings,
     return `
         <html>
             <head>
-                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Nota Barang #${tx.id.substring(0, 8)}</title>
                 <style>${css}</style>
             </head>
@@ -566,7 +562,7 @@ export const generatePrintGoodsNote = (tx: Transaction, settings: StoreSettings,
                     ${itemsHtml}
                     ${contentHtml}
                 </div>
-                <script>window.print(); setTimeout(function(){ window.close(); }, 1000);</script>
+                <script>window.addEventListener('afterprint', function() { window.close(); }); window.print();</script>
             </body>
         </html>
     `;
@@ -632,7 +628,6 @@ export const generatePrintSuratJalan = (tx: Transaction, settings: StoreSettings
     return `
         <html>
             <head>
-                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Surat Jalan #${tx.invoiceNumber || tx.id.substring(0, 8)}</title>
                 <style>${css}</style>
             </head>
@@ -715,7 +710,7 @@ export const generatePrintSuratJalan = (tx: Transaction, settings: StoreSettings
                         </div>
                     </div>
                 </div>
-                <script>window.print();</script>
+                <script>window.addEventListener('afterprint', function() { window.close(); }); window.print();</script>
             </body>
         </html>
     `;
@@ -772,7 +767,6 @@ export const generatePrintTransactionDetail = (tx: Transaction, settings: StoreS
     return `
         <html>
             <head>
-                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Detail Transaksi #${tx.id}</title>
                 <style>${css}</style>
             </head>
@@ -850,7 +844,7 @@ export const generatePrintTransactionDetail = (tx: Transaction, settings: StoreS
                 <div class="footer">
                     <p>Dicetak pada: ${new Date().toLocaleString('id-ID')}</p>
                 </div>
-                <script>window.print();</script>
+                <script>window.addEventListener('afterprint', function() { window.close(); }); window.print();</script>
             </body>
         </html>
     `;
@@ -907,7 +901,6 @@ export const generatePrintPurchaseDetail = (purchase: Purchase, settings: StoreS
     return `
         <html>
             <head>
-                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Detail Pembelian #${purchase.id}</title>
                 <style>${css}</style>
             </head>
@@ -989,7 +982,7 @@ export const generatePrintPurchaseDetail = (purchase: Purchase, settings: StoreS
                 <div class="footer">
                     <p>Dicetak pada: ${new Date().toLocaleString('id-ID')}</p>
                 </div>
-                <script>window.print();</script>
+                <script>window.onafterprint = function() { window.close(); }; window.print();</script>
             </body>
         </html>
     `;
@@ -1139,7 +1132,6 @@ export const generatePrintPurchaseNote = (purchase: Purchase, settings: StoreSet
     return `
         <html>
             <head>
-                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
                 <title>Nota Pembelian #${purchase.id.substring(0, 8)}</title>
                 <style>${css}</style>
             </head>
@@ -1147,7 +1139,7 @@ export const generatePrintPurchaseNote = (purchase: Purchase, settings: StoreSet
                 ${headerHtml}
                 ${itemsHtml}
                 ${contentHtml}
-                <script>window.print(); setTimeout(function(){ window.close(); }, 1000);</script>
+                <script>window.onafterprint = function() { window.close(); }; window.print();</script>
             </body>
         </html>
     `;
@@ -1271,7 +1263,6 @@ export const generatePrintDashboard = (
     return `
     <html>
         <head>
-                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
             <title>Laporan Dashboard - ${settings.name}</title>
             <style>${css}</style>
         </head>
