@@ -829,9 +829,9 @@ export const Products: React.FC = () => {
             </div>
             <div className="max-h-64 overflow-y-auto p-4 space-y-2">
               {categories.map(c => (
-                <div key={c.id} className="flex justify-between items-center border border-slate-100 p-3 rounded-lg bg-white shadow-sm">
+                <div key={c.id} className="flex justify-between items-center border border-slate-100 p-3 rounded-lg bg-white shadow-sm group">
                   <span className="font-medium text-slate-700">{c.name}</span>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100">
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => { setCategoryFormName(c.name); setEditingId(c.id); }} className="text-primary hover:bg-primary/10 p-1 rounded"><Edit2 size={14} /></button>
                     <button onClick={() => handleDeleteCategory(c.id)} className="text-red-600 hover:bg-red-100 p-1 rounded"><Trash2 size={14} /></button>
                   </div>

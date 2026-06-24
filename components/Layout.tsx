@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { LayoutDashboard, ShoppingCart, Package, Receipt, Wallet, Settings, LogOut, Users, Menu, ChevronLeft, Barcode, ShoppingBag, UserCheck, Truck, ArrowRightLeft, Undo2, ClipboardCheck, X, Info } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Receipt, Wallet, Settings, LogOut, Users, Menu, ChevronLeft, Barcode, ShoppingBag, UserCheck, Truck, ArrowRightLeft, Undo2, ClipboardCheck, X, Info, FileText, PlusSquare } from 'lucide-react';
 import { UserRole } from '../types';
 
 interface LayoutProps {
@@ -69,6 +69,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
     let items = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'pos', label: 'Kasir (POS)', icon: ShoppingCart },
+      { id: 'input-kasir', label: 'Input Kasir Manual', icon: PlusSquare },
+      { id: 'laporan-rekapan', label: 'Laporan Rekapan', icon: FileText },
       { id: 'products', label: 'Produk', icon: Package },
       { id: 'transactions', label: 'Riwayat & Utang', icon: Receipt },
       { id: 'people', label: 'Kontak', icon: Users },
@@ -117,7 +119,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 bg-primary text-white flex flex-col shadow-xl transition-all duration-300 ease-in-out md:static md:translate-x-0 relative overflow-hidden
+        className={`fixed inset-y-0 left-0 z-50 bg-primary text-white flex flex-col shadow-xl transition-all duration-300 ease-in-out md:static md:translate-x-0 relative overflow-hidden print:hidden
         ${mobileMenuOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} 
         ${isSidebarOpen ? 'md:w-64' : 'md:w-24'}
         `}
@@ -186,7 +188,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto bg-slate-100 flex flex-col relative w-full">
         {/* Mobile Header */}
-        <div className="md:hidden bg-white px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-30">
+        <div className="md:hidden bg-white px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-30 print:hidden">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(true)}
