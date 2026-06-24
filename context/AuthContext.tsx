@@ -56,8 +56,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           );
         } catch (error) {
           console.error("Error fetching user data:", error);
-          setUser(null);
-          localStorage.removeItem("pos_current_user");
+          const authUser = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            role: "CASHIER",
+            name: firebaseUser.displayName || undefined,
+            username: firebaseUser.email || undefined,
+            image: undefined,
+          };
+          setUser(authUser);
+          localStorage.setItem(
+            "pos_current_user",
+            JSON.stringify({
+              id: firebaseUser.uid,
+              name: authUser.name || firebaseUser.email || "",
+              username: authUser.username || firebaseUser.email || "",
+              role: authUser.role,
+              image: authUser.image || "",
+            }),
+          );
         }
       } else {
         setUser(null);
