@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { LayoutDashboard, ShoppingCart, Package, Receipt, Wallet, Settings, LogOut, Users, Menu, ChevronLeft, Barcode, ShoppingBag, UserCheck, Truck, ArrowRightLeft, Undo2, ClipboardCheck, X, Info, FileText, PlusSquare } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Receipt, Wallet, Settings, LogOut, Users, Menu, ChevronLeft, Barcode, ShoppingBag, UserCheck, Truck, ArrowRightLeft, Undo2, ClipboardCheck, X, Info, FileText, PlusSquare, Wifi, WifiOff } from 'lucide-react';
 import { UserRole } from '../types';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -48,6 +49,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
   });
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isOnline = useOnlineStatus();
 
   // Persist sidebar state to localStorage
   useEffect(() => {
@@ -95,13 +97,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
       items.push({ id: 'transfer_history', label: 'Riwayat Transfer', icon: ArrowRightLeft });
       items.push({ id: 'return_history', label: 'Riwayat Retur', icon: Undo2 });
       items.push({ id: 'barcode', label: 'Cetak Barcode', icon: Barcode });
-
-      // Settings hanya untuk Owner dan Superadmin
-      if (userRole !== UserRole.ADMIN) {
-        items.push({ id: 'settings', label: 'Pengaturan', icon: Settings });
-      }
     }
 
+    items.push({ id: 'settings', label: 'Pengaturan', icon: Settings });
     items.push({ id: 'about', label: 'Tentang Aplikasi', icon: Info });
 
     return items;
@@ -174,6 +172,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
         </nav>
 
         <div className="p-4 border-t border-white/10">
+          {(isSidebarOpen || mobileMenuOpen) && (
+            <div className={`mb-3 px-3 py-2 rounded-lg flex items-center gap-2 text-xs font-medium transition-colors ${isOnline ? 'bg-green-500/20 text-green-200' : 'bg-red-500/20 text-red-200'}`}>
+              {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
+              <span>{isOnline ? 'Online (Sinkron)' : 'Offline (Mode Lokal)'}</span>
+            </div>
+          )}
+          {!isSidebarOpen && !mobileMenuOpen && (
+            <div className={`mb-3 mx-auto w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isOnline ? 'bg-green-500/20 text-green-200' : 'bg-red-500/20 text-red-200'}`} title={isOnline ? 'Online' : 'Offline'}>
+              {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
+            </div>
+          )}
           <button
             onClick={onLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white hover:bg-white/10 transition-all duration-150 active:scale-95"
