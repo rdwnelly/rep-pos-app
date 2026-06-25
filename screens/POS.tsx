@@ -60,7 +60,8 @@ export const POS: React.FC = () => {
 
   // Customer State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
-  const [customerName, setCustomerName] = useState(''); // Still used for display or custom walk-in name
+  const [customerName, setCustomerName] = useState('Pelanggan Umum'); // Still used for display or custom walk-in name
+  const [tableNumber, setTableNumber] = useState('');
 
   // Payment State
   const [amountPaid, setAmountPaid] = useState<string>('');
@@ -360,7 +361,8 @@ export const POS: React.FC = () => {
       cashierName: currentUser.name || 'Kasir',
       discount: discount > 0 ? discount : 0,
       discountType: discount > 0 ? discountType : 'FIXED',
-      discountAmount: discountAmountValue > 0 ? discountAmountValue : 0
+      discountAmount: discountAmountValue > 0 ? discountAmountValue : 0,
+      tableNumber: tableNumber || undefined,
     };
 
     try {
@@ -393,6 +395,7 @@ export const POS: React.FC = () => {
       setSelectedBankId('');
       setSelectedCustomerId('');
       setCustomerName('Pelanggan Umum');
+      setTableNumber('');
       setShowPaymentModal(false);
       searchInputRef.current?.focus();
       alert('Transaksi Kasir REP Berhasil!');
@@ -868,6 +871,31 @@ export const POS: React.FC = () => {
                 <p className="text-white/80 text-sm mt-1">Total: {formatIDR(totalAmount)}</p>
               </div>
               <div className="p-6 space-y-6 overflow-y-auto">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="customerNameInput" className="block text-sm font-medium text-slate-600 mb-1">Nama Pelanggan (Opsional)</label>
+                    <input
+                      id="customerNameInput"
+                      type="text"
+                      className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                      placeholder="Cth: Budi"
+                      value={customerName === 'Pelanggan Umum' ? '' : customerName}
+                      onChange={(e) => setCustomerName(e.target.value || 'Pelanggan Umum')}
+                      disabled={!!selectedCustomerId} // Kalo pilih dari db, jangan bisa diedit
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="tableNumberInput" className="block text-sm font-medium text-slate-600 mb-1">Pesanan Meja (Opsional)</label>
+                    <input
+                      id="tableNumberInput"
+                      type="text"
+                      className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                      placeholder="Cth: Meja 04"
+                      value={tableNumber}
+                      onChange={(e) => setTableNumber(e.target.value)}
+                    />
+                  </div>
+                </div>
 
                 <div>
                   <span className="block text-sm font-medium text-slate-600 mb-2">Metode Pembayaran</span>

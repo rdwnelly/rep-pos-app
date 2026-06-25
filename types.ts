@@ -129,6 +129,7 @@ export interface Transaction {
   discount?: number;
   discountType?: 'PERCENTAGE' | 'FIXED';
   discountAmount?: number;
+  tableNumber?: string; // New: Optional table number
 }
 
 export enum PurchaseType {
