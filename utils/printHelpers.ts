@@ -139,9 +139,10 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                         </div>
                         <div class="customer-info">
                             <div class="customer-title">Kepada Yth.</div>
-                            <div class="customer-name">${tx.customerName}</div>
+                            <div class="customer-name">${tx.customerName && tx.customerName !== 'Pelanggan Umum' ? tx.customerName : 'Pelanggan Umum (walk-in)'}</div>
                             <div class="info-text">${tx.customerAddress || '-'}</div>
-                            ${tx.tableNumber ? `<div class="info-text">Meja: ${tx.tableNumber}</div>` : ''}
+                            <div class="info-text">Meja: ${tx.tableNumber || '-'}</div>
+                            <div class="info-text">Catatan: ${tx.paymentNote || '-'}</div>
                         </div>
                     </div>
 
@@ -252,8 +253,9 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                     <tr><td style="width: 35%; border: none; padding: 1px 0; vertical-align: top;">No. Struk</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.invoiceNumber || tx.id.substring(0, 8)}</td></tr>
                     <tr><td style="border: none; padding: 1px 0; vertical-align: top;">Tanggal</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${formatDate(tx.date)}</td></tr>
                     <tr><td style="border: none; padding: 1px 0; vertical-align: top;">Kasir</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.cashierName}</td></tr>
-                    <tr><td style="border: none; padding: 1px 0; vertical-align: top;">Pesanan</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.customerName || '-'}</td></tr>
-                    ${tx.tableNumber ? `<tr><td style="border: none; padding: 1px 0; vertical-align: top;">Meja</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.tableNumber}</td></tr>` : ''}
+                    <tr><td style="border: none; padding: 1px 0; vertical-align: top;">Pelanggan</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.customerName && tx.customerName !== 'Pelanggan Umum' ? tx.customerName : 'Pelanggan Umum (walk-in)'}</td></tr>
+                    <tr><td style="border: none; padding: 1px 0; vertical-align: top;">Meja</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.tableNumber || '-'}</td></tr>
+                    <tr><td style="border: none; padding: 1px 0; vertical-align: top;">Catatan</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.paymentNote || '-'}</td></tr>
                 </table>
             </div>
         `;
