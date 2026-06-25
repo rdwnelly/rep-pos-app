@@ -109,15 +109,16 @@ export const generateESCPOSReceipt = (tx: Transaction, settings: StoreSettings):
     encoder.initialize()
         .alignCenter()
         .bold(true)
-        .textLine(settings.name || 'Toko')
+        .textLine('YAYASAN RUMAH ETNIK PAPUA')
         .bold(false);
 
-    if (settings.showAddress && settings.address) {
-        encoder.textLine(settings.address);
-    }
-    if (settings.showPhone && settings.phone) {
-        encoder.textLine(settings.phone);
-    }
+    encoder.textLine('Jl. Baru Aimas - Klamono Km. 21');
+    encoder.textLine('Malawili, Kec. Aimas, Sorong');
+    encoder.textLine('Papua Barat Daya');
+    encoder.textLine('WA: 0821-9986-7918');
+    encoder.textLine('IG: @rumah_etnik_papua');
+    encoder.textLine('TikTok: Rumah Etnik Papua');
+    
     encoder.line('-', width)
         .alignLeft()
         .textLine(`Tgl  : ${formatDateWithTime(tx.date)}`)

@@ -109,7 +109,7 @@ export const useBluetoothPrinter = () => {
             throw new Error("Printer tidak terhubung.");
         }
 
-        const maxChunk = 512; // BLE characteristic max write size is often small (usually around 20-512)
+        const maxChunk = 100; // BLE characteristic max write size is often small. Reduced to 100 to prevent data drop
         let offset = 0;
 
         console.log(`Printing ${data.length} bytes...`);
@@ -126,7 +126,7 @@ export const useBluetoothPrinter = () => {
                 
                 offset = end;
                 // Small delay to prevent overwhelming some slow printers
-                await new Promise(resolve => setTimeout(resolve, 10));
+                await new Promise(resolve => setTimeout(resolve, 20));
             }
             console.log('Print selesai.');
             return true;
