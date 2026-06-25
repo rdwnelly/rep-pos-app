@@ -482,9 +482,8 @@ export const POS: React.FC = () => {
             onChange={(e) => setDefaultPriceType(e.target.value as PriceType)}
           >
             <option value={PriceType.RETAIL}>Eceran</option>
-            <option value={PriceType.GENERAL}>Umum</option>
             <option value={PriceType.WHOLESALE}>Grosir</option>
-            <option value={PriceType.PROMO}>Promo</option>
+            <option value={PriceType.EMPLOYEE}>Karyawan</option>
           </select>
         </div>
 
@@ -499,9 +498,8 @@ export const POS: React.FC = () => {
             onChange={(e) => setDefaultPriceType(e.target.value as PriceType)}
           >
             <option value={PriceType.RETAIL}>Harga Eceran</option>
-            <option value={PriceType.GENERAL}>Harga Umum</option>
             <option value={PriceType.WHOLESALE}>Harga Grosir</option>
-            <option value={PriceType.PROMO}>Harga Promo</option>
+            <option value={PriceType.EMPLOYEE}>Harga Karyawan</option>
           </select>
         </div>
 
@@ -546,9 +544,8 @@ export const POS: React.FC = () => {
               <h4 className="font-semibold text-slate-800 line-clamp-2 text-sm h-10">{product.name}</h4>
               <div className="mt-2 w-full">
                 <span className={`block font-bold ${defaultPriceType === PriceType.RETAIL ? 'text-primary' :
-                  defaultPriceType === PriceType.GENERAL ? 'text-slate-500' :
-                    defaultPriceType === PriceType.WHOLESALE ? 'text-blue-600' :
-                      defaultPriceType === PriceType.PROMO ? 'text-red-600' : 'text-slate-800'
+                  defaultPriceType === PriceType.WHOLESALE ? 'text-blue-600' :
+                    defaultPriceType === PriceType.EMPLOYEE ? 'text-purple-600' : 'text-slate-800'
                   }`}>
                   {getPriceByType(product, defaultPriceType) === 0 ? '0' : formatIDR(getPriceByType(product, defaultPriceType))}
                 </span>
@@ -766,9 +763,8 @@ export const POS: React.FC = () => {
                       onChange={(e) => updateCartItem(idx, { selectedPriceType: e.target.value as PriceType })}
                     >
                       <option value={PriceType.RETAIL}>Eceran</option>
-                      <option value={PriceType.GENERAL}>Umum</option>
                       <option value={PriceType.WHOLESALE}>Grosir</option>
-                      <option value={PriceType.PROMO}>Promo</option>
+                      <option value={PriceType.EMPLOYEE}>Karyawan</option>
                     </select>
                     <span className="text-xs text-slate-400">@{formatIDR(item.finalPrice)}</span>
                   </div>

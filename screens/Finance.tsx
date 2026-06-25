@@ -482,7 +482,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                     ...product,
                     qty: i.qty,
                     finalPrice: i.price,
-                    selectedPriceType: 'UMUM'
+                    selectedPriceType: 'ECERAN'
                 } as any;
             }) : [],
             totalAmount: -totalRefund,

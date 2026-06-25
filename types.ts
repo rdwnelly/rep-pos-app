@@ -18,9 +18,8 @@ export interface User {
 
 export enum PriceType {
   RETAIL = 'ECERAN', // Highest price
-  GENERAL = 'UMUM',  // Medium price
   WHOLESALE = 'GROSIR', // Lowest price
-  PROMO = 'PROMO' // Promotional price
+  EMPLOYEE = 'KARYAWAN' // Employee price
 }
 
 export interface Category {
@@ -56,9 +55,8 @@ export interface Product {
   stock: number;
   hpp: number; // Harga Pokok Penjualan (Cost Price)
   priceRetail: number;
-  priceGeneral: number;
   priceWholesale: number;
-  pricePromo?: number; // Optional promo price
+  priceEmployee?: number; // Optional employee price
   image?: string;
   unit?: string; // e.g. Pcs, Kg, Box
 }

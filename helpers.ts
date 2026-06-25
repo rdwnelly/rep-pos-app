@@ -34,8 +34,7 @@ export const formatDateDateOnly = (dateString: string): string => {
 export const getPriceByType = (product: Product, type: PriceType): number => {
   switch (type) {
     case PriceType.WHOLESALE: return product.priceWholesale;
-    case PriceType.GENERAL: return product.priceGeneral;
-    case PriceType.PROMO: return product.pricePromo || 0; // No fallback, return 0 if not set
+    case PriceType.EMPLOYEE: return product.priceEmployee || 0;
     case PriceType.RETAIL: return product.priceRetail;
     default: return product.priceRetail;
   }
