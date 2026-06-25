@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { User, UserRole, StoreSettings, BankAccount, PrinterType } from '../types';
-import { Trash2, Plus, User as UserIcon, Shield, ShieldAlert, Edit2, Save, X, Store, Upload, CreditCard, Printer, AlertTriangle, Download, FileSpreadsheet, Settings as SettingsIcon, History as HistoryIcon, Palette } from 'lucide-react';
+import { Trash2, Plus, User as UserIcon, Shield, ShieldAlert, Edit2, Save, X, Store, Upload, CreditCard, Printer, AlertTriangle, Download, FileSpreadsheet, Settings as SettingsIcon, History as HistoryIcon, Palette, Bluetooth } from 'lucide-react';
 import { exportToCSV, compressImage, exportToExcel } from '../utils';
 import { useTheme } from '../hooks/useTheme';
+import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { firebaseConfig } from '../src/lib/firebase';
@@ -17,12 +18,15 @@ const DEFAULT_STORE_SETTINGS: StoreSettings = {
 };
 
 export const Settings: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'store' | 'users' | 'payments' | 'data' | 'appearance'>('store');
-    const { hue, setHue, saturation, setSaturation, resetTheme } = useTheme();
-
     // User State with useData
     const currentUser = JSON.parse(localStorage.getItem('pos_current_user') || '{}') as User;
     const isSuperAdmin = currentUser.role === UserRole.SUPERADMIN;
+    const canManageStore = currentUser.role === UserRole.SUPERADMIN || currentUser.role === UserRole.OWNER || currentUser.role === UserRole.ADMIN;
+    const initialTab = canManageStore ? 'store' : 'print';
+
+    const [activeTab, setActiveTab] = useState<'store' | 'print' | 'users' | 'payments' | 'data' | 'appearance'>(initialTab);
+    const { hue, setHue, saturation, setSaturation, resetTheme } = useTheme();
+    const bluetooth = useBluetoothPrinter();
 
     const users = useData(async () => {
         if (isSuperAdmin) {
@@ -407,17 +411,27 @@ export const Settings: React.FC = () => {
             </div>
 
             <div className="flex gap-4 mb-6 border-b border-slate-200 overflow-x-auto">
+                {canManageStore && (
+                    <button
+                        onClick={() => setActiveTab('store')}
+                        className={`pb-3 px-4 font-medium text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'store' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Profil Toko
+                    </button>
+                )}
+                {canManageStore && (
+                    <button
+                        onClick={() => setActiveTab('payments')}
+                        className={`pb-3 px-4 font-medium text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'payments' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Bank & E-Wallet
+                    </button>
+                )}
                 <button
-                    onClick={() => setActiveTab('store')}
-                    className={`pb-3 px-4 font-medium text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'store' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    onClick={() => setActiveTab('print')}
+                    className={`pb-3 px-4 font-medium text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'print' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
-                    Profil Toko
-                </button>
-                <button
-                    onClick={() => setActiveTab('payments')}
-                    className={`pb-3 px-4 font-medium text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === 'payments' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                >
-                    Bank & E-Wallet
+                    Pengaturan Cetak
                 </button>
                 <button
                     onClick={() => setActiveTab('appearance')}
@@ -491,7 +505,25 @@ export const Settings: React.FC = () => {
                                 ></textarea>
                             </div>
 
-                            <div className="col-span-2 border-t border-slate-100 pt-4">
+                        </div>
+                    </div>
+
+                    <div className="mt-6 flex justify-end">
+                        <button onClick={handleSaveStore} className="bg-primary text-white px-6 py-2.5 rounded-lg font-bold hover:bg-primary/90 flex items-center gap-2">
+                            <Save size={18} /> Simpan Pengaturan
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'print' && (
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in">
+                    <div className="flex items-start gap-6 flex-col md:flex-row">
+                        <div className="bg-primary/10 p-4 rounded-full">
+                            <Printer size={48} className="text-primary" />
+                        </div>
+                        <div className="flex-1 w-full">
+                            <div className="border-slate-100 pb-4">
                                 <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><Printer size={16} /> Pengaturan Cetak Nota</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                     <div>
@@ -532,6 +564,41 @@ export const Settings: React.FC = () => {
                                         <input id="showBank" name="showBank" type="checkbox" checked={storeSettings.showBank} onChange={e => setStoreSettings({ ...storeSettings, showBank: e.target.checked })} className="w-4 h-4 text-primary rounded" />
                                         <span className="text-sm text-slate-700">Tampilkan Info Bank</span>
                                     </label>
+                                </div>
+                                
+                                <div className="mt-4 p-4 border border-blue-100 bg-blue-50/50 rounded-lg">
+                                    <h5 className="font-semibold text-slate-800 mb-2 flex items-center gap-2"><Bluetooth size={16} className="text-blue-600" /> Bluetooth Printer (Silent Print)</h5>
+                                    <p className="text-xs text-slate-600 mb-3">Gunakan Web Bluetooth API untuk mencetak langsung ke printer thermal tanpa popup dialog browser.</p>
+                                    
+                                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                        <label htmlFor="useBluetoothPrinter" className="flex items-center gap-2 cursor-pointer">
+                                            <input id="useBluetoothPrinter" name="useBluetoothPrinter" type="checkbox" checked={storeSettings.useBluetoothPrinter || false} onChange={e => setStoreSettings({ ...storeSettings, useBluetoothPrinter: e.target.checked })} className="w-4 h-4 text-blue-600 rounded" />
+                                            <span className="text-sm font-medium text-slate-700">Aktifkan Bluetooth Print</span>
+                                        </label>
+
+                                        {storeSettings.useBluetoothPrinter && (
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            await bluetooth.connect();
+                                                        } catch (err: any) {
+                                                            alert(err.message || 'Gagal koneksi ke printer');
+                                                        }
+                                                    }}
+                                                    className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
+                                                >
+                                                    <Bluetooth size={14} /> {bluetooth.isConnected ? 'Hubungkan Ulang' : 'Cari Printer'}
+                                                </button>
+                                                
+                                                {bluetooth.isConnected && (
+                                                    <span className="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded">
+                                                        Terhubung: {bluetooth.deviceName}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -11,6 +11,7 @@ import {
   updateDoc,
   writeBatch,
   orderBy,
+  increment,
 } from "firebase/firestore";
 import { db } from "../src/lib/firebase";
 import {
@@ -106,58 +107,36 @@ const saveEntityBulk = async <T extends { id?: string }>(
 };
 
 const adjustStock = async (productId: string, quantityDelta: number) => {
-  await runTransaction(db, async (tx) => {
-    const ref = doc(collectionRef("products"), productId);
-    const productSnapshot = await tx.get(ref);
-    if (!productSnapshot.exists()) return;
-
-    const productData = productSnapshot.data() as Product;
-    const currentStock =
-      typeof productData.stock === "number"
-        ? productData.stock
-        : parseFloat(String(productData.stock)) || 0;
-    await tx.update(ref, { stock: currentStock + quantityDelta });
-  });
+  const ref = doc(collectionRef("products"), productId);
+  await updateDoc(ref, { stock: increment(quantityDelta) });
 };
 
 const applyTransactionStock = async (
   transaction: Transaction,
   multiplier: number,
 ) => {
-  await runTransaction(db, async (tx) => {
-    // READS
-    const productSnapshots = await Promise.all(
-        transaction.items.map(item => tx.get(doc(collectionRef("products"), item.id)))
-    );
+  const batch = writeBatch(db);
+  const txRef = transaction.id
+    ? doc(collectionRef("transactions"), transaction.id)
+    : doc(collectionRef("transactions"));
+  const savedTx = {
+    ...transaction,
+    id: txRef.id,
+    type: transaction.type || TransactionType.SALE,
+  };
+  batch.set(txRef, cleanUndefined(savedTx), { merge: true });
 
-    // WRITES
-    const txRef = transaction.id
-      ? doc(collectionRef("transactions"), transaction.id)
-      : doc(collectionRef("transactions"));
-    const savedTx = {
-      ...transaction,
-      id: txRef.id,
-      type: transaction.type || TransactionType.SALE,
-    };
-    tx.set(txRef, cleanUndefined(savedTx), { merge: true });
-
-    transaction.items.forEach((item, index) => {
-      const productSnapshot = productSnapshots[index];
-      if (!productSnapshot.exists()) return;
-
-      const productData = productSnapshot.data() as Product;
-      const currentStock =
-        typeof productData.stock === "number"
-          ? productData.stock
-          : parseFloat(String(productData.stock)) || 0;
-      const quantity = item.qty || 0;
-      const change =
-        transaction.type === TransactionType.RETURN
-          ? quantity * -1 * multiplier
-          : quantity * multiplier;
-      tx.update(productSnapshot.ref, { stock: currentStock - change });
-    });
+  transaction.items.forEach((item) => {
+    const productRef = doc(collectionRef("products"), item.id);
+    const quantity = item.qty || 0;
+    const change =
+      transaction.type === TransactionType.RETURN
+        ? quantity * -1 * multiplier
+        : quantity * multiplier;
+    batch.update(productRef, { stock: increment(-change) });
   });
+  
+  await batch.commit();
 };
 
 export const FirestoreService = {
@@ -263,30 +242,17 @@ export const FirestoreService = {
             ]
           : []),
     };
-    await runTransaction(db, async (tx) => {
-      // READS
-      const productSnapshots = await Promise.all(
-        txData.items.map(item => tx.get(doc(collectionRef("products"), item.id)))
-      );
-      
-      // WRITES
-      tx.set(txRef, cleanUndefined(txData), { merge: true });
-      
-      txData.items.forEach((item, index) => {
-        const productSnapshot = productSnapshots[index];
-        if (!productSnapshot.exists()) return;
-        const productData = productSnapshot.data() as Product;
-        const currentStock =
-          typeof productData.stock === "number"
-            ? productData.stock
-            : parseFloat(String(productData.stock)) || 0;
-        const quantity = item.qty || 0;
-        const stockDelta =
-          txData.type === TransactionType.RETURN ? quantity : -quantity;
-        
-        tx.update(productSnapshot.ref, { stock: currentStock + stockDelta });
-      });
+    const batch = writeBatch(db);
+    batch.set(txRef, cleanUndefined(txData), { merge: true });
+    
+    txData.items.forEach((item) => {
+      const productRef = doc(collectionRef("products"), item.id);
+      const quantity = item.qty || 0;
+      const stockDelta = txData.type === TransactionType.RETURN ? quantity : -quantity;
+      batch.update(productRef, { stock: increment(stockDelta) });
     });
+
+    await batch.commit();
     return txData;
   },
   updateTransaction: async (transaction: Transaction) =>
@@ -305,29 +271,17 @@ export const FirestoreService = {
       id: purRef.id,
       type: purchase.type || PurchaseType.PURCHASE,
     };
-    await runTransaction(db, async (tx) => {
-      // READS
-      const productSnapshots = await Promise.all(
-        (purData.items || []).map(item => tx.get(doc(collectionRef("products"), item.id)))
-      );
-
-      // WRITES
-      tx.set(purRef, cleanUndefined(purData), { merge: true });
-      
-      (purData.items || []).forEach((item, index) => {
-        const productSnapshot = productSnapshots[index];
-        if (!productSnapshot.exists()) return;
-        const productData = productSnapshot.data() as Product;
-        const currentStock =
-          typeof productData.stock === "number"
-            ? productData.stock
-            : parseFloat(String(productData.stock)) || 0;
-        const quantity = item.qty || 0;
-        const stockDelta =
-          purData.type === PurchaseType.RETURN ? -quantity : quantity;
-        tx.update(productSnapshot.ref, { stock: currentStock + stockDelta });
-      });
+    const batch = writeBatch(db);
+    batch.set(purRef, cleanUndefined(purData), { merge: true });
+    
+    (purData.items || []).forEach((item) => {
+      const productRef = doc(collectionRef("products"), item.id);
+      const quantity = item.qty || 0;
+      const stockDelta = purData.type === PurchaseType.RETURN ? -quantity : quantity;
+      batch.update(productRef, { stock: increment(stockDelta) });
     });
+
+    await batch.commit();
   },
   updatePurchase: async (purchase: Purchase) =>
     saveEntity<Purchase>("purchases", purchase),
@@ -343,28 +297,19 @@ export const FirestoreService = {
   getStockAdjustments: async (): Promise<StockAdjustment[]> =>
     getCollectionOrdered<StockAdjustment>("stock_adjustments", "date", "desc"),
   addStockAdjustment: async (adjustment: StockAdjustment) => {
-    await runTransaction(db, async (tx) => {
-      // READS
-      const productRef = doc(collectionRef("products"), adjustment.productId);
-      const productSnapshot = await tx.get(productRef);
-      if (!productSnapshot.exists()) return;
-
-      // WRITES
-      const ref = adjustment.id
-        ? doc(collectionRef("stock_adjustments"), adjustment.id)
-        : doc(collectionRef("stock_adjustments"));
-      const adjustmentData = { ...adjustment, id: ref.id };
-      tx.set(ref, cleanUndefined(adjustmentData), { merge: true });
-      
-      const productData = productSnapshot.data() as Product;
-      const currentStock =
-        typeof productData.stock === "number"
-          ? productData.stock
-          : parseFloat(String(productData.stock)) || 0;
-      const delta =
-        adjustment.type === "INCREASE" ? adjustment.qty : -adjustment.qty;
-      tx.update(productRef, { stock: currentStock + delta });
-    });
+    const batch = writeBatch(db);
+    const ref = adjustment.id
+      ? doc(collectionRef("stock_adjustments"), adjustment.id)
+      : doc(collectionRef("stock_adjustments"));
+    const adjustmentData = { ...adjustment, id: ref.id };
+    
+    batch.set(ref, cleanUndefined(adjustmentData), { merge: true });
+    
+    const productRef = doc(collectionRef("products"), adjustment.productId);
+    const delta = adjustment.type === "INCREASE" ? adjustment.qty : -adjustment.qty;
+    batch.update(productRef, { stock: increment(delta) });
+    
+    await batch.commit();
   },
 
   getUsers: async (): Promise<User[]> => getCollection<User>("users"),

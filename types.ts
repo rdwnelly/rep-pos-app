@@ -203,6 +203,7 @@ export interface StoreSettings {
   showJargon?: boolean;
   showBank?: boolean;
   printerType?: PrinterType;
+  useBluetoothPrinter?: boolean;
   autoSyncMySQL?: boolean; // Auto sync dari MySQL saat startup
   useMySQLPrimary?: boolean; // Gunakan MySQL sebagai database utama (read dari MySQL)
 }

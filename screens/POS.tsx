@@ -6,8 +6,44 @@ import { StorageService } from '../services/storage';
 import { Product, CartItem, PriceType, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, HoldBill, Category } from '../types';
 import { formatIDR, getPriceByType, generateId, formatDate, toMySQLDate } from '../utils';
 import { generatePrintInvoice } from '../utils/printHelpers';
+import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
+import { generateESCPOSReceipt } from '../utils/escposEncoder';
+import { playBeep } from '../utils/soundEffect';
 
+const FlyingItem = ({ item, cartRect }: { item: any, cartRect?: DOMRect }) => {
+  const [animate, setAnimate] = useState(false);
+  useEffect(() => {
+    const timer = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setAnimate(true));
+    });
+    return () => cancelAnimationFrame(timer);
+  }, []);
+
+  const endX = cartRect ? cartRect.left + cartRect.width / 2 : window.innerWidth;
+  const endY = cartRect ? cartRect.top + cartRect.height / 2 : 0;
+
+  return (
+    <div
+      className="fixed z-[9999] pointer-events-none transition-all duration-500 ease-in-out"
+      style={{
+        left: item.startX - 25,
+        top: item.startY - 25,
+        transform: animate ? `translate(${endX - item.startX}px, ${endY - item.startY}px) scale(0.1)` : 'translate(0px, 0px) scale(1)',
+        opacity: animate ? 0.3 : 1
+      }}
+    >
+      {item.image && !item.image.includes('picsum.photos') ? (
+        <img src={item.image} alt="" className="w-[50px] h-[50px] object-cover rounded-full shadow-lg border-2 border-primary" />
+      ) : (
+        <div className="w-[50px] h-[50px] bg-primary rounded-full shadow-lg flex items-center justify-center">
+          <ShoppingBag size={24} className="text-white" />
+        </div>
+      )}
+    </div>
+  );
+};
 export const POS: React.FC = () => {
+  const bluetooth = useBluetoothPrinter();
   const products = useData(() => StorageService.getProducts(), [], 'products') || [];
   const customers = useData(() => StorageService.getCustomers(), [], 'customers') || [];
   const banks = useData(() => StorageService.getBanks(), [], 'banks') || [];
@@ -48,6 +84,10 @@ export const POS: React.FC = () => {
   // Mobile State
   const [showMobileCart, setShowMobileCart] = useState(false);
 
+  // Micro-animations State
+  const cartIconRef = useRef<HTMLDivElement>(null);
+  const [flyingItems, setFlyingItems] = useState<Array<{ id: string, startX: number, startY: number, image?: string }>>([]);
+
   useEffect(() => {
     // Auto focus search for scanner
     searchInputRef.current?.focus();
@@ -75,13 +115,14 @@ export const POS: React.FC = () => {
       // Try to find exact match first (Scanner behavior)
       const exactMatch = products.find(p => p.sku.toLowerCase() === search.toLowerCase());
       if (exactMatch) {
+        playBeep();
         addToCart(exactMatch);
         setSearch(''); // Clear for next scan
       }
     }
   };
 
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, event?: React.MouseEvent) => {
     // Validate Price: Prevent adding items with 0 price
     const price = getPriceByType(product, defaultPriceType);
     if (price === 0) {
@@ -111,6 +152,17 @@ export const POS: React.FC = () => {
       // price calculated above is used here
       return [...prev, { ...product, qty: 1, selectedPriceType: defaultPriceType, finalPrice: price }];
     });
+
+    if (event && cartIconRef.current) {
+        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+        const startX = rect.left + rect.width / 2;
+        const startY = rect.top + rect.height / 2;
+        const id = Date.now().toString() + Math.random().toString();
+        setFlyingItems(prev => [...prev, { id, startX, startY, image: product.image }]);
+        setTimeout(() => {
+            setFlyingItems(prev => prev.filter(item => item.id !== id));
+        }, 500);
+    }
   };
 
   const updateCartItem = (index: number, updates: Partial<CartItem>) => {
@@ -350,9 +402,31 @@ export const POS: React.FC = () => {
     }
   };
 
-  const printReceipt = (tx: Transaction, settings: StoreSettings) => {
+  const printReceipt = async (tx: Transaction, settings: StoreSettings) => {
+    if (settings.useBluetoothPrinter) {
+      try {
+        if (!bluetooth.isConnected) {
+          console.log("Mencoba koneksi bluetooth sebelum cetak...");
+          await bluetooth.connect();
+        }
+        
+        const escposData = generateESCPOSReceipt(tx, settings);
+        await bluetooth.print(escposData);
+        console.log("Cetak via Bluetooth berhasil.");
+        return;
+      } catch (error: any) {
+        console.error("Bluetooth print error:", error);
+        alert("Gagal cetak via Bluetooth: " + error.message + ".\nSistem akan menggunakan cetak standar browser.");
+        // Fallback to browser print below
+      }
+    }
+
+    // Default Browser Print
     const w = window.open('', '', 'width=800,height=600');
-    if (!w) return;
+    if (!w) {
+      alert("Popup blocker mencegah cetak struk. Mohon izinkan popup untuk website ini.");
+      return;
+    }
 
     const html = generatePrintInvoice(tx, settings, formatIDR, formatDate);
     w.document.write(html);
@@ -361,6 +435,10 @@ export const POS: React.FC = () => {
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-6rem)] gap-6 animate-fade-in relative">
+      {flyingItems.map(item => (
+        <FlyingItem key={item.id} item={item} cartRect={cartIconRef.current?.getBoundingClientRect()} />
+      ))}
+      
       {/* Product Grid */}
       <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex gap-4 bg-white z-10">
@@ -449,7 +527,7 @@ export const POS: React.FC = () => {
           {visibleProducts.map(product => (
             <button
               key={product.id}
-              onClick={() => addToCart(product)}
+              onClick={(e) => addToCart(product, e)}
               className="group flex flex-col items-start text-left bg-white border border-slate-100 rounded-xl p-3 hover:shadow-md hover:border-primary/50 transition-all active:scale-95"
             >
               <div className="w-full aspect-square bg-slate-100 rounded-lg mb-3 overflow-hidden relative">
@@ -499,7 +577,7 @@ export const POS: React.FC = () => {
       </div>
 
       {/* Cart Sidebar / Mobile Modal */}
-      <div className={`
+      <div ref={cartIconRef} className={`
         flex flex-col bg-white lg:rounded-2xl lg:shadow-sm lg:border lg:border-slate-200
         lg:w-96 lg:static lg:h-full lg:overflow-hidden
         fixed inset-0 z-[60] transition-transform duration-300 ease-in-out
@@ -783,9 +861,9 @@ export const POS: React.FC = () => {
       {/* Payment Modal */}
       {
         showPaymentModal && createPortal(
-          <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-black/40 backdrop-blur-md z-[9999] flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-              <div className="bg-primary p-6 text-white shrink-0">
+          <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-black/40 backdrop-blur-md z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+            <div className="bg-white/85 backdrop-blur-2xl border border-white/40 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="bg-primary/90 p-6 text-white shrink-0">
                 <h3 className="text-lg font-semibold">Konfirmasi Pembayaran</h3>
                 <p className="text-white/80 text-sm mt-1">Total: {formatIDR(totalAmount)}</p>
               </div>
