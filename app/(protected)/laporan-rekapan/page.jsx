@@ -108,14 +108,14 @@ export default function LaporanRekapanPage() {
     };
 
     // Auto-fill manualPengeluaran when rekapan changes (e.g. date change)
+    const pengeluaranStr = JSON.stringify(rekapan?.pengeluaran || []);
     useEffect(() => {
-        if (rekapan) {
-            setManualPengeluaran(Array.from({ length: 18 }, (_, i) => {
-                const item = rekapan.pengeluaran[i];
-                return item ? { catatan: item.catatan, nominal: String(item.nominal) } : { catatan: '', nominal: '' };
-            }));
-        }
-    }, [rekapan?.pengeluaran]);
+        const pengeluaran = JSON.parse(pengeluaranStr);
+        setManualPengeluaran(Array.from({ length: 18 }, (_, i) => {
+            const item = pengeluaran[i];
+            return item ? { catatan: item.catatan, nominal: String(item.nominal) } : { catatan: '', nominal: '' };
+        }));
+    }, [pengeluaranStr]);
 
     const finalTotalPengeluaran = manualPengeluaran.reduce((sum, item) => sum + (Number(item.nominal) || 0), 0);
     const uangYangAda = Number(modalDisetor || 0) + (rekapan?.totalTunai || 0) - finalTotalPengeluaran;
