@@ -13,8 +13,8 @@ import { firebaseConfig } from '../src/lib/firebase';
 
 // Default store settings - defined outside component to avoid recreation
 const DEFAULT_STORE_SETTINGS: StoreSettings = {
-    name: '', jargon: '', address: '', phone: '', bankAccount: '', footerMessage: '', notes: '',
-    showAddress: true, showJargon: true, showBank: true, printerType: '58mm'
+    name: '', jargon: '', address: '', phone: '', bankAccount: '', footerMessage: '', notes: '', instagram: '', tiktok: '',
+    showAddress: true, showJargon: true, showBank: true, showPhone: true, showLogo: true, showInstagram: true, showTiktok: true, printerType: '58mm'
 };
 
 export const Settings: React.FC = () => {
@@ -481,8 +481,16 @@ export const Settings: React.FC = () => {
                                 <textarea id="storeAddress" name="storeAddress" rows={2} className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={storeSettings.address} onChange={e => setStoreSettings({ ...storeSettings, address: e.target.value })}></textarea>
                             </div>
                             <div>
-                                <label htmlFor="storePhone" className="block text-sm font-medium text-slate-700 mb-1">No. Telepon</label>
+                                <label htmlFor="storePhone" className="block text-sm font-medium text-slate-700 mb-1">No. Telepon / WA</label>
                                 <input id="storePhone" name="storePhone" type="text" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={storeSettings.phone} onChange={e => setStoreSettings({ ...storeSettings, phone: e.target.value })} />
+                            </div>
+                            <div>
+                                <label htmlFor="storeInstagram" className="block text-sm font-medium text-slate-700 mb-1">Akun Instagram</label>
+                                <input id="storeInstagram" name="storeInstagram" type="text" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={storeSettings.instagram || ''} onChange={e => setStoreSettings({ ...storeSettings, instagram: e.target.value })} placeholder="@rumah_etnik_papua" />
+                            </div>
+                            <div>
+                                <label htmlFor="storeTiktok" className="block text-sm font-medium text-slate-700 mb-1">Akun TikTok</label>
+                                <input id="storeTiktok" name="storeTiktok" type="text" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={storeSettings.tiktok || ''} onChange={e => setStoreSettings({ ...storeSettings, tiktok: e.target.value })} placeholder="Rumah Etnik Papua" />
                             </div>
                             <div>
                                 <label htmlFor="storeBankInfo" className="block text-sm font-medium text-slate-700 mb-1">Info Bank Utama (Di Struk)</label>
@@ -550,18 +558,33 @@ export const Settings: React.FC = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex gap-6 mt-2">
+                                <div className="flex flex-wrap gap-6 mt-2">
+                                    <label htmlFor="showLogo" className="flex items-center gap-2 cursor-pointer">
+                                        <input id="showLogo" name="showLogo" type="checkbox" checked={storeSettings.showLogo !== false} onChange={e => setStoreSettings({ ...storeSettings, showLogo: e.target.checked })} className="w-4 h-4 text-primary rounded" />
+                                        <span className="text-sm text-slate-700">Tampilkan Logo</span>
+                                    </label>
                                     <label htmlFor="showAddress" className="flex items-center gap-2 cursor-pointer">
-                                        <input id="showAddress" name="showAddress" type="checkbox" checked={storeSettings.showAddress} onChange={e => setStoreSettings({ ...storeSettings, showAddress: e.target.checked })} className="w-4 h-4 text-primary rounded" />
+                                        <input id="showAddress" name="showAddress" type="checkbox" checked={storeSettings.showAddress !== false} onChange={e => setStoreSettings({ ...storeSettings, showAddress: e.target.checked })} className="w-4 h-4 text-primary rounded" />
                                         <span className="text-sm text-slate-700">Tampilkan Alamat</span>
                                     </label>
+                                    <label htmlFor="showPhone" className="flex items-center gap-2 cursor-pointer">
+                                        <input id="showPhone" name="showPhone" type="checkbox" checked={storeSettings.showPhone !== false} onChange={e => setStoreSettings({ ...storeSettings, showPhone: e.target.checked })} className="w-4 h-4 text-primary rounded" />
+                                        <span className="text-sm text-slate-700">Tampilkan Telepon/WA</span>
+                                    </label>
+                                    <label htmlFor="showInstagram" className="flex items-center gap-2 cursor-pointer">
+                                        <input id="showInstagram" name="showInstagram" type="checkbox" checked={storeSettings.showInstagram !== false} onChange={e => setStoreSettings({ ...storeSettings, showInstagram: e.target.checked })} className="w-4 h-4 text-primary rounded" />
+                                        <span className="text-sm text-slate-700">Tampilkan Instagram</span>
+                                    </label>
+                                    <label htmlFor="showTiktok" className="flex items-center gap-2 cursor-pointer">
+                                        <input id="showTiktok" name="showTiktok" type="checkbox" checked={storeSettings.showTiktok !== false} onChange={e => setStoreSettings({ ...storeSettings, showTiktok: e.target.checked })} className="w-4 h-4 text-primary rounded" />
+                                        <span className="text-sm text-slate-700">Tampilkan TikTok</span>
+                                    </label>
                                     <label htmlFor="showJargon" className="flex items-center gap-2 cursor-pointer">
-                                        <input id="showJargon" name="showJargon" type="checkbox" checked={storeSettings.showJargon} onChange={e => setStoreSettings({ ...storeSettings, showJargon: e.target.checked })} className="w-4 h-4 text-primary rounded" />
+                                        <input id="showJargon" name="showJargon" type="checkbox" checked={storeSettings.showJargon !== false} onChange={e => setStoreSettings({ ...storeSettings, showJargon: e.target.checked })} className="w-4 h-4 text-primary rounded" />
                                         <span className="text-sm text-slate-700">Tampilkan Jargon</span>
                                     </label>
-
                                     <label htmlFor="showBank" className="flex items-center gap-2 cursor-pointer">
-                                        <input id="showBank" name="showBank" type="checkbox" checked={storeSettings.showBank} onChange={e => setStoreSettings({ ...storeSettings, showBank: e.target.checked })} className="w-4 h-4 text-primary rounded" />
+                                        <input id="showBank" name="showBank" type="checkbox" checked={storeSettings.showBank !== false} onChange={e => setStoreSettings({ ...storeSettings, showBank: e.target.checked })} className="w-4 h-4 text-primary rounded" />
                                         <span className="text-sm text-slate-700">Tampilkan Info Bank</span>
                                     </label>
                                 </div>

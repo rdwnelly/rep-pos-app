@@ -109,15 +109,22 @@ export const generateESCPOSReceipt = (tx: Transaction, settings: StoreSettings):
     encoder.initialize()
         .alignCenter()
         .bold(true)
-        .textLine('YAYASAN RUMAH ETNIK PAPUA')
+        .textLine(settings.name || 'Toko')
         .bold(false);
 
-    encoder.textLine('Jl. Baru Aimas - Klamono Km. 21');
-    encoder.textLine('Malawili, Kec. Aimas, Sorong');
-    encoder.textLine('Papua Barat Daya');
-    encoder.textLine('WA: 0821-9986-7918');
-    encoder.textLine('IG: @rumah_etnik_papua');
-    encoder.textLine('TikTok: Rumah Etnik Papua');
+    if (settings.showAddress !== false && settings.address) {
+        // Address might contain multiple lines or we can just print as is
+        settings.address.split('\n').forEach(line => encoder.textLine(line));
+    }
+    if (settings.showPhone !== false && settings.phone) {
+        encoder.textLine(`WA: ${settings.phone}`);
+    }
+    if (settings.showInstagram !== false && settings.instagram) {
+        encoder.textLine(`IG: ${settings.instagram}`);
+    }
+    if (settings.showTiktok !== false && settings.tiktok) {
+        encoder.textLine(`TikTok: ${settings.tiktok}`);
+    }
     
     encoder.line('-', width)
         .alignLeft()
