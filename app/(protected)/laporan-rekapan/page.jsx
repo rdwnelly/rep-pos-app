@@ -1,89 +1,98 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
-import { db } from "../../../src/lib/firebase"; 
-import { KATEGORI_KASIR } from "../../../utils/constants";
+import { useState, useMemo } from "react";
+import { useData } from "../../../hooks/useData";
+import { StorageService } from "../../../services/storage";
+import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
 
 export default function LaporanRekapanPage() {
     const [tanggal, setTanggal] = useState(new Date().toISOString().split("T")[0]);
     const [namaKasir, setNamaKasir] = useState("");
     const [modalDisetor, setModalDisetor] = useState("");
     const [catatan, setCatatan] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
-    const [rekapan, setRekapan] = useState(null);
 
-    const fetchLaporan = async () => {
-        if (!tanggal) return;
-        
-        setIsLoading(true);
-        try {
-            const startDate = new Date(tanggal);
-            startDate.setHours(0, 0, 0, 0);
-            const endDate = new Date(tanggal);
-            endDate.setHours(23, 59, 59, 999);
+    const transactions = useData(() => StorageService.getTransactions(), [], 'transactions') || [];
+    const cashflows = useData(() => StorageService.getCashFlow(), [], 'cashflow') || [];
 
-            const q = query(
-                collection(db, "transaksi_harian"),
-                where("tanggal_transaksi", ">=", Timestamp.fromDate(startDate)),
-                where("tanggal_transaksi", "<=", Timestamp.fromDate(endDate))
-            );
+    const rekapan = useMemo(() => {
+        if (!tanggal) return null;
 
-            const querySnapshot = await getDocs(q);
+        const startDate = new Date(tanggal);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(tanggal);
+        endDate.setHours(23, 59, 59, 999);
 
-            let totalTunai = 0;
-            let totalQris = 0;
-            let totalPengeluaran = 0;
-            const ringkasanKategori = {};
-            const pengeluaranList = [];
+        let totalTunai = 0;
+        let totalQris = 0;
+        let totalPengeluaran = 0;
+        const ringkasanKategori = {};
+        const pengeluaranList = [];
 
-            // Inisialisasi semua kategori agar selalu muncul di tabel
-            KATEGORI_KASIR.forEach(kat => {
-                ringkasanKategori[kat.id] = { tunai: 0, qris: 0 };
-            });
+        // Pengeluaran dari cashflows
+        cashflows.forEach(cf => {
+            const cfDate = new Date(cf.date);
+            if (cfDate >= startDate && cfDate <= endDate && cf.type === CashFlowType.OUT) {
+                totalPengeluaran += cf.amount;
+                pengeluaranList.push({
+                    catatan: cf.description || 'Pengeluaran',
+                    nominal: cf.amount
+                });
+            }
+        });
 
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                const nominal = Number(data.nominal) || 0;
+        // Pendapatan dari transactions
+        transactions.forEach(t => {
+            const tDate = new Date(t.date);
+            if (tDate >= startDate && tDate <= endDate) {
+                t.items.forEach(item => {
+                    const catName = item.categoryName || 'Lainnya';
+                    if (!ringkasanKategori[catName]) {
+                        ringkasanKategori[catName] = { tunai: 0, qris: 0 };
+                    }
+                    
+                    let itemTotal = item.finalPrice * item.qty;
+                    if (t.type === TransactionType.RETURN) {
+                        itemTotal = -itemTotal;
+                    }
 
-                if (data.tipe === "pengeluaran") {
-                    totalPengeluaran += nominal;
-                    pengeluaranList.push({
-                        catatan: data.catatan || 'Pengeluaran',
-                        nominal: nominal
-                    });
-                } else if (data.tipe === "pendapatan") {
-                    if (ringkasanKategori[data.kategori_kasir]) {
-                        if (data.metode_pembayaran === "tunai") {
-                            ringkasanKategori[data.kategori_kasir].tunai += nominal;
-                            totalTunai += nominal;
-                        } else if (data.metode_pembayaran === "qris") {
-                            ringkasanKategori[data.kategori_kasir].qris += nominal;
-                            totalQris += nominal;
-                        }
+                    if (t.paymentMethod === PaymentMethod.CASH) {
+                        ringkasanKategori[catName].tunai += itemTotal;
+                        totalTunai += itemTotal;
+                    } else {
+                        ringkasanKategori[catName].qris += itemTotal;
+                        totalQris += itemTotal;
+                    }
+                });
+                
+                // Jika ada diskon (Discount Amount)
+                if (t.discountAmount && t.discountAmount > 0) {
+                    const catName = "Diskon Penjualan";
+                    if (!ringkasanKategori[catName]) {
+                        ringkasanKategori[catName] = { tunai: 0, qris: 0 };
+                    }
+                    if (t.paymentMethod === PaymentMethod.CASH) {
+                        ringkasanKategori[catName].tunai -= t.discountAmount;
+                        totalTunai -= t.discountAmount;
+                    } else {
+                        ringkasanKategori[catName].qris -= t.discountAmount;
+                        totalQris -= t.discountAmount;
                     }
                 }
-            });
+            }
+        });
 
-            setRekapan({
-                kategori: ringkasanKategori,
-                totalTunai,
-                totalQris,
-                totalPengeluaran,
-                pengeluaran: pengeluaranList
-            });
+        // Get sorted category names
+        const sortedCategories = Object.keys(ringkasanKategori).sort();
 
-        } catch (error) {
-            console.error("Gagal menarik data:", error);
-            alert("Terjadi kesalahan saat menarik data dari Firestore.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchLaporan();
-    }, [tanggal]);
+        return {
+            kategori: ringkasanKategori,
+            sortedCategories,
+            totalTunai,
+            totalQris,
+            totalPengeluaran,
+            pengeluaran: pengeluaranList
+        };
+    }, [tanggal, transactions, cashflows]);
 
     const handlePrint = () => {
         window.print();
@@ -134,7 +143,7 @@ export default function LaporanRekapanPage() {
             </div>
 
             {/* Area BAP (Printed area) */}
-            {isLoading || !rekapan ? (
+            {!rekapan ? (
                 <div className="text-center py-10 print:hidden">Memuat data rekapan...</div>
             ) : (
                 <div className="bg-white p-4 print:py-8 print:px-2 print:shadow-none mx-auto text-black" style={{ width: '100%', maxWidth: '180mm' }}>
@@ -204,11 +213,11 @@ export default function LaporanRekapanPage() {
                                     {/* Tabel Pendapatan Tunai */}
                                     <table style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid black', marginBottom: '8px', fontSize: '9px' }}>
                                         <tbody>
-                                            {KATEGORI_KASIR.map(kat => (
-                                                <tr key={`tunai-${kat.id}`}>
-                                                    <td style={{ border: '1px solid black', padding: '2px 4px', fontWeight: '500' }}>Pendapatan {kat.label}</td>
+                                            {rekapan.sortedCategories.map(katName => (
+                                                <tr key={`tunai-${katName}`}>
+                                                    <td style={{ border: '1px solid black', padding: '2px 4px', fontWeight: '500' }}>Pendapatan {katName}</td>
                                                     <td style={{ border: '1px solid black', padding: '2px 4px', textAlign: 'right', width: '70px', fontWeight: '500' }}>
-                                                        {rekapan.kategori[kat.id].tunai > 0 ? rekapan.kategori[kat.id].tunai.toLocaleString('id-ID') : ''}
+                                                        {rekapan.kategori[katName].tunai > 0 ? rekapan.kategori[katName].tunai.toLocaleString('id-ID') : ''}
                                                     </td>
                                                 </tr>
                                             ))}
@@ -224,11 +233,11 @@ export default function LaporanRekapanPage() {
                                     {/* Tabel Pendapatan QRIS */}
                                     <table style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid black', marginBottom: '8px', fontSize: '9px' }}>
                                         <tbody>
-                                            {KATEGORI_KASIR.map(kat => (
-                                                <tr key={`qris-${kat.id}`}>
-                                                    <td style={{ border: '1px solid black', padding: '2px 4px', fontWeight: '500' }}>Pendapatan {kat.label}</td>
+                                            {rekapan.sortedCategories.map(katName => (
+                                                <tr key={`qris-${katName}`}>
+                                                    <td style={{ border: '1px solid black', padding: '2px 4px', fontWeight: '500' }}>Pendapatan {katName}</td>
                                                     <td style={{ border: '1px solid black', padding: '2px 4px', textAlign: 'right', width: '70px', fontWeight: '500' }}>
-                                                        {rekapan.kategori[kat.id].qris > 0 ? rekapan.kategori[kat.id].qris.toLocaleString('id-ID') : ''}
+                                                        {rekapan.kategori[katName].qris > 0 ? rekapan.kategori[katName].qris.toLocaleString('id-ID') : ''}
                                                     </td>
                                                 </tr>
                                             ))}
