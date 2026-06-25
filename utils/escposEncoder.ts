@@ -131,8 +131,13 @@ export const generateESCPOSReceipt = (tx: Transaction, settings: StoreSettings):
         .textLine(`Tgl  : ${formatDateWithTime(tx.date)}`)
         .textLine(`No   : ${tx.invoiceNumber || tx.id.substring(0, 8)}`)
         .textLine(`Kasir: ${tx.cashierName}`)
-        .textLine(`Plg  : ${tx.customerName || '-'}`)
-        .line('-', width);
+        .textLine(`Plg  : ${tx.customerName || '-'}`);
+        
+    if (tx.tableNumber) {
+        encoder.textLine(`Meja : ${tx.tableNumber}`);
+    }
+        
+    encoder.line('-', width);
 
     // Items
     tx.items.forEach(item => {
