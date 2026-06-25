@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { LayoutDashboard, ShoppingCart, Package, Receipt, Wallet, Settings, LogOut, Users, Menu, ChevronLeft, Barcode, ShoppingBag, UserCheck, Truck, ArrowRightLeft, Undo2, ClipboardCheck, X, Info, FileText, PlusSquare, Wifi, WifiOff } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Receipt, Wallet, Settings, LogOut, Users, Menu, ChevronLeft, Barcode, ShoppingBag, UserCheck, Truck, ArrowRightLeft, Undo2, ClipboardCheck, X, Info, FileText, Wifi, WifiOff } from 'lucide-react';
 import { UserRole } from '../types';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
@@ -71,7 +71,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
     let items = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'pos', label: 'Kasir (POS)', icon: ShoppingCart },
-      { id: 'input-kasir', label: 'Input Kasir Manual', icon: PlusSquare },
+
       { id: 'laporan-rekapan', label: 'Laporan Rekapan', icon: FileText },
       { id: 'products', label: 'Produk', icon: Package },
       { id: 'transactions', label: 'Riwayat & Utang', icon: Receipt },
