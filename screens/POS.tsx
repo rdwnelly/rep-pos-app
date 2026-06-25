@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Search, Trash2, User, Plus, Minus, ShoppingBag, Printer, CreditCard, Banknote, Clock, ScanLine, StickyNote, Image as ImageIcon, X, ChevronLeft, ClipboardList } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
-import { Product, CartItem, PriceType, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, HoldBill, Category } from '../types';
+import { Product, CartItem, PriceType, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, Category } from '../types';
 import { formatIDR, getPriceByType, generateId, formatDate, toMySQLDate } from '../utils';
 import { generatePrintInvoice } from '../utils/printHelpers';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
@@ -51,10 +51,7 @@ export const POS: React.FC = () => {
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const holdBills = useData(() => StorageService.getHoldBills(), [], 'hold_bills') || [];
-  const [showHoldBillNameModal, setShowHoldBillNameModal] = useState(false);
-  const [showHoldBillListModal, setShowHoldBillListModal] = useState(false);
-  const [holdBillName, setHoldBillName] = useState('');
+
   const [search, setSearch] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
 
@@ -181,55 +178,6 @@ export const POS: React.FC = () => {
     setCart(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSaveHoldBill = async () => {
-    if (!holdBillName.trim()) {
-      alert('Nama meja/pelanggan tidak boleh kosong!');
-      return;
-    }
-    const newHoldBill: HoldBill = {
-      id: `hold-${Date.now()}`,
-      tableName: holdBillName,
-      cart: cart,
-      customerId: selectedCustomerId,
-      customerName: customerName,
-      defaultPriceType: defaultPriceType,
-      timestamp: Date.now()
-    };
-    const updatedBills = [...holdBills, newHoldBill];
-    await StorageService.saveHoldBills(updatedBills);
-    
-    setCart([]);
-    setSelectedCustomerId('');
-    setCustomerName('Pelanggan Umum');
-    setDefaultPriceType(PriceType.RETAIL);
-    setHoldBillName('');
-    setShowHoldBillNameModal(false);
-  };
-
-  const handleResumeHoldBill = async (bill: HoldBill) => {
-    if (cart.length > 0) {
-      if (!confirm('Keranjang saat ini tidak kosong. Ganti dengan pesanan dari meja ini? (Pesanan di keranjang akan tertimpa)')) {
-        return;
-      }
-    }
-    setCart(bill.cart);
-    setSelectedCustomerId(bill.customerId);
-    setCustomerName(bill.customerName);
-    setDefaultPriceType(bill.defaultPriceType);
-    
-    // Remove from hold bills
-    const updatedBills = holdBills.filter(b => b.id !== bill.id);
-    await StorageService.saveHoldBills(updatedBills);
-    
-    setShowHoldBillListModal(false);
-  };
-
-  const handleDeleteHoldBill = async (id: string) => {
-    if (confirm('Hapus pesanan meja ini permanen?')) {
-      const updatedBills = holdBills.filter(b => b.id !== id);
-      await StorageService.saveHoldBills(updatedBills);
-    }
-  };
 
   const subtotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + (item.finalPrice * item.qty), 0);
@@ -708,37 +656,20 @@ export const POS: React.FC = () => {
               <span className="text-2xl font-bold text-slate-900">{formatIDR(totalAmount)}</span>
             </div>
           </div>
-          {/* Action Buttons: Hold and Clear */}
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="mt-3 grid grid-cols-1 gap-2">
             {cart.length > 0 && (
-              <>
-                <button
-                  onClick={() => setShowHoldBillNameModal(true)}
-                  className="py-2 bg-amber-50 text-amber-600 rounded-lg text-sm font-medium hover:bg-amber-100 transition-colors flex items-center justify-center gap-2"
-                >
-                  <StickyNote size={16} />
-                  Simpan Meja
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm('Hapus semua item di keranjang?')) {
-                      setCart([]);
-                    }
-                  }}
-                  className="py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Trash2 size={16} />
-                  Kosongkan
-                </button>
-              </>
+              <button
+                onClick={() => {
+                  if (confirm('Hapus semua item di keranjang?')) {
+                    setCart([]);
+                  }
+                }}
+                className="py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors flex items-center justify-center gap-2 w-full"
+              >
+                <Trash2 size={16} />
+                Kosongkan Keranjang
+              </button>
             )}
-            <button
-              onClick={() => setShowHoldBillListModal(true)}
-              className={`py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 ${cart.length === 0 ? 'col-span-2' : 'col-span-2'}`}
-            >
-              <ClipboardList size={16} />
-              Daftar Meja (Hold) {holdBills.length > 0 && <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">{holdBills.length}</span>}
-            </button>
           </div>
 
           {/* Cart Items List - Enhanced for Mobile Scrolling inside Fixed Div */}
@@ -1040,61 +971,7 @@ export const POS: React.FC = () => {
           document.body
         )
       }
-      {/* Hold Bill Name Modal */}
-      {showHoldBillNameModal && createPortal(
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-fade-in">
-            <h3 className="text-lg font-bold text-slate-800 mb-4">Simpan Pesanan Meja</h3>
-            <input
-              type="text"
-              autoFocus
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl mb-4 focus:ring-2 focus:ring-amber-500 focus:outline-none"
-              placeholder="Contoh: Meja 4 / Bpk. Budi"
-              value={holdBillName}
-              onChange={(e) => setHoldBillName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSaveHoldBill()}
-            />
-            <div className="flex gap-3">
-              <button onClick={() => setShowHoldBillNameModal(false)} className="flex-1 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition-colors">Batal</button>
-              <button onClick={handleSaveHoldBill} className="flex-1 py-2.5 bg-amber-500 text-white rounded-xl font-bold shadow-md hover:bg-amber-600 transition-colors">Simpan</button>
-            </div>
-          </div>
-        </div>, document.body
-      )}
 
-      {/* Hold Bill List Modal */}
-      {showHoldBillListModal && createPortal(
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-fade-in max-h-[80vh] flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-slate-800">Daftar Meja (Hold Bills)</h3>
-              <button onClick={() => setShowHoldBillListModal(false)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-500"><X size={20} /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-              {holdBills.length === 0 ? (
-                <div className="text-center py-8 text-slate-400">
-                  <ClipboardList size={40} className="mx-auto mb-2 opacity-50" />
-                  <p>Belum ada meja yang disimpan</p>
-                </div>
-              ) : (
-                holdBills.map((bill) => (
-                  <div key={bill.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50 flex items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-slate-800 truncate">{bill.tableName}</h4>
-                      <p className="text-xs text-slate-500">{bill.cart.reduce((a,c) => a + c.qty, 0)} Item • {formatIDR(bill.cart.reduce((a,c) => a + (c.finalPrice * c.qty), 0))}</p>
-                      <p className="text-[10px] text-slate-400 mt-1">{new Date(bill.timestamp).toLocaleTimeString('id-ID')}</p>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <button onClick={() => handleResumeHoldBill(bill)} className="px-3 py-1.5 bg-blue-500 text-white text-xs font-bold rounded-lg hover:bg-blue-600 transition-colors">Lanjutkan</button>
-                      <button onClick={() => handleDeleteHoldBill(bill.id)} className="px-3 py-1.5 bg-red-100 text-red-600 text-xs font-bold rounded-lg hover:bg-red-200 transition-colors">Hapus</button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>, document.body
-      )}
     </div>
   );
 };

@@ -240,13 +240,3 @@ export interface StockAdjustment {
   userId?: string;
   userName?: string;
 }
-
-export interface HoldBill {
-  id: string;
-  tableName: string;
-  cart: CartItem[];
-  customerId: string;
-  customerName: string;
-  defaultPriceType: PriceType;
-  timestamp: number;
-}
