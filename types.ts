@@ -198,10 +198,15 @@ export interface StoreSettings {
   jargon?: string;
   footerMessage?: string;
   notes?: string;
+  instagram?: string;
+  tiktok?: string;
   showAddress?: boolean;
   showPhone?: boolean;
   showJargon?: boolean;
   showBank?: boolean;
+  showLogo?: boolean;
+  showInstagram?: boolean;
+  showTiktok?: boolean;
   printerType?: PrinterType;
   useBluetoothPrinter?: boolean;
   autoSyncMySQL?: boolean; // Auto sync dari MySQL saat startup

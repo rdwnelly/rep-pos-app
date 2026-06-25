@@ -235,11 +235,16 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
     } else {
         let headerHtml = `
             <div style="text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px;">
-                <img src="/logokasir.jpg" alt="Logo" style="width: 60px; height: 60px; border-radius: 8px; margin-bottom: 5px; object-fit: cover;" />
-                <h3 style="font-family: 'Lora', serif; margin: 0; font-size: 14px; text-transform: uppercase;">YAYASAN RUMAH ETNIK PAPUA</h3>
-                <p style="margin: 2px 0; font-size: 10px;">Jl. Baru Aimas - Klamono Km. 21, Malawili, Kec. Aimas, Kab. Sorong, Papua Barat Daya.</p>
-                <p style="margin: 2px 0; font-size: 10px;">WA: 0821-9986-7918</p>
-                <p style="margin: 2px 0; font-size: 10px;">IG: @rumah_etnik_papua | TikTok: Rumah Etnik Papua</p>
+                ${settings.showLogo !== false ? `<img src="/logokasir.jpg" alt="Logo" style="width: 60px; height: 60px; border-radius: 8px; margin-bottom: 5px; object-fit: cover;" />` : ''}
+                <h3 style="font-family: 'Lora', serif; margin: 0; font-size: 14px; text-transform: uppercase;">${settings.name || 'Toko'}</h3>
+                ${settings.showAddress !== false && settings.address ? `<p style="margin: 2px 0; font-size: 10px;">${settings.address}</p>` : ''}
+                ${settings.showPhone !== false && settings.phone ? `<p style="margin: 2px 0; font-size: 10px;">WA: ${settings.phone}</p>` : ''}
+                ${settings.showInstagram !== false && settings.instagram || settings.showTiktok !== false && settings.tiktok ? 
+                    `<p style="margin: 2px 0; font-size: 10px;">
+                        ${settings.showInstagram !== false && settings.instagram ? `IG: ${settings.instagram}` : ''}
+                        ${settings.showInstagram !== false && settings.instagram && settings.showTiktok !== false && settings.tiktok ? ' | ' : ''}
+                        ${settings.showTiktok !== false && settings.tiktok ? `TikTok: ${settings.tiktok}` : ''}
+                    </p>` : ''}
             </div>
             <div style="margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px;">
                 <table style="width: 100%; border: none; font-size: 9px; border-collapse: collapse;" cellspacing="0" cellpadding="0">
