@@ -162,6 +162,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                 <td>${i.qty}</td>
                 ${showHPP ? `<td style="text-align:right">${formatIDR(i.hpp || 0)}</td>` : ''}
                 <td style="text-align:right">${formatIDR(i.finalPrice)}</td>
+                <td>${i.categoryName || '-'}</td>
                 <td>${i.selectedPriceType}</td>
                 <td>${i.customerName}</td>
                 <td>${i.cashierName}</td>
@@ -196,7 +197,8 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                 <th>Qty</th>
                                 ${showHPP ? '<th>HPP</th>' : ''}
                                 <th>Harga Jual</th>
-                                <th>Kategori</th>
+                                <th>Kategori Produk</th>
+                                <th>Tipe Harga</th>
                                 <th>Pembeli</th>
                                 <th>Kasir</th>
                                 <th>Status</th>
@@ -224,7 +226,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
 
     const handleExport = () => {
         const showHPP = currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN;
-        let headers = ['ID Transaksi', 'No Faktur', 'Tanggal', 'Waktu', 'Item', 'Satuan', 'Qty', 'Harga Jual', 'Kategori', 'Pembeli', 'Kasir', 'Status'];
+        let headers = ['ID Transaksi', 'No Faktur', 'Tanggal', 'Waktu', 'Item', 'Satuan', 'Qty', 'Harga Jual', 'Kategori Produk', 'Tipe Harga', 'Pembeli', 'Kasir', 'Status'];
         if (showHPP) {
             headers.splice(7, 0, 'HPP');
         }
@@ -240,6 +242,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                 i.unit || 'Pcs',
                 i.qty,
                 i.finalPrice,
+                i.categoryName || '-',
                 i.selectedPriceType,
                 i.customerName,
                 i.cashierName,
@@ -266,7 +269,8 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                 'Satuan': i.unit || 'Pcs',
                 'Qty': i.qty,
                 'Harga Jual': i.finalPrice,
-                'Kategori': i.selectedPriceType,
+                'Kategori Produk': i.categoryName || '-',
+                'Tipe Harga': i.selectedPriceType,
                 'Pembeli': i.customerName,
                 'Kasir': i.cashierName,
                 'Status': i.transactionType === TransactionType.RETURN ? 'RETUR' : i.isReturned ? 'Retur Sebagian' : 'Normal'
@@ -287,7 +291,8 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
             { wch: 8 },  // Qty
             ...(showHPP ? [{ wch: 15 }] : []), // HPP
             { wch: 15 }, // Harga Jual
-            { wch: 15 }, // Kategori
+            { wch: 15 }, // Kategori Produk
+            { wch: 15 }, // Tipe Harga
             { wch: 20 }, // Pembeli
             { wch: 15 }, // Kasir
             { wch: 15 }  // Status
@@ -426,8 +431,11 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                 <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('finalPrice')}>
                                     <div className="flex items-center">Harga Jual <SortIcon column="finalPrice" /></div>
                                 </th>
+                                <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('categoryName')}>
+                                    <div className="flex items-center">Kategori Produk <SortIcon column="categoryName" /></div>
+                                </th>
                                 <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('selectedPriceType')}>
-                                    <div className="flex items-center">Kategori Harga <SortIcon column="selectedPriceType" /></div>
+                                    <div className="flex items-center">Tipe Harga <SortIcon column="selectedPriceType" /></div>
                                 </th>
                                 <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('customerName')}>
                                     <div className="flex items-center">Pembeli <SortIcon column="customerName" /></div>
@@ -461,6 +469,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                         <td className="p-4 text-slate-500">{formatIDR(item.hpp || 0)}</td>
                                     )}
                                     <td className="p-4 text-slate-800">{formatIDR(item.finalPrice)}</td>
+                                    <td className="p-4 text-slate-600">{item.categoryName || '-'}</td>
                                     <td className="p-4">
                                         <span className="px-2 py-1 rounded text-xs bg-slate-100 text-slate-600">
                                             {item.selectedPriceType}
