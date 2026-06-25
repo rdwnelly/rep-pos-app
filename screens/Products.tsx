@@ -46,7 +46,7 @@ export const Products: React.FC = () => {
 
   // Product Form State
   const [formData, setFormData] = useState<Partial<Product>>({
-    name: '', sku: '', stock: 0, hpp: 0, priceRetail: 0, priceGeneral: 0, priceWholesale: 0, pricePromo: 0, categoryId: '', categoryName: '', image: '', unit: 'Pcs'
+    name: '', sku: '', stock: 0, hpp: 0, priceRetail: 0, priceWholesale: 0, priceEmployee: 0, categoryId: '', categoryName: '', image: '', unit: 'Pcs'
   });
 
 
@@ -96,7 +96,7 @@ export const Products: React.FC = () => {
   };
 
   const resetProductForm = () => {
-    setFormData({ name: '', sku: '', stock: 0, hpp: 0, priceRetail: 0, priceGeneral: 0, priceWholesale: 0, pricePromo: 0, categoryId: '', categoryName: '', image: '', unit: 'Pcs' });
+    setFormData({ name: '', sku: '', stock: 0, hpp: 0, priceRetail: 0, priceWholesale: 0, priceEmployee: 0, categoryId: '', categoryName: '', image: '', unit: 'Pcs' });
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,9 +126,8 @@ export const Products: React.FC = () => {
       ...prev,
       hpp: hpp,
       priceRetail: std,
-      priceGeneral: std,
       priceWholesale: eko,
-      pricePromo: prem > 0 ? prem : prev.pricePromo
+      priceEmployee: std // Or whichever logic fits best for employee, defaulting to std for now
     }));
     setIsHPPModalOpen(false);
   };
@@ -179,12 +178,12 @@ export const Products: React.FC = () => {
 
     const headers = ['ID', 'Nama Produk', 'SKU', 'Kategori', 'Satuan', 'Stok'];
     if (showHPP) headers.push('HPP');
-    headers.push('Harga Eceran', 'Harga Umum', 'Harga Grosir', 'Harga Promo');
+    headers.push('Harga Eceran', 'Harga Grosir', 'Harga Karyawan');
 
     const rows = products.map(p => {
       const row = [p.id, p.name, p.sku, p.categoryName, p.unit || 'Pcs', p.stock];
       if (showHPP) row.push(p.hpp);
-      row.push(p.priceRetail, p.priceGeneral, p.priceWholesale, p.pricePromo || 0);
+      row.push(p.priceRetail, p.priceWholesale, p.priceEmployee || 0);
       return row;
     });
 
@@ -208,9 +207,8 @@ export const Products: React.FC = () => {
         row['HPP'] = p.hpp;
       }
       row['Harga Eceran'] = p.priceRetail;
-      row['Harga Umum'] = p.priceGeneral;
       row['Harga Grosir'] = p.priceWholesale;
-      row['Harga Promo'] = p.pricePromo || 0;
+      row['Harga Karyawan'] = p.priceEmployee || 0;
       return row;
     });
 
@@ -254,9 +252,8 @@ export const Products: React.FC = () => {
         <td style="text-align: right;">
           <div style="font-size: 11px;">
             <div style="color: #1d4ed8; font-weight: bold;">E: ${formatIDR(p.priceRetail)}</div>
-            <div>U: ${formatIDR(p.priceGeneral)}</div>
             <div style="color: #2563eb;">G: ${formatIDR(p.priceWholesale)}</div>
-            ${p.pricePromo ? `<div style="color: #dc2626; font-weight: bold;">P: ${formatIDR(p.pricePromo)}</div>` : ''}
+            <div style="color: #9333ea;">K: ${formatIDR(p.priceEmployee || 0)}</div>
           </div>
         </td>
       </tr>
@@ -342,10 +339,9 @@ export const Products: React.FC = () => {
         stock: headers.findIndex(h => h.includes('stok') || h.includes('stock')),
         hpp: headers.findIndex(h => h.includes('hpp') || h.includes('modal')),
         retail: headers.findIndex(h => h.includes('eceran') || h.includes('retail')),
-        general: headers.findIndex(h => h.includes('umum') || h.includes('general')),
+        employee: headers.findIndex(h => h.includes('karyawan') || h.includes('employee')),
         unit: headers.findIndex(h => h.includes('satuan') || h.includes('unit')),
-        wholesale: headers.findIndex(h => h.includes('grosir') || h.includes('wholesale')),
-        promo: headers.findIndex(h => h.includes('promo'))
+        wholesale: headers.findIndex(h => h.includes('grosir') || h.includes('wholesale'))
       };
 
       // Basic validation: Name is required
@@ -410,9 +406,8 @@ export const Products: React.FC = () => {
           stock: getValue(colMap.stock, 'int') as number,
           hpp: getValue(colMap.hpp, 'float') as number,
           priceRetail: getValue(colMap.retail, 'float') as number,
-          priceGeneral: getValue(colMap.general, 'float') as number,
+          priceEmployee: getValue(colMap.employee, 'float') as number,
           priceWholesale: getValue(colMap.wholesale, 'float') as number,
-          pricePromo: getValue(colMap.promo, 'float') as number,
           image: ''
         });
       }
@@ -661,9 +656,8 @@ export const Products: React.FC = () => {
                 <td className="p-4 text-slate-600">
                   <div className="flex flex-col gap-0.5 text-xs">
                     <span className="text-primary font-bold">E: {formatIDR(p.priceRetail)}</span>
-                    <span className="text-slate-500">U: {formatIDR(p.priceGeneral)}</span>
                     <span className="text-blue-600">G: {formatIDR(p.priceWholesale)}</span>
-                    {p.pricePromo ? <span className="text-red-600 font-bold">P: {formatIDR(p.pricePromo)}</span> : null}
+                    <span className="text-purple-600">K: {formatIDR(p.priceEmployee || 0)}</span>
                   </div>
                 </td>
                 <td className="p-4 text-right">
@@ -791,16 +785,12 @@ export const Products: React.FC = () => {
                     <input id="priceRetail" name="priceRetail" type="text" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.priceRetail} onChange={e => handleNumericInput('priceRetail', e.target.value)} />
                   </div>
                   <div className="col-span-2 md:col-span-1">
-                    <label htmlFor="priceGeneral" className="block text-xs text-slate-500 mb-1">Harga Umum</label>
-                    <input id="priceGeneral" name="priceGeneral" type="text" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.priceGeneral} onChange={e => handleNumericInput('priceGeneral', e.target.value)} />
-                  </div>
-                  <div className="col-span-2 md:col-span-1">
                     <label htmlFor="priceWholesale" className="block text-xs text-slate-500 mb-1">Harga Grosir</label>
                     <input id="priceWholesale" name="priceWholesale" type="text" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.priceWholesale} onChange={e => handleNumericInput('priceWholesale', e.target.value)} />
                   </div>
                   <div className="col-span-2 md:col-span-1">
-                    <label htmlFor="pricePromo" className="block text-xs text-red-500 font-bold mb-1">Harga Promo</label>
-                    <input id="pricePromo" name="pricePromo" type="text" className="w-full border border-red-200 bg-red-50 p-2 rounded-lg focus:ring-2 focus:ring-red-500 outline-none" value={formData.pricePromo || 0} onChange={e => handleNumericInput('pricePromo', e.target.value)} />
+                    <label htmlFor="priceEmployee" className="block text-xs text-purple-500 font-bold mb-1">Harga Karyawan</label>
+                    <input id="priceEmployee" name="priceEmployee" type="text" className="w-full border border-purple-200 bg-purple-50 p-2 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" value={formData.priceEmployee || 0} onChange={e => handleNumericInput('priceEmployee', e.target.value)} />
                   </div>
                 </div>
               </div>

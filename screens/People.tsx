@@ -627,9 +627,8 @@ export const People: React.FC = () => {
                                         onChange={e => setFormData({ ...formData, defaultPriceType: e.target.value as PriceType })}
                                     >
                                         <option value={PriceType.RETAIL}>Eceran (Retail)</option>
-                                        <option value={PriceType.GENERAL}>Umum</option>
                                         <option value={PriceType.WHOLESALE}>Grosir</option>
-                                        <option value={PriceType.PROMO}>Promo</option>
+                                        <option value={PriceType.EMPLOYEE}>Karyawan</option>
                                     </select>
                                     <p className="text-xs text-slate-500 mt-1">Kategori harga ini akan otomatis terpilih saat pelanggan ini dipilih di kasir.</p>
                                 </div>
