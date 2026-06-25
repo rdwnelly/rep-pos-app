@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useData } from "../../../hooks/useData";
 import { StorageService } from "../../../services/storage";
 import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
@@ -10,6 +10,15 @@ export default function LaporanRekapanPage() {
     const [namaKasir, setNamaKasir] = useState("");
     const [modalDisetor, setModalDisetor] = useState("");
     const [catatan, setCatatan] = useState("");
+    const [manualPengeluaran, setManualPengeluaran] = useState(Array.from({ length: 18 }, () => ({ catatan: '', nominal: '' })));
+
+    const handleManualPengeluaranChange = (index, field, value) => {
+        setManualPengeluaran(prev => {
+            const newArr = [...prev];
+            newArr[index] = { ...newArr[index], [field]: value };
+            return newArr;
+        });
+    };
 
     const transactions = useData(() => StorageService.getTransactions(), [], 'transactions') || [];
     const cashflows = useData(() => StorageService.getCashFlow(), [], 'cashflow') || [];
@@ -98,7 +107,18 @@ export default function LaporanRekapanPage() {
         window.print();
     };
 
-    const uangYangAda = Number(modalDisetor || 0) + (rekapan?.totalTunai || 0) - (rekapan?.totalPengeluaran || 0);
+    // Auto-fill manualPengeluaran when rekapan changes (e.g. date change)
+    useEffect(() => {
+        if (rekapan) {
+            setManualPengeluaran(Array.from({ length: 18 }, (_, i) => {
+                const item = rekapan.pengeluaran[i];
+                return item ? { catatan: item.catatan, nominal: String(item.nominal) } : { catatan: '', nominal: '' };
+            }));
+        }
+    }, [rekapan?.pengeluaran]);
+
+    const finalTotalPengeluaran = manualPengeluaran.reduce((sum, item) => sum + (Number(item.nominal) || 0), 0);
+    const uangYangAda = Number(modalDisetor || 0) + (rekapan?.totalTunai || 0) - finalTotalPengeluaran;
 
     return (
         <div className="min-h-screen bg-gray-100 p-4 md:p-8 print:bg-white print:p-0">
@@ -268,7 +288,7 @@ export default function LaporanRekapanPage() {
                                             <tr>
                                                 <td style={{ border: '1px solid black', padding: '2px 4px', textTransform: 'uppercase' }}>PENGELUARAN</td>
                                                 <td style={{ border: '1px solid black', padding: '2px 4px', textAlign: 'right' }}>
-                                                    {rekapan.totalPengeluaran.toLocaleString('id-ID')}
+                                                    {finalTotalPengeluaran.toLocaleString('id-ID')}
                                                 </td>
                                             </tr>
                                             <tr>
@@ -298,24 +318,38 @@ export default function LaporanRekapanPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {/* Render 18 baris pengeluaran */}
-                                            {Array.from({ length: Math.max(18, rekapan.pengeluaran.length) }).map((_, i) => {
-                                                const item = rekapan.pengeluaran[i];
-                                                return (
-                                                    <tr key={`pengeluaran-${i}`} style={{ height: '18px' }}>
-                                                        <td style={{ border: '1px solid black', padding: '2px 4px', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-                                                            {item ? item.catatan : ''}
-                                                        </td>
-                                                        <td style={{ border: '1px solid black', padding: '2px 4px', textAlign: 'right', width: '70px' }}>
-                                                            {item ? item.nominal.toLocaleString('id-ID') : ''}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
+                                            {/* Render 18 baris pengeluaran (Editable) */}
+                                            {manualPengeluaran.map((item, i) => (
+                                                <tr key={`pengeluaran-${i}`} style={{ height: '18px' }}>
+                                                    <td style={{ border: '1px solid black', padding: 0 }}>
+                                                        <input 
+                                                            type="text" 
+                                                            className="w-full h-full px-1 text-[9px] outline-none bg-transparent print:hidden"
+                                                            value={item.catatan}
+                                                            onChange={(e) => handleManualPengeluaranChange(i, 'catatan', e.target.value)}
+                                                            placeholder={i === 0 ? "Ketik pengeluaran..." : ""}
+                                                        />
+                                                        <span className="hidden print:block px-1 font-medium" style={{ fontSize: '9px', wordBreak: 'break-word' }}>
+                                                            {item.catatan}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ border: '1px solid black', padding: 0, width: '70px' }}>
+                                                        <input 
+                                                            type="number" 
+                                                            className="w-full h-full px-1 text-[9px] outline-none text-right bg-transparent print:hidden"
+                                                            value={item.nominal}
+                                                            onChange={(e) => handleManualPengeluaranChange(i, 'nominal', e.target.value)}
+                                                        />
+                                                        <span className="hidden print:block px-1 text-right font-medium" style={{ fontSize: '9px' }}>
+                                                            {item.nominal ? Number(item.nominal).toLocaleString('id-ID') : ''}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
                                             <tr>
                                                 <td style={{ border: '2px solid black', padding: '4px', fontWeight: 'bold', textAlign: 'center', backgroundColor: '#ffff00' }}>TOTAL</td>
                                                 <td style={{ border: '2px solid black', padding: '4px', fontWeight: 'bold', textAlign: 'right', backgroundColor: '#ffff00' }}>
-                                                    {rekapan.totalPengeluaran > 0 ? rekapan.totalPengeluaran.toLocaleString('id-ID') : ''}
+                                                    {finalTotalPengeluaran > 0 ? finalTotalPengeluaran.toLocaleString('id-ID') : ''}
                                                 </td>
                                             </tr>
                                         </tbody>
