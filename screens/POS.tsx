@@ -385,13 +385,13 @@ export const POS: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-6rem)] gap-6 animate-fade-in relative">
+    <div className="flex flex-col lg:flex-row flex-1 h-full w-full gap-0 animate-fade-in relative bg-white">
       {flyingItems.map(item => (
         <FlyingItem key={item.id} item={item} cartRect={cartIconRef.current?.getBoundingClientRect()} />
       ))}
       
       {/* Product Grid */}
-      <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="flex-1 flex flex-col bg-white border-r border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex gap-4 bg-white z-10">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
@@ -472,7 +472,7 @@ export const POS: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 content-start pb-20 lg:pb-4">
+        <div className="flex-1 overflow-y-auto p-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 content-start pb-20 lg:pb-2">
           {visibleProducts.map(product => (
             <button
               key={product.id}
@@ -526,12 +526,12 @@ export const POS: React.FC = () => {
 
       {/* Cart Sidebar / Mobile Modal */}
       <div ref={cartIconRef} className={`
-        flex flex-col bg-white lg:rounded-2xl lg:shadow-sm lg:border lg:border-slate-200
+        flex flex-col bg-white
         lg:w-96 lg:static lg:h-full lg:overflow-hidden
         fixed inset-0 z-[60] transition-transform duration-300 ease-in-out
         ${showMobileCart ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
       `}>
-        <div className="p-4 border-b border-slate-100 bg-slate-50 lg:rounded-t-2xl flex flex-col h-full lg:h-full overflow-hidden">
+        <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col h-full lg:h-full overflow-hidden">
 
           {/* Mobile Header for Cart */}
           <div className="lg:hidden flex items-center gap-3 mb-4 pb-4 border-b border-slate-200">
