@@ -241,8 +241,8 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                 <h3 style="font-family: 'Lora', serif; margin: 0; font-size: 14px; text-transform: uppercase;">${settings.name || 'Toko'}</h3>
                 ${settings.showAddress !== false && settings.address ? `<p style="margin: 2px 0; font-size: 10px;">${settings.address}</p>` : ''}
                 ${settings.showPhone !== false && settings.phone ? `<p style="margin: 2px 0; font-size: 10px;">WA: ${settings.phone}</p>` : ''}
-                ${settings.showInstagram !== false && settings.instagram || settings.showTiktok !== false && settings.tiktok ? 
-                    `<p style="margin: 2px 0; font-size: 10px;">
+                ${settings.showInstagram !== false && settings.instagram || settings.showTiktok !== false && settings.tiktok ?
+                `<p style="margin: 2px 0; font-size: 10px;">
                         ${settings.showInstagram !== false && settings.instagram ? `IG: ${settings.instagram}` : ''}
                         ${settings.showInstagram !== false && settings.instagram && settings.showTiktok !== false && settings.tiktok ? ' | ' : ''}
                         ${settings.showTiktok !== false && settings.tiktok ? `TikTok: ${settings.tiktok}` : ''}

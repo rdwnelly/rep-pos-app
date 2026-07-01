@@ -210,7 +210,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
           {/* Optional: Add user avatar or other mobile actions here */}
         </div>
 
-        <div className="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto">
+        <div className={`flex-1 w-full mx-auto flex flex-col ${activePage === 'pos' ? 'p-0 max-w-full' : 'p-4 md:p-8 max-w-7xl'}`}>
           {children}
         </div>
       </main>
