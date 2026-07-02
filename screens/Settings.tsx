@@ -17,6 +17,135 @@ const DEFAULT_STORE_SETTINGS: StoreSettings = {
     showAddress: true, showJargon: true, showBank: true, showPhone: true, showLogo: true, showInstagram: true, showTiktok: true, printerType: '58mm'
 };
 
+interface DeleteModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    title: string;
+    description: string;
+    confirmationText: string;
+    requireDateFilter: boolean;
+    onConfirm: (startDate?: string, endDate?: string) => Promise<void>;
+}
+
+const DeleteConfirmationModal: React.FC<DeleteModalProps> = ({
+    isOpen, onClose, title, description, confirmationText, requireDateFilter, onConfirm
+}) => {
+    const [dateFilterType, setDateFilterType] = useState<'ALL' | 'RANGE'>('ALL');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [confirmInput, setConfirmInput] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    if (!isOpen) return null;
+
+    const handleConfirm = async () => {
+        if (confirmInput.trim().toUpperCase() !== confirmationText.toUpperCase()) {
+            alert('Teks konfirmasi tidak sesuai!');
+            return;
+        }
+
+        let finalStart, finalEnd;
+        if (requireDateFilter && dateFilterType === 'RANGE') {
+            if (!startDate || !endDate) {
+                alert('Silakan pilih rentang tanggal (Mulai dan Sampai) dengan lengkap!');
+                return;
+            }
+            if (new Date(startDate) > new Date(endDate)) {
+                alert('Tanggal mulai tidak boleh lebih besar dari tanggal selesai!');
+                return;
+            }
+            // Append time to ensure start of day and end of day
+            finalStart = `${startDate}T00:00:00.000Z`;
+            finalEnd = `${endDate}T23:59:59.999Z`;
+        }
+
+        setIsLoading(true);
+        try {
+            await onConfirm(finalStart, finalEnd);
+        } catch (error: any) {
+            alert(`Error: ${error.message}`);
+        } finally {
+            setIsLoading(false);
+            setConfirmInput('');
+            onClose();
+        }
+    };
+
+    return createPortal(
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-black/50 backdrop-blur-sm z-[99999] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-xl animate-fade-in">
+                <div className="bg-red-50 p-4 border-b border-red-100 flex justify-between items-center">
+                    <h3 className="font-bold text-red-700 flex items-center gap-2">
+                        <AlertTriangle size={20} /> {title}
+                    </h3>
+                    <button onClick={onClose} disabled={isLoading} className="text-red-400 hover:text-red-700">
+                        <X size={20} />
+                    </button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div className="text-sm text-slate-700 font-medium whitespace-pre-wrap">{description}</div>
+                    
+                    {requireDateFilter && (
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <p className="text-sm font-bold text-slate-700 mb-2">Pilih Rentang Waktu Data:</p>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="dateFilterType" checked={dateFilterType === 'ALL'} onChange={() => setDateFilterType('ALL')} className="text-red-600" />
+                                    <span className="text-sm">Semua Waktu (Seluruh Data)</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="dateFilterType" checked={dateFilterType === 'RANGE'} onChange={() => setDateFilterType('RANGE')} className="text-red-600" />
+                                    <span className="text-sm">Pilih Tanggal Tertentu</span>
+                                </label>
+                            </div>
+
+                            {dateFilterType === 'RANGE' && (
+                                <div className="mt-3 grid grid-cols-2 gap-3 animate-fade-in">
+                                    <div>
+                                        <label className="block text-xs text-slate-500 mb-1">Mulai Tanggal</label>
+                                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full border border-slate-300 p-2 rounded focus:ring-2 focus:ring-red-500 outline-none text-sm" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-slate-500 mb-1">Sampai Tanggal</label>
+                                        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full border border-slate-300 p-2 rounded focus:ring-2 focus:ring-red-500 outline-none text-sm" />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                        <label className="block text-sm text-red-900 mb-2">
+                            Untuk melanjutkan, ketik: <strong>{confirmationText}</strong>
+                        </label>
+                        <input 
+                            type="text" 
+                            value={confirmInput} 
+                            onChange={e => setConfirmInput(e.target.value)} 
+                            placeholder={confirmationText}
+                            className="w-full border border-red-300 p-2 rounded outline-none focus:ring-2 focus:ring-red-500 text-center font-bold"
+                        />
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                        <button onClick={onClose} disabled={isLoading} className="flex-1 py-2 rounded-lg text-slate-600 hover:bg-slate-100 font-medium border border-slate-200">
+                            Batal
+                        </button>
+                        <button 
+                            onClick={handleConfirm} 
+                            disabled={isLoading || confirmInput.trim().toUpperCase() !== confirmationText} 
+                            className="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {isLoading ? 'Menghapus...' : <><Trash2 size={16} /> Hapus Data</>}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+};
+
 export const Settings: React.FC = () => {
     // User State with useData
     const currentUser = JSON.parse(localStorage.getItem('pos_current_user') || '{}') as User;
@@ -39,6 +168,22 @@ export const Settings: React.FC = () => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [userForm, setUserForm] = useState<Partial<User>>({
         name: '', username: '', email: '', password: '', role: UserRole.CASHIER, image: ''
+    });
+
+    const [deleteModalConfig, setDeleteModalConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        description: string;
+        confirmationText: string;
+        requireDateFilter: boolean;
+        onConfirm: (startDate?: string, endDate?: string) => Promise<void>;
+    }>({
+        isOpen: false,
+        title: '',
+        description: '',
+        confirmationText: '',
+        requireDateFilter: false,
+        onConfirm: async () => {}
     });
 
     // Store State
@@ -285,115 +430,140 @@ export const Settings: React.FC = () => {
     // --- DATA MANAGEMENT HANDLERS (SUPERADMIN ONLY) ---
     const handleResetProducts = async () => {
         if (!isSuperAdmin) return;
-        const confirmation = prompt('PERINGATAN: Ini akan menghapus SEMUA data produk!\n\nSemua produk yang Anda input akan HILANG PERMANEN!\nStock akan kembali ke 0.\n\nKetik "HAPUS PRODUK" untuk konfirmasi:');
-        if (confirmation === 'HAPUS PRODUK') {
-            await StorageService.resetProducts();
-            alert('✅ Semua data produk berhasil dihapus!');
-            window.location.reload();
-        } else {
-            alert('❌ Penghapusan dibatalkan.');
-        }
+        setDeleteModalConfig({
+            isOpen: true,
+            title: 'Hapus Data Produk',
+            description: 'PERINGATAN: Ini akan menghapus SEMUA data produk!\n\nSemua produk yang Anda input akan HILANG PERMANEN!\nStock akan kembali ke 0.',
+            confirmationText: 'HAPUS PRODUK',
+            requireDateFilter: false,
+            onConfirm: async () => {
+                await StorageService.resetProducts();
+                alert('✅ Semua data produk berhasil dihapus!');
+                window.location.reload();
+            }
+        });
     };
 
     const handleResetTransactions = async () => {
         if (!isSuperAdmin) return;
-        const confirmation = prompt('PERINGATAN: Ini akan menghapus SEMUA data transaksi penjualan!\n\nKetik "HAPUS TRANSAKSI" untuk konfirmasi:');
-        if (confirmation === 'HAPUS TRANSAKSI') {
-            await StorageService.resetTransactions();
-            alert('✅ Semua data transaksi berhasil dihapus!');
-        } else {
-            alert('❌ Penghapusan dibatalkan.');
-        }
+        setDeleteModalConfig({
+            isOpen: true,
+            title: 'Hapus Data Transaksi',
+            description: 'PERINGATAN: Ini akan menghapus data transaksi penjualan!',
+            confirmationText: 'HAPUS TRANSAKSI',
+            requireDateFilter: true,
+            onConfirm: async (startDate, endDate) => {
+                await StorageService.resetTransactions(startDate, endDate);
+                alert('✅ Data transaksi berhasil dihapus!');
+                window.location.reload();
+            }
+        });
     };
 
     const handleResetPurchases = async () => {
         if (!isSuperAdmin) return;
-        const confirmation = prompt('PERINGATAN: Ini akan menghapus SEMUA data pembelian/stok masuk!\n\nKetik "HAPUS PEMBELIAN" untuk konfirmasi:');
-        if (confirmation === 'HAPUS PEMBELIAN') {
-            await StorageService.resetPurchases();
-            alert('✅ Semua data pembelian berhasil dihapus!');
-        } else {
-            alert('❌ Penghapusan dibatalkan.');
-        }
+        setDeleteModalConfig({
+            isOpen: true,
+            title: 'Hapus Data Pembelian',
+            description: 'PERINGATAN: Ini akan menghapus data pembelian/stok masuk!',
+            confirmationText: 'HAPUS PEMBELIAN',
+            requireDateFilter: true,
+            onConfirm: async (startDate, endDate) => {
+                await StorageService.resetPurchases(startDate, endDate);
+                alert('✅ Data pembelian berhasil dihapus!');
+                window.location.reload();
+            }
+        });
     };
 
     const handleResetCashFlow = async () => {
         if (!isSuperAdmin) return;
-        const confirmation = prompt('PERINGATAN: Ini akan menghapus SEMUA data arus kas!\n\nKetik "HAPUS ARUS KAS" untuk konfirmasi:');
-        if (confirmation === 'HAPUS ARUS KAS') {
-            await StorageService.resetCashFlow();
-            alert('✅ Semua data arus kas berhasil dihapus!');
-        } else {
-            alert('❌ Penghapusan dibatalkan.');
-        }
+        setDeleteModalConfig({
+            isOpen: true,
+            title: 'Hapus Data Arus Kas',
+            description: 'PERINGATAN: Ini akan menghapus data arus kas!',
+            confirmationText: 'HAPUS ARUS KAS',
+            requireDateFilter: true,
+            onConfirm: async (startDate, endDate) => {
+                await StorageService.resetCashFlow(startDate, endDate);
+                alert('✅ Data arus kas berhasil dihapus!');
+                window.location.reload();
+            }
+        });
     };
 
     const handleResetStockAdjustments = async () => {
         if (!isSuperAdmin) return;
-        const confirmation = prompt('PERINGATAN: Ini akan menghapus SEMUA data riwayat penyesuaian stok!\n\nKetik "HAPUS DATA STOK" untuk konfirmasi:');
-        if (confirmation === 'HAPUS DATA STOK') {
-            await StorageService.resetStockAdjustments();
-            alert('✅ Semua data penyesuaian stok berhasil dihapus!');
-        } else {
-            alert('❌ Penghapusan dibatalkan.');
-        }
+        setDeleteModalConfig({
+            isOpen: true,
+            title: 'Hapus Penyesuaian Stok',
+            description: 'PERINGATAN: Ini akan menghapus data riwayat penyesuaian stok!',
+            confirmationText: 'HAPUS DATA STOK',
+            requireDateFilter: true,
+            onConfirm: async (startDate, endDate) => {
+                await StorageService.resetStockAdjustments(startDate, endDate);
+                alert('✅ Data penyesuaian stok berhasil dihapus!');
+                window.location.reload();
+            }
+        });
     };
 
     const handleResetAllFinancial = async () => {
         if (!isSuperAdmin) return;
-        const confirmation = prompt('⚠️ BAHAYA: Ini akan menghapus SEMUA data keuangan (Transaksi, Pembelian, Arus Kas, Penyesuaian Stok)!\n\nTindakan ini TIDAK DAPAT DIBATALKAN!\n\nKetik "RESET SEMUA" untuk konfirmasi:');
-        if (confirmation === 'RESET SEMUA') {
-            const doubleConfirm = confirm('Apakah Anda BENAR-BENAR YAKIN ingin menghapus semua data keuangan?');
-            if (doubleConfirm) {
-                await StorageService.resetAllFinancialData();
-                alert('✅ Semua data keuangan berhasil dihapus!');
-                window.location.reload(); // Refresh halaman
-            } else {
-                alert('❌ Penghapusan dibatalkan.');
+        setDeleteModalConfig({
+            isOpen: true,
+            title: 'Reset Semua Keuangan',
+            description: '⚠️ BAHAYA: Ini akan menghapus data keuangan (Transaksi, Pembelian, Arus Kas, Penyesuaian Stok)!\nTindakan ini TIDAK DAPAT DIBATALKAN!',
+            confirmationText: 'RESET SEMUA',
+            requireDateFilter: true,
+            onConfirm: async (startDate, endDate) => {
+                await StorageService.resetAllFinancialData(startDate, endDate);
+                alert('✅ Data keuangan berhasil dihapus!');
+                window.location.reload();
             }
-        } else {
-            alert('❌ Penghapusan dibatalkan.');
-        }
+        });
     };
 
     const handleResetMasterData = async () => {
         if (!isSuperAdmin) return;
-        const confirmation = prompt('⚠️ BAHAYA: Ini akan me-reset SEMUA Master Data (Produk, Kategori, Pelanggan, Supplier) ke default awal!\n\nData yang Anda input akan HILANG PERMANEN!\n\nKetik "RESET MASTER DATA" untuk konfirmasi:');
-        if (confirmation === 'RESET MASTER DATA') {
-            const doubleConfirm = confirm('Apakah Anda BENAR-BENAR YAKIN ingin me-reset Master Data ke default?');
-            if (doubleConfirm) {
+        setDeleteModalConfig({
+            isOpen: true,
+            title: 'Reset Master Data',
+            description: '⚠️ BAHAYA: Ini akan me-reset SEMUA Master Data (Produk, Kategori, Pelanggan, Supplier) ke default awal!\nData yang Anda input akan HILANG PERMANEN!',
+            confirmationText: 'RESET MASTER DATA',
+            requireDateFilter: false,
+            onConfirm: async () => {
                 await StorageService.resetMasterData();
                 alert('✅ Master Data berhasil di-reset ke default!');
                 window.location.reload();
-            } else {
-                alert('❌ Reset dibatalkan.');
             }
-        } else {
-            alert('❌ Reset dibatalkan.');
-        }
+        });
     };
 
     const handleResetAllData = async () => {
         if (!isSuperAdmin) return;
-        const confirmation = prompt('🚨 PERINGATAN EKSTRIM 🚨\n\nIni akan menghapus SELURUH DATA dari database:\n• Transaksi Penjualan\n• Pembelian\n• Arus Kas\n• Penyesuaian Stok\n• Produk\n• Kategori\n• Pelanggan\n• Supplier\n\nSEMUA DATA AKAN HILANG PERMANEN!\n\nKetik "HAPUS SEMUA DATA" untuk konfirmasi:');
-        if (confirmation === 'HAPUS SEMUA DATA') {
-            const doubleConfirm = confirm('⚠️ KONFIRMASI KEDUA ⚠️\n\nAnda akan menghapus SELURUH DATA di aplikasi!\nTindakan ini TIDAK DAPAT DIBATALKAN!\n\nLanjutkan?');
-            if (doubleConfirm) {
-                const tripleConfirm = prompt('KONFIRMASI TERAKHIR!\n\nKetik nama toko Anda untuk konfirmasi penghapusan total data:');
-                const storeSettings = await StorageService.getStoreSettings();
-                if (tripleConfirm === storeSettings.name) {
-                    await StorageService.resetAllData();
-                    alert('✅ SEMUA data berhasil dihapus! Aplikasi akan dimuat ulang.');
-                    window.location.reload();
-                } else {
-                    alert('❌ Nama toko tidak cocok. Penghapusan dibatalkan.');
-                }
-            } else {
-                alert('❌ Penghapusan dibatalkan.');
-            }
-        } else {
-            alert('❌ Penghapusan dibatalkan.');
+        
+        const tripleConfirm = prompt('🚨 PERINGATAN EKSTRIM 🚨\n\nMenghapus SELURUH DATA dari database.\nKetik nama toko Anda untuk konfirmasi awal penghapusan total data:');
+        if (!tripleConfirm) return;
+        
+        const storeSettingsData = await StorageService.getStoreSettings();
+        if (tripleConfirm !== storeSettingsData.name) {
+            alert('❌ Nama toko tidak cocok. Penghapusan dibatalkan.');
+            return;
         }
+
+        setDeleteModalConfig({
+            isOpen: true,
+            title: 'HAPUS SEMUA DATA',
+            description: '🚨 PERINGATAN EKSTRIM 🚨\n\nIni akan menghapus SELURUH DATA dari database:\n• Transaksi Penjualan\n• Pembelian\n• Arus Kas\n• Penyesuaian Stok\n• Produk\n• Kategori\n• Pelanggan\n• Supplier\n\nSEMUA DATA AKAN HILANG PERMANEN!',
+            confirmationText: 'HAPUS SEMUA DATA',
+            requireDateFilter: false,
+            onConfirm: async () => {
+                await StorageService.resetAllData();
+                alert('✅ SEMUA data berhasil dihapus! Aplikasi akan dimuat ulang.');
+                window.location.reload();
+            }
+        });
     };
 
 
@@ -1154,6 +1324,11 @@ export const Settings: React.FC = () => {
                     document.body
                 )
             }
+
+            <DeleteConfirmationModal 
+                {...deleteModalConfig} 
+                onClose={() => setDeleteModalConfig(prev => ({ ...prev, isOpen: false }))} 
+            />
         </div >
     );
 };
