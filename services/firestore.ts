@@ -12,6 +12,7 @@ import {
   writeBatch,
   orderBy,
   increment,
+  where,
 } from "firebase/firestore";
 import { db } from "../src/lib/firebase";
 import {
@@ -62,11 +63,42 @@ const getDocument = async <T>(name: string, id: string): Promise<T | null> => {
 
 const deleteCollection = async (name: string) => {
   const snapshot = await getDocs(collectionRef(name));
-  const batch = writeBatch(db);
-  snapshot.docs.forEach((docSnapshot) => {
-    batch.delete(doc(collectionRef(name), docSnapshot.id));
-  });
-  await batch.commit();
+  
+  // Firestore batches have a limit of 500 operations
+  const chunks = [];
+  for (let i = 0; i < snapshot.docs.length; i += 500) {
+    chunks.push(snapshot.docs.slice(i, i + 500));
+  }
+  
+  for (const chunk of chunks) {
+    const batch = writeBatch(db);
+    chunk.forEach((docSnapshot) => {
+      batch.delete(doc(collectionRef(name), docSnapshot.id));
+    });
+    await batch.commit();
+  }
+};
+
+const deleteCollectionByDateRange = async (name: string, startDate?: string, endDate?: string) => {
+  let q: any = collectionRef(name);
+  if (startDate && endDate) {
+    q = query(collectionRef(name), where("date", ">=", startDate), where("date", "<=", endDate));
+  }
+  
+  const snapshot = await getDocs(q);
+  
+  const chunks = [];
+  for (let i = 0; i < snapshot.docs.length; i += 500) {
+    chunks.push(snapshot.docs.slice(i, i + 500));
+  }
+  
+  for (const chunk of chunks) {
+    const batch = writeBatch(db);
+    chunk.forEach((docSnapshot) => {
+      batch.delete(doc(collectionRef(name), docSnapshot.id));
+    });
+    await batch.commit();
+  }
 };
 
 const cleanUndefined = (obj: any): any => {
@@ -318,16 +350,16 @@ export const FirestoreService = {
   deleteUser: async (id: string) => deleteDoc(doc(collectionRef("users"), id)),
 
   resetProducts: async () => deleteCollection("products"),
-  resetTransactions: async () => deleteCollection("transactions"),
-  resetPurchases: async () => deleteCollection("purchases"),
-  resetCashFlow: async () => deleteCollection("cashflow"),
-  resetStockAdjustments: async () => deleteCollection("stock_adjustments"),
-  resetAllFinancialData: async () => {
+  resetTransactions: async (startDate?: string, endDate?: string) => deleteCollectionByDateRange("transactions", startDate, endDate),
+  resetPurchases: async (startDate?: string, endDate?: string) => deleteCollectionByDateRange("purchases", startDate, endDate),
+  resetCashFlow: async (startDate?: string, endDate?: string) => deleteCollectionByDateRange("cashflow", startDate, endDate),
+  resetStockAdjustments: async (startDate?: string, endDate?: string) => deleteCollectionByDateRange("stock_adjustments", startDate, endDate),
+  resetAllFinancialData: async (startDate?: string, endDate?: string) => {
     await Promise.all([
-      deleteCollection("transactions"),
-      deleteCollection("purchases"),
-      deleteCollection("cashflow"),
-      deleteCollection("stock_adjustments"),
+      deleteCollectionByDateRange("transactions", startDate, endDate),
+      deleteCollectionByDateRange("purchases", startDate, endDate),
+      deleteCollectionByDateRange("cashflow", startDate, endDate),
+      deleteCollectionByDateRange("stock_adjustments", startDate, endDate),
     ]);
   },
   resetMasterData: async () => {

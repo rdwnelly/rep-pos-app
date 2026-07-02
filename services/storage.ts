@@ -212,28 +212,28 @@ export const StorageService = {
     notifyListeners('products');
     notifyListeners('stock_adjustments');
   },
-  resetTransactions: async () => {
-    await ApiService.resetTransactions();
+  resetTransactions: async (startDate?: string, endDate?: string) => {
+    await ApiService.resetTransactions(startDate, endDate);
     notifyListeners('transactions');
     notifyListeners('products');
     notifyListeners('cashflow');
   },
-  resetPurchases: async () => {
-    await ApiService.resetPurchases();
+  resetPurchases: async (startDate?: string, endDate?: string) => {
+    await ApiService.resetPurchases(startDate, endDate);
     notifyListeners('purchases');
     notifyListeners('products');
     notifyListeners('cashflow');
   },
-  resetCashFlow: async () => {
-    await ApiService.resetCashFlow();
+  resetCashFlow: async (startDate?: string, endDate?: string) => {
+    await ApiService.resetCashFlow(startDate, endDate);
     notifyListeners('cashflow');
   },
-  resetStockAdjustments: async () => {
-    await ApiService.resetStockAdjustments();
+  resetStockAdjustments: async (startDate?: string, endDate?: string) => {
+    await ApiService.resetStockAdjustments(startDate, endDate);
     notifyListeners('stock_adjustments');
   },
-  resetAllFinancialData: async () => {
-    await ApiService.resetAllFinancialData();
+  resetAllFinancialData: async (startDate?: string, endDate?: string) => {
+    await ApiService.resetAllFinancialData(startDate, endDate);
     notifyListeners('transactions');
     notifyListeners('purchases');
     notifyListeners('cashflow');
