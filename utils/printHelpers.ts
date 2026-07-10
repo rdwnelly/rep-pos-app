@@ -56,27 +56,32 @@ function generateDynamicQRIS(staticQris: string, amount: number): string {
     let result = '';
     let hasTag54 = false;
 
+    // First check if 54 already exists
+    for (const el of elements) {
+        if (el.tag === '54') hasTag54 = true;
+    }
+
     for (const el of elements) {
         if (el.tag === '63') continue;
+        
         if (el.tag === '01') {
             result += encodeTLV('01', '12');
         } else if (el.tag === '54') {
             result += encodeTLV('54', amount.toString());
-            hasTag54 = true;
         } else {
             result += encodeTLV(el.tag, el.value);
         }
+
+        // Inject 54 right after 53 if it didn't exist
+        if (el.tag === '53' && !hasTag54) {
+            result += encodeTLV('54', amount.toString());
+            hasTag54 = true;
+        }
     }
 
+    // Fallback if 53 was somehow missing too
     if (!hasTag54) {
-        const amountTLV = encodeTLV('54', amount.toString());
-        const tag53Pos = result.indexOf('5303');
-        if (tag53Pos !== -1) {
-            const tag53End = tag53Pos + 7;
-            result = result.substring(0, tag53End) + amountTLV + result.substring(tag53End);
-        } else {
-            result += amountTLV;
-        }
+        result += encodeTLV('54', amount.toString());
     }
 
     const crcPlaceholder = result + '6304';
