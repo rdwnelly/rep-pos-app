@@ -11,6 +11,8 @@ import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { playBeep } from '../utils/soundEffect';
 import { PaymentQRCode } from '../components/ui/PaymentQRCode';
 
+const formatNumber = (val: number) => val.toLocaleString('id-ID');
+
 const FlyingItem = ({ item, cartRect }: { item: any, cartRect?: DOMRect }) => {
   const [animate, setAnimate] = useState(false);
   useEffect(() => {
@@ -70,6 +72,7 @@ export const POS: React.FC = () => {
   const [paymentNote, setPaymentNote] = useState('');
   const [discount, setDiscount] = useState<number>(0);
   const [discountType, setDiscountType] = useState<'PERCENTAGE' | 'FIXED'>('FIXED');
+  const [showQrisModal, setShowQrisModal] = useState(false);
 
   // Settings
   const [defaultPriceType, setDefaultPriceType] = useState<PriceType>(PriceType.RETAIL);
@@ -799,105 +802,266 @@ export const POS: React.FC = () => {
       {/* Payment Modal */}
       {
         showPaymentModal && createPortal(
-          <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-black/40 backdrop-blur-md z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-            <div className="bg-white/85 backdrop-blur-2xl border border-white/40 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-              <div className="bg-primary/90 p-6 text-white shrink-0">
-                <h3 className="text-lg font-semibold">Konfirmasi Pembayaran</h3>
-                <p className="text-white/80 text-sm mt-1">Total: {formatIDR(totalAmount)}</p>
+          <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+            <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
+              
+              {/* Sisi Kiri: Receipt Preview */}
+              <div className="w-full md:w-5/12 bg-slate-50 border-r border-slate-200 p-6 flex flex-col relative overflow-hidden">
+                <div className="text-center mb-4 pb-4 border-b border-dashed border-slate-300 shrink-0">
+                  <h4 className="font-bold text-lg text-slate-800">{storeSettings?.name || 'Toko'}</h4>
+                  <p className="text-xs text-slate-500">Preview Struk Pembayaran</p>
+                </div>
+                <div className="flex-1 overflow-y-auto pr-2 space-y-3 font-mono text-sm text-slate-700">
+                  {cart.map((item, idx) => (
+                    <div key={idx}>
+                      <div className="font-semibold">{item.name}</div>
+                      <div className="flex justify-between text-xs text-slate-500 mt-0.5">
+                        <span>{item.qty} x {formatIDR(item.finalPrice)}</span>
+                        <span className="font-medium text-slate-700">{formatIDR(item.finalPrice * item.qty)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="pt-4 mt-4 border-t border-dashed border-slate-300 font-mono text-sm shrink-0">
+                  <div className="flex justify-between mb-1 text-slate-600">
+                    <span>Subtotal</span>
+                    <span>{formatIDR(subtotal)}</span>
+                  </div>
+                  {discountAmountValue > 0 && (
+                    <div className="flex justify-between mb-1 text-red-500">
+                      <span>Diskon</span>
+                      <span>-{formatIDR(discountAmountValue)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-lg mt-3 pt-3 border-t border-slate-300 text-slate-900">
+                    <span>TOTAL</span>
+                    <span>{formatIDR(totalAmount)}</span>
+                  </div>
+                </div>
               </div>
-              <div className="p-6 space-y-6 overflow-y-auto">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="customerNameInput" className="block text-sm font-medium text-slate-600 mb-1">Nama Pelanggan (Opsional)</label>
-                    <input
-                      id="customerNameInput"
-                      type="text"
-                      className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                      placeholder="Cth: Budi"
-                      value={customerName === 'Pelanggan Umum' ? '' : customerName}
-                      onChange={(e) => setCustomerName(e.target.value || 'Pelanggan Umum')}
-                      disabled={!!selectedCustomerId} // Kalo pilih dari db, jangan bisa diedit
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="tableNumberInput" className="block text-sm font-medium text-slate-600 mb-1">Pesanan Meja (Opsional)</label>
-                    <input
-                      id="tableNumberInput"
-                      type="text"
-                      className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                      placeholder="Cth: Meja 04"
-                      value={tableNumber}
-                      onChange={(e) => setTableNumber(e.target.value)}
-                    />
-                  </div>
+
+              {/* Sisi Kanan: Input Pembayaran & Numpad */}
+              <div className="w-full md:w-7/12 p-6 flex flex-col bg-white overflow-y-auto">
+                <div className="flex justify-between items-center mb-6 shrink-0">
+                  <h3 className="text-xl font-bold text-slate-800">Detail Pembayaran</h3>
+                  <button onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
+                    <X size={20} />
+                  </button>
                 </div>
 
-                <div>
-                  <span className="block text-sm font-medium text-slate-600 mb-2">Metode Pembayaran</span>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      onClick={() => {
-                        setPaymentMethod(PaymentMethod.CASH);
-                        setSelectedBankId('');
-                        if (paymentMethod === PaymentMethod.TEMPO && paymentNote === 'Max 1 minggu dari transaksi.') {
-                          setPaymentNote('');
-                        }
-                      }}
-                      className={`p-2 rounded-lg border text-sm font-medium flex flex-col items-center gap-1 ${paymentMethod === PaymentMethod.CASH ? 'border-primary bg-primary/10 text-primary' : 'border-slate-200 text-slate-500'}`}
-                    >
-                      <Banknote size={20} /> Tunai
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPaymentMethod(PaymentMethod.TRANSFER);
-                        setAmountPaid(totalAmount.toString());
-                        if (paymentMethod === PaymentMethod.TEMPO && paymentNote === 'Max 1 minggu dari transaksi.') {
-                          setPaymentNote('');
-                        }
-                      }}
-                      className={`p-2 rounded-lg border text-sm font-medium flex flex-col items-center gap-1 ${paymentMethod === PaymentMethod.TRANSFER ? 'border-primary bg-primary/10 text-primary' : 'border-slate-200 text-slate-500'}`}
-                    >
-                      <CreditCard size={20} /> Transfer
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (paymentMethod !== PaymentMethod.TEMPO) {
-                          setPaymentNote('Max 1 minggu dari transaksi.');
-                        }
-                        setPaymentMethod(PaymentMethod.TEMPO);
-                        setAmountPaid('0');
-                        setSelectedBankId('');
-                      }}
-                      className={`p-2 rounded-lg border text-sm font-medium flex flex-col items-center gap-1 ${paymentMethod === PaymentMethod.TEMPO ? 'border-primary bg-primary/10 text-primary' : 'border-slate-200 text-slate-500'}`}
-                    >
-                      <Clock size={20} /> Tempo
-                    </button>
+                <div className="space-y-5 flex-1 shrink-0">
+                  {/* Customer & Table */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="customerNameInput" className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Pelanggan</label>
+                      <input
+                        id="customerNameInput"
+                        type="text"
+                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                        placeholder="Nama (Opsional)"
+                        value={customerName === 'Pelanggan Umum' ? '' : customerName}
+                        onChange={(e) => setCustomerName(e.target.value || 'Pelanggan Umum')}
+                        disabled={!!selectedCustomerId}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="tableNumberInput" className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Meja</label>
+                      <input
+                        id="tableNumberInput"
+                        type="text"
+                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                        placeholder="Cth: 04"
+                        value={tableNumber}
+                        onChange={(e) => setTableNumber(e.target.value)}
+                      />
+                    </div>
                   </div>
+
+                  {/* Payment Method */}
+                  <div>
+                    <span className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">Metode Pembayaran</span>
+                    <div className="grid grid-cols-3 gap-3">
+                      <button
+                        onClick={() => {
+                          setPaymentMethod(PaymentMethod.CASH);
+                          setSelectedBankId('');
+                          if (paymentMethod === PaymentMethod.TEMPO && paymentNote === 'Max 1 minggu dari transaksi.') setPaymentNote('');
+                        }}
+                        className={`p-3 rounded-xl border-2 text-sm font-bold flex flex-col items-center gap-1.5 transition-all ${paymentMethod === PaymentMethod.CASH ? 'border-primary bg-primary/5 text-primary shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
+                      >
+                        <Banknote size={22} /> TUNAI
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPaymentMethod(PaymentMethod.TRANSFER);
+                          setAmountPaid(totalAmount.toString());
+                          if (paymentMethod === PaymentMethod.TEMPO && paymentNote === 'Max 1 minggu dari transaksi.') setPaymentNote('');
+                        }}
+                        className={`p-3 rounded-xl border-2 text-sm font-bold flex flex-col items-center gap-1.5 transition-all ${paymentMethod === PaymentMethod.TRANSFER ? 'border-primary bg-primary/5 text-primary shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
+                      >
+                        <CreditCard size={22} /> TRANSFER
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (paymentMethod !== PaymentMethod.TEMPO) setPaymentNote('Max 1 minggu dari transaksi.');
+                          setPaymentMethod(PaymentMethod.TEMPO);
+                          setAmountPaid('0');
+                          setSelectedBankId('');
+                        }}
+                        className={`p-3 rounded-xl border-2 text-sm font-bold flex flex-col items-center gap-1.5 transition-all ${paymentMethod === PaymentMethod.TEMPO ? 'border-primary bg-primary/5 text-primary shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
+                      >
+                        <Clock size={22} /> TEMPO
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Bank Selector */}
+                  {(paymentMethod === PaymentMethod.TRANSFER || paymentMethod === PaymentMethod.TEMPO) && (
+                    <div className="animate-fade-in">
+                      <label htmlFor="bankSelect" className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">
+                        {paymentMethod === PaymentMethod.TRANSFER ? 'Rekening / E-Wallet Tujuan' : 'Rekening Tujuan (Jika DP)'}
+                      </label>
+                      <select
+                        id="bankSelect"
+                        name="bankSelect"
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium text-slate-700"
+                        value={selectedBankId}
+                        onChange={e => setSelectedBankId(e.target.value)}
+                      >
+                        <option value="">-- Pilih Bank / E-Wallet --</option>
+                        {banks.sort((a, b) => a.bankName.localeCompare(b.bankName)).map(b => (
+                          <option key={b.id} value={b.id}>{b.bankName} - {b.accountNumber}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Amount & Numpad (Only for Cash or Tempo) */}
+                  {(paymentMethod === PaymentMethod.CASH || paymentMethod === PaymentMethod.TEMPO) && (
+                    <div className="animate-fade-in space-y-4">
+                      <div>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Jumlah Diterima</label>
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xl">Rp</span>
+                          <input
+                            type="text"
+                            readOnly
+                            className="w-full pl-12 pr-4 py-3 text-2xl font-bold text-slate-900 bg-white border-2 border-slate-200 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                            value={formatNumber(parseFloat(amountPaid || '0'))}
+                            placeholder="0"
+                          />
+                        </div>
+                        
+                        {/* Quick Cash Buttons */}
+                        <div className="grid grid-cols-4 gap-2 mt-2">
+                          <button onClick={() => setAmountPaid(totalAmount.toString())} className="py-2 bg-primary/10 text-primary font-bold rounded-lg text-sm hover:bg-primary/20 transition-colors">Uang Pas</button>
+                          <button onClick={() => setAmountPaid((parseInt(amountPaid || '0') + 50000).toString())} className="py-2 bg-slate-100 text-slate-700 font-bold rounded-lg text-sm hover:bg-slate-200 transition-colors">+50k</button>
+                          <button onClick={() => setAmountPaid((parseInt(amountPaid || '0') + 100000).toString())} className="py-2 bg-slate-100 text-slate-700 font-bold rounded-lg text-sm hover:bg-slate-200 transition-colors">+100k</button>
+                          <button onClick={() => setAmountPaid('')} className="py-2 bg-red-100 text-red-600 font-bold rounded-lg text-sm hover:bg-red-200 transition-colors">Clear</button>
+                        </div>
+                      </div>
+
+                      {/* Numeric Keypad */}
+                      <div className="grid grid-cols-3 gap-2 select-none">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                          <button key={num} onClick={() => setAmountPaid(prev => (prev === '0' || !prev ? num.toString() : prev + num))} className="py-3 text-xl font-bold bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors">
+                            {num}
+                          </button>
+                        ))}
+                        <button onClick={() => setAmountPaid(prev => prev ? prev + '000' : '0')} className="py-3 text-xl font-bold bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors">000</button>
+                        <button onClick={() => setAmountPaid(prev => (prev === '0' || !prev ? '0' : prev + '0'))} className="py-3 text-xl font-bold bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors">0</button>
+                        <button onClick={() => setAmountPaid(prev => prev.slice(0, -1))} className="py-3 text-xl font-bold bg-slate-100 border border-slate-200 rounded-xl hover:bg-slate-200 active:bg-slate-300 transition-colors flex justify-center items-center">
+                          ⌫
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Catatan</label>
+                    <div className="relative">
+                      <StickyNote size={18} className="absolute left-3.5 top-3.5 text-slate-400" />
+                      <input
+                        type="text"
+                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                        placeholder="Catatan opsional..."
+                        value={paymentNote}
+                        onChange={e => setPaymentNote(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Summary / Change */}
+                  {(paymentMethod === PaymentMethod.CASH) && parseFloat(amountPaid) >= totalAmount && (
+                    <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex justify-between items-center animate-fade-in mt-2">
+                      <span className="text-emerald-700 font-bold uppercase tracking-wider text-sm">Kembalian</span>
+                      <span className="text-2xl font-black text-emerald-600">{formatIDR(parseFloat(amountPaid) - totalAmount)}</span>
+                    </div>
+                  )}
+
+                  {(paymentMethod === PaymentMethod.TEMPO || (paymentMethod === PaymentMethod.CASH && parseFloat(amountPaid) < totalAmount)) && (
+                    <div className="p-4 bg-orange-50 rounded-xl border border-orange-200 flex justify-between items-center animate-fade-in mt-2">
+                      <span className="text-orange-700 font-bold uppercase tracking-wider text-sm">Sisa Hutang</span>
+                      <span className="text-2xl font-black text-orange-600">{formatIDR(totalAmount - (parseFloat(amountPaid) || 0))}</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Bank Selector for Transfer or Tempo (Partial Transfer) */}
-                {(paymentMethod === PaymentMethod.TRANSFER || paymentMethod === PaymentMethod.TEMPO) && (
-                  <div>
-                    <label htmlFor="bankSelect" className="block text-sm font-medium text-slate-600 mb-1">
-                      {paymentMethod === PaymentMethod.TRANSFER ? 'Pilih Rekening Tujuan' : 'Rekening Tujuan (Jika DP Transfer)'}
-                    </label>
-                    <select
-                      id="bankSelect"
-                      name="bankSelect"
-                      className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white"
-                      value={selectedBankId}
-                      onChange={e => setSelectedBankId(e.target.value)}
-                    >
-                      <option value="">-- Pilih Bank / E-Wallet --</option>
-                      {banks.sort((a, b) => a.bankName.localeCompare(b.bankName)).map(b => (
-                        <option key={b.id} value={b.id}>{b.bankName} - {b.accountNumber}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                {/* Footer Action */}
+                <div className="mt-6 pt-4 border-t border-slate-100 flex gap-3 shrink-0">
+                  <button onClick={() => setShowPaymentModal(false)} className="px-6 py-4 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition-colors">Batal</button>
+                  <button 
+                    onClick={() => {
+                      if (paymentMethod === PaymentMethod.TRANSFER) {
+                        if (!selectedBankId) {
+                          alert("Pilih rekening bank tujuan terlebih dahulu!");
+                          return;
+                        }
+                        setShowQrisModal(true);
+                      } else {
+                        handleCheckout();
+                      }
+                    }} 
+                    className="flex-1 py-4 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/30 hover:bg-primary-hover hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 text-lg"
+                  >
+                    {paymentMethod === PaymentMethod.TRANSFER ? (
+                      <>Generate QRIS <ScanLine size={22}/></>
+                    ) : (
+                      <>Proses & Cetak <Printer size={22}/></>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      }
 
-                {/* QR Code for Transfer Payment */}
-                {paymentMethod === PaymentMethod.TRANSFER && selectedBankId && (() => {
+      {/* QRIS Dedicated Popup Modal */}
+      {
+        showQrisModal && paymentMethod === PaymentMethod.TRANSFER && selectedBankId && createPortal(
+          <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-slate-900/80 backdrop-blur-md z-[10000] flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col items-center p-8 relative animate-scale-in">
+              <button 
+                onClick={() => setShowQrisModal(false)} 
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-full transition-colors"
+              >
+                <X size={24} />
+              </button>
+              
+              <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-4">
+                <ScanLine size={32} />
+              </div>
+              
+              <h3 className="text-2xl font-black text-slate-800 text-center mb-1">Scan QRIS</h3>
+              <p className="text-slate-500 text-sm text-center mb-6">Minta pelanggan memindai QR code ini</p>
+              
+              <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100 w-full flex justify-center mb-6">
+                {(() => {
                   const selectedBank = banks.find(b => b.id === selectedBankId);
                   return selectedBank ? (
                     <PaymentQRCode
@@ -907,85 +1071,22 @@ export const POS: React.FC = () => {
                     />
                   ) : null;
                 })()}
-
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label htmlFor="amountPaid" className="block text-sm font-medium text-slate-600">Jumlah Diterima</label>
-                    {paymentMethod === PaymentMethod.CASH && (
-                      <button
-                        onClick={() => setAmountPaid(totalAmount.toString())}
-                        className="text-xs bg-primary/10 text-primary px-2 py-1 rounded font-bold hover:bg-primary/20 transition-colors"
-                      >
-                        Uang Pas
-                      </button>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">Rp</span>
-                    <input
-                      id="amountPaid"
-                      name="amountPaid"
-                      type="text"
-                      className="w-full pl-12 pr-4 py-3 text-xl font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none"
-                      value={amountPaid}
-                      onChange={e => {
-                        const val = e.target.value.replace(/[^0-9]/g, '');
-                        setAmountPaid(val);
-                      }}
-                      placeholder="0"
-                      autoFocus
-                    />
-                  </div>
-                  {/* Warning for Tempo payment if amount exceeds total */}
-                  {paymentMethod === PaymentMethod.TEMPO && parseFloat(amountPaid) > totalAmount && (
-                    <div className="mt-2 p-3 bg-red-50 rounded-lg border border-red-200">
-                      <p className="text-xs text-red-600 font-medium flex items-center gap-1">
-                        <span className="font-bold">⚠</span> Peringatan: Jumlah yang diterima melebihi total tagihan!
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label htmlFor="paymentNote" className="block text-sm font-medium text-slate-600 mb-1">Catatan (Opsional)</label>
-                  <div className="relative">
-                    <StickyNote size={16} className="absolute left-3 top-3 text-slate-400" />
-                    <textarea
-                      id="paymentNote"
-                      name="paymentNote"
-                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary outline-none text-sm"
-                      rows={2}
-                      placeholder="Catatan tambahan..."
-                      value={paymentNote}
-                      onChange={e => setPaymentNote(e.target.value)}
-                    ></textarea>
-                  </div>
-                </div>
-
-                {/* Summary Logic */}
-                {(paymentMethod === PaymentMethod.CASH || paymentMethod === PaymentMethod.TRANSFER) && parseFloat(amountPaid) >= totalAmount && (
-                  <div className="p-4 bg-green-50 rounded-xl border border-green-100 text-center">
-                    <p className="text-sm text-green-600">Kembalian</p>
-                    <p className="text-2xl font-bold text-green-700">{formatIDR(parseFloat(amountPaid) - totalAmount)}</p>
-                  </div>
-                )}
-
-                {(paymentMethod === PaymentMethod.TEMPO || parseFloat(amountPaid) < totalAmount) && (paymentMethod !== PaymentMethod.TRANSFER && paymentMethod !== PaymentMethod.CASH) && (
-                  <div className="p-4 bg-orange-50 rounded-xl border border-orange-100">
-                    <p className="text-sm text-orange-600 font-medium">Sisa Hutang</p>
-                    <p className="text-xl font-bold text-orange-700">{formatIDR(totalAmount - (parseFloat(amountPaid) || 0))}</p>
-                    <p className="text-xs text-orange-500 mt-1">Akan dicatat sebagai piutang {customerName}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-3 pt-2">
-                  <button onClick={() => setShowPaymentModal(false)} className="flex-1 py-3 text-slate-600 hover:bg-slate-50 rounded-xl font-medium">Batal</button>
-                  <button onClick={handleCheckout} className="flex-1 py-3 bg-primary text-white rounded-xl font-semibold shadow-lg hover:bg-primary-hover transition-colors">
-                    Proses
-                  </button>
-                </div>
               </div>
+              
+              <div className="w-full text-center mb-8">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Tagihan</p>
+                <p className="text-3xl font-black text-primary">{formatIDR(totalAmount)}</p>
+              </div>
+              
+              <button 
+                onClick={() => {
+                  setShowQrisModal(false);
+                  handleCheckout(); // Actually process the transaction
+                }} 
+                className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/30 hover:bg-emerald-600 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 text-lg"
+              >
+                Konfirmasi Sukses <Printer size={22}/>
+              </button>
             </div>
           </div>,
           document.body
