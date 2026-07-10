@@ -774,27 +774,30 @@ export const POS: React.FC = () => {
             ))}
           </div>
 
-          <div className="pt-4 mt-auto border-t border-slate-100">
-            <button
-              onClick={() => {
-                if (discountType === 'PERCENTAGE' && discount > 100) {
-                  alert('Diskon tidak valid: Tidak boleh lebih dari 100%');
-                  return;
-                }
-                if (discountType === 'FIXED' && discount > subtotal) {
-                  alert('Diskon tidak valid: Tidak boleh melebihi subtotal');
-                  return;
-                }
-                setAmountPaid(''); // Reset on open
-                setShowPaymentModal(true);
-              }}
-              disabled={cart.length === 0}
-              className="w-full bg-primary text-white py-3 rounded-xl font-semibold shadow-lg shadow-primary/20 hover:bg-primary-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              <Printer size={20} />
-              Bayar & Cetak
-            </button>
           </div>
+        </div>
+
+        {/* Sticky Pay Button Area */}
+        <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-4px_15px_rgba(0,0,0,0.05)] shrink-0 z-10 relative">
+          <button
+            onClick={() => {
+              if (discountType === 'PERCENTAGE' && discount > 100) {
+                alert('Diskon tidak valid: Tidak boleh lebih dari 100%');
+                return;
+              }
+              if (discountType === 'FIXED' && discount > subtotal) {
+                alert('Diskon tidak valid: Tidak boleh melebihi subtotal');
+                return;
+              }
+              setAmountPaid(''); // Reset on open
+              setShowPaymentModal(true);
+            }}
+            disabled={cart.length === 0}
+            className="w-full bg-primary text-white py-3.5 rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary-hover active:translate-y-0 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-2 text-lg"
+          >
+            <Printer size={22} />
+            Bayar & Cetak
+          </button>
         </div>
       </div>
 
@@ -1054,8 +1057,8 @@ export const POS: React.FC = () => {
               </button>
 
               {/* Left Side: QR Code Area */}
-              <div className="w-full md:w-1/2 bg-slate-50 p-6 md:p-8 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-200">
-                <div className="w-full max-w-[420px] transform scale-105 origin-center">
+              <div className="w-full md:w-1/2 bg-slate-50 p-4 md:p-6 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-200">
+                <div className="w-full max-w-[320px] origin-center mx-auto">
                   {(() => {
                     const selectedBank = banks.find(b => b.id === selectedBankId);
                     return selectedBank ? (
@@ -1063,7 +1066,7 @@ export const POS: React.FC = () => {
                         amount={totalAmount}
                         bank={selectedBank}
                         storeName={storeSettings?.name}
-                        size={350}
+                        size={280}
                       />
                     ) : null;
                   })()}
