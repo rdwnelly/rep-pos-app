@@ -84,6 +84,7 @@ export interface BankAccount {
   bankName: string; // e.g. BCA, GoPay, Dana
   accountNumber: string;
   holderName: string;
+  qrisCode?: string; // QRIS static code string from bank for generating dynamic payment QR
 }
 
 export interface PaymentHistoryItem {

@@ -5,7 +5,9 @@ import { StorageService } from '../services/storage';
 import { Transaction, PaymentStatus, CashFlow, CashFlowType, Purchase, Supplier, PaymentMethod, CashFlow as CashFlowTypeInterface, StoreSettings, BankAccount, User, UserRole, TransactionType, PurchaseType } from '../types';
 import { formatIDR, formatDate, exportToCSV, generateId, exportToExcel } from '../utils';
 import { generatePrintInvoice, generatePrintGoodsNote, generatePrintSuratJalan, generatePrintTransactionDetail, generatePrintPurchaseDetail, generatePrintPurchaseNote } from '../utils/printHelpers';
-import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet } from 'lucide-react';
+import { generateESCPOSReceipt } from '../utils/escposEncoder';
+import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
+import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet, Bluetooth } from 'lucide-react';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 
 interface FinanceProps {
@@ -108,6 +110,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     };
 
     // Detail Modal State
+    const bluetooth = useBluetoothPrinter();
     const [detailTransaction, setDetailTransaction] = useState<Transaction | null>(null);
     const [detailPurchase, setDetailPurchase] = useState<Purchase | null>(null);
 
@@ -1092,7 +1095,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         let filename = 'export.csv';
 
         if (activeTab === 'history') {
-            headers = ['ID', 'Tanggal', 'Waktu', 'Faktur', 'Pelanggan', 'Keterangan', 'Kasir', 'Total', 'Dibayar', 'Piutang', 'Kembalian', 'Status', 'Metode'];
+            headers = ['ID', 'Tanggal', 'Waktu', 'Faktur', 'Pelanggan', 'Keterangan', 'Kasir', 'Total', 'Dibayar', 'Piutang', 'Kembalian', 'Metode'];
             rows = filteredTransactions.map(t => {
                 const d = new Date(t.date);
                 const remaining = t.totalAmount - t.amountPaid;
@@ -1708,8 +1711,8 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
 
     const printInvoice = (tx: Transaction) => {
         const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
-        const w = window.open('', '', 'width=800,height=600');
-        if (!w) return;
+        const newWindow = window.open('', '', 'width=800,height=600');
+        if (!newWindow) return;
 
         // Ensure customer address is populated
         let txToPrint = { ...tx };
@@ -1721,8 +1724,25 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         }
 
         const html = generatePrintInvoice(txToPrint, settings, formatIDR, formatDate);
-        w.document.write(html);
-        w.document.close();
+        newWindow.document.write(html);
+        newWindow.document.close();
+    };
+
+    const printBluetoothInvoice = async (tx: Transaction) => {
+        try {
+            const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
+            const escposData = generateESCPOSReceipt(tx, settings);
+            
+            if (!bluetooth.isConnected) {
+                console.log("Mencoba koneksi bluetooth sebelum cetak...");
+                await bluetooth.connect();
+            }
+            
+            await bluetooth.print(escposData);
+        } catch (error) {
+            console.error('Error printing via bluetooth:', error);
+            alert('Gagal mencetak: ' + (error instanceof Error ? error.message : 'Unknown error'));
+        }
     };
 
     const printGoodsNote = (tx: Transaction) => {
@@ -2404,6 +2424,9 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button onClick={(e) => { e.stopPropagation(); printInvoice(t); }} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 flex items-center gap-1" title="Cetak Nota">
                                                         <Printer size={12} /> Nota
+                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); printBluetoothInvoice(t); }} className="text-xs bg-green-50 text-green-600 px-2 py-1 rounded hover:bg-green-100 flex items-center gap-1" title="Cetak Struk Bluetooth">
+                                                        <Bluetooth size={12} /> BT
                                                     </button>
                                                     <button onClick={(e) => { e.stopPropagation(); printGoodsNote(t); }} className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded hover:bg-indigo-100 flex items-center gap-1" title="Cetak Nota Barang (Tanpa Bayar)">
                                                         <ShoppingBag size={12} /> Barang
@@ -3272,6 +3295,9 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                     )}
                                     <button onClick={() => printTransactionDetail(detailTransaction)} className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50">
                                         <Printer size={16} /> Cetak Detail
+                                    </button>
+                                    <button onClick={() => printBluetoothInvoice(detailTransaction)} className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-green-100">
+                                        <Bluetooth size={16} /> Struk BT
                                     </button>
                                     <button onClick={() => setDetailTransaction(null)} className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-primary/90">Tutup</button>
                                 </div>
