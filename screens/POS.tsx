@@ -5,7 +5,7 @@ import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Product, CartItem, PriceType, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, Category } from '../types';
 import { formatIDR, getPriceByType, generateId, formatDate, toMySQLDate } from '../utils';
-import { generatePrintInvoice } from '../utils/printHelpers';
+import { generatePrintInvoice, PrintInvoiceOptions } from '../utils/printHelpers';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { playBeep } from '../utils/soundEffect';
@@ -334,7 +334,13 @@ export const POS: React.FC = () => {
         txToPrint.invoiceNumber = savedTransaction.invoiceNumber;
       }
 
-      printReceipt(txToPrint, settings);
+      // Build print options with QRIS code from the selected bank
+      const printOptions: PrintInvoiceOptions = {
+        qrisCode: selectedBank?.qrisCode,
+        bankName: selectedBank?.bankName,
+      };
+
+      printReceipt(txToPrint, settings, printOptions);
 
       // Reset
       setCart([]);
@@ -355,7 +361,7 @@ export const POS: React.FC = () => {
     }
   };
 
-  const printReceipt = async (tx: Transaction, settings: StoreSettings) => {
+  const printReceipt = async (tx: Transaction, settings: StoreSettings, printOptions?: PrintInvoiceOptions) => {
     if (settings.useBluetoothPrinter) {
       try {
         if (!bluetooth.isConnected) {
@@ -381,7 +387,7 @@ export const POS: React.FC = () => {
       return;
     }
 
-    const html = generatePrintInvoice(tx, settings, formatIDR, formatDate);
+    const html = generatePrintInvoice(tx, settings, formatIDR, formatDate, printOptions);
     w.document.write(html);
     w.document.close();
   };

@@ -1,5 +1,5 @@
 // Helper function to generate improved print layouts
-import { Transaction, StoreSettings, Purchase } from '../types';
+import { Transaction, StoreSettings, Purchase, BankAccount } from '../types';
 import { formatDateDateOnly } from '../utils';
 
 const formatDateWithTime = (dateStr: string) => {
@@ -13,8 +13,128 @@ const formatNumber = (val: number) => {
     return val.toLocaleString('id-ID');
 };
 
+// ==========================================
+// QRIS Helper Functions for Receipt QR Code
+// ==========================================
 
-export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, formatIDR: (val: number) => string, formatDate: (date: string) => string) => {
+function parseTLV(data: string): { tag: string; value: string }[] {
+    const result: { tag: string; value: string }[] = [];
+    let i = 0;
+    while (i + 4 <= data.length) {
+        const tag = data.substring(i, i + 2);
+        const len = parseInt(data.substring(i + 2, i + 4), 10);
+        if (isNaN(len) || i + 4 + len > data.length) break;
+        const value = data.substring(i + 4, i + 4 + len);
+        result.push({ tag, value });
+        i += 4 + len;
+    }
+    return result;
+}
+
+function encodeTLV(tag: string, value: string): string {
+    return `${tag}${value.length.toString().padStart(2, '0')}${value}`;
+}
+
+function calculateCRC16(data: string): string {
+    let crc = 0xFFFF;
+    for (let i = 0; i < data.length; i++) {
+        crc ^= data.charCodeAt(i) << 8;
+        for (let j = 0; j < 8; j++) {
+            if (crc & 0x8000) {
+                crc = (crc << 1) ^ 0x1021;
+            } else {
+                crc <<= 1;
+            }
+            crc &= 0xFFFF;
+        }
+    }
+    return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+function generateDynamicQRIS(staticQris: string, amount: number): string {
+    const elements = parseTLV(staticQris);
+    let result = '';
+    let hasTag54 = false;
+
+    for (const el of elements) {
+        if (el.tag === '63') continue;
+        if (el.tag === '01') {
+            result += encodeTLV('01', '12');
+        } else if (el.tag === '54') {
+            result += encodeTLV('54', amount.toString());
+            hasTag54 = true;
+        } else {
+            result += encodeTLV(el.tag, el.value);
+        }
+    }
+
+    if (!hasTag54) {
+        const amountTLV = encodeTLV('54', amount.toString());
+        const tag53Pos = result.indexOf('5303');
+        if (tag53Pos !== -1) {
+            const tag53End = tag53Pos + 7;
+            result = result.substring(0, tag53End) + amountTLV + result.substring(tag53End);
+        } else {
+            result += amountTLV;
+        }
+    }
+
+    const crcPlaceholder = result + '6304';
+    const crc = calculateCRC16(crcPlaceholder);
+    return crcPlaceholder + crc;
+}
+
+function isValidQRIS(code: string): boolean {
+    if (!code || code.length < 20) return false;
+    if (!code.startsWith('000201')) return false;
+    if (!code.includes('6304')) return false;
+    return true;
+}
+
+/** Generate the QR code script for the print receipt */
+function generateQRISPrintSection(qrisCode: string | undefined, amount: number, bankName: string): string {
+    if (!qrisCode || !isValidQRIS(qrisCode.trim())) return '';
+
+    const dynamicQris = generateDynamicQRIS(qrisCode.trim(), amount);
+
+    return `
+        <div style="text-align: center; margin: 10px 0; padding: 10px 0; border-top: 1px dashed #000;">
+            <p style="margin: 0 0 5px 0; font-size: 10px; font-weight: bold;">Scan QRIS untuk Pembayaran</p>
+            <canvas id="qrisCanvas" style="margin: 0 auto;"></canvas>
+            <p style="margin: 5px 0 0 0; font-size: 9px; color: #333;">${bankName}</p>
+            <p style="margin: 2px 0 0 0; font-size: 8px; color: #666;">Rp ${amount.toLocaleString('id-ID')}</p>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+        <script>
+            (function() {
+                var canvas = document.getElementById('qrisCanvas');
+                if (canvas && typeof QRCode !== 'undefined') {
+                    QRCode.toCanvas(canvas, '${dynamicQris}', {
+                        width: 150,
+                        margin: 1,
+                        color: { dark: '#000000', light: '#ffffff' },
+                        errorCorrectionLevel: 'M'
+                    }, function(err) {
+                        if (!err) {
+                            setTimeout(function() { window.print(); }, 300);
+                        } else {
+                            window.print();
+                        }
+                    });
+                } else {
+                    window.print();
+                }
+            })();
+        </script>
+    `;
+}
+
+export interface PrintInvoiceOptions {
+    qrisCode?: string;
+    bankName?: string;
+}
+
+export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, formatIDR: (val: number) => string, formatDate: (date: string) => string, printOptions?: PrintInvoiceOptions) => {
     const type = settings.printerType || '58mm';
     const isA4 = type === 'A4';
 
@@ -230,7 +350,11 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                     </div>
                 </div>
                 
-                <script>window.addEventListener('afterprint', function() { window.close(); }); window.print();</script>
+                ${printOptions?.qrisCode && isValidQRIS(printOptions.qrisCode.trim()) ? 
+                    generateQRISPrintSection(printOptions.qrisCode, tx.totalAmount, printOptions.bankName || '') :
+                    `<script>window.addEventListener('afterprint', function() { window.close(); }); window.print();</script>`
+                }
+                <script>window.addEventListener('afterprint', function() { window.close(); });</script>
             </body>
         </html>
         `;
@@ -334,7 +458,11 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                     ${thermalItemsHtml}
                     ${contentHtml}
                 </div>
-                <script>window.addEventListener('afterprint', function() { window.close(); }); window.print();</script>
+                ${printOptions?.qrisCode && isValidQRIS(printOptions.qrisCode.trim()) ?
+                    generateQRISPrintSection(printOptions.qrisCode, tx.totalAmount, printOptions.bankName || '') :
+                    `<script>window.addEventListener('afterprint', function() { window.close(); }); window.print();</script>`
+                }
+                <script>window.addEventListener('afterprint', function() { window.close(); });</script>
             </body>
         </html>
         `;
