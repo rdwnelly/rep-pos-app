@@ -8,6 +8,7 @@ interface PaymentQRCodeProps {
   amount: number;
   bank: BankAccount;
   storeName?: string;
+  size?: number;
 }
 
 // ==========================================
@@ -106,7 +107,7 @@ function isValidQRIS(code: string): boolean {
   return true;
 }
 
-export const PaymentQRCode: React.FC<PaymentQRCodeProps> = ({ amount, bank, storeName }) => {
+export const PaymentQRCode: React.FC<PaymentQRCodeProps> = ({ amount, bank, storeName, size = 220 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [copied, setCopied] = useState(false);
   const [isGenerated, setIsGenerated] = useState(false);
@@ -127,7 +128,7 @@ export const PaymentQRCode: React.FC<PaymentQRCodeProps> = ({ amount, bank, stor
     if (canvasRef.current) {
       setIsGenerated(false);
       QRCode.toCanvas(canvasRef.current, qrPayload, {
-        width: 220,
+        width: size,
         margin: 2,
         color: {
           dark: '#1e293b',
@@ -142,7 +143,7 @@ export const PaymentQRCode: React.FC<PaymentQRCodeProps> = ({ amount, bank, stor
         }
       });
     }
-  }, [qrPayload, hasQris]);
+  }, [qrPayload, hasQris, size]);
 
   const handleCopyAccount = async () => {
     try {
