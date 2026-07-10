@@ -72,43 +72,28 @@ function generateDynamicQRIS(staticQris: string, amount: number): string {
     if (el.tag === '63') continue;
 
     if (el.tag === '01') {
-      // Change Point of Initiation from static (11) to dynamic (12)
-      result += encodeTLV('01', '12');
+      result += encodeTLV('01', '12'); // Change to dynamic
     } else if (el.tag === '54') {
-      // Update transaction amount
-      const amountStr = amount.toString();
-      result += encodeTLV('54', amountStr);
-      hasTag54 = true;
+      result += encodeTLV('54', amount.toString());
     } else {
       result += encodeTLV(el.tag, el.value);
     }
-  }
 
-  // Add amount if not present in original
-  if (!hasTag54) {
-    // Insert tag 54 before tag 58 (Country Code) or at end before CRC
-    // We need to re-parse and rebuild to maintain proper order
-    const amountStr = amount.toString();
-    const amountTLV = encodeTLV('54', amountStr);
-
-    // Find position after tag 53 (Transaction Currency) to insert amount
-    const tag53Pos = result.indexOf('5303');
-    if (tag53Pos !== -1) {
-      // Find end of tag 53 (it's always "5303360" for IDR = 3 chars value)
-      const tag53End = tag53Pos + 7; // "5303" + "360"
-      result = result.substring(0, tag53End) + amountTLV + result.substring(tag53End);
-    } else {
-      // Just append before we add CRC
-      result += amountTLV;
+    // Inject 54 right after 53 if it didn't exist
+    if (el.tag === '53' && !hasTag54) {
+      result += encodeTLV('54', amount.toString());
+      hasTag54 = true;
     }
   }
 
-  // Add CRC placeholder and calculate
+  // Fallback if 53 was somehow missing too
+  if (!hasTag54) {
+    result += encodeTLV('54', amount.toString());
+  }
+
   const crcPlaceholder = result + '6304';
   const crc = calculateCRC16(crcPlaceholder);
-  result = crcPlaceholder + crc;
-
-  return result;
+  return crcPlaceholder + crc;
 }
 
 /** Validate if a string looks like a valid QRIS code */
