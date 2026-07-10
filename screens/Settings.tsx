@@ -201,7 +201,7 @@ export const Settings: React.FC = () => {
 
     // Bank State
     const banks = useData(() => StorageService.getBanks(), [], 'banks') || [];
-    const [bankForm, setBankForm] = useState<Partial<BankAccount>>({ bankName: '', accountNumber: '', holderName: '' });
+    const [bankForm, setBankForm] = useState<Partial<BankAccount>>({ bankName: '', accountNumber: '', holderName: '', qrisCode: '' });
     const [isBankModalOpen, setIsBankModalOpen] = useState(false);
     const [editingBankId, setEditingBankId] = useState<string | null>(null);
 
@@ -223,10 +223,10 @@ export const Settings: React.FC = () => {
     const handleOpenBankModal = (bank?: BankAccount) => {
         if (bank) {
             setEditingBankId(bank.id);
-            setBankForm({ bankName: bank.bankName, accountNumber: bank.accountNumber, holderName: bank.holderName });
+            setBankForm({ bankName: bank.bankName, accountNumber: bank.accountNumber, holderName: bank.holderName, qrisCode: bank.qrisCode || '' });
         } else {
             setEditingBankId(null);
-            setBankForm({ bankName: '', accountNumber: '', holderName: '' });
+            setBankForm({ bankName: '', accountNumber: '', holderName: '', qrisCode: '' });
         }
         setIsBankModalOpen(true);
     };
@@ -842,8 +842,13 @@ export const Settings: React.FC = () => {
                                         <button onClick={() => handleDeleteBank(bank.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
                                     </div>
                                 </div>
-                                <div className="mt-3 pt-3 border-t border-slate-50 text-xs text-slate-400 uppercase font-medium">
-                                    a.n {bank.holderName}
+                                <div className="mt-3 pt-3 border-t border-slate-50 flex items-center justify-between">
+                                    <span className="text-xs text-slate-400 uppercase font-medium">a.n {bank.holderName}</span>
+                                    {bank.qrisCode ? (
+                                        <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">QRIS ✓</span>
+                                    ) : (
+                                        <span className="text-[10px] font-medium text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">No QRIS</span>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -869,6 +874,20 @@ export const Settings: React.FC = () => {
                                     <div>
                                         <label htmlFor="holderName" className="block text-sm font-medium text-slate-700 mb-1">Atas Nama</label>
                                         <input id="holderName" name="holderName" type="text" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={bankForm.holderName} onChange={e => setBankForm({ ...bankForm, holderName: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="qrisCode" className="block text-sm font-medium text-slate-700 mb-1">Kode QRIS <span className="text-xs text-slate-400 font-normal">(Opsional)</span></label>
+                                        <textarea
+                                            id="qrisCode"
+                                            name="qrisCode"
+                                            rows={3}
+                                            className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none text-xs font-mono"
+                                            placeholder="Paste kode QRIS statis dari bank Anda di sini (dimulai dengan 000201...).
+Dapatkan dari aplikasi bank atau struk QRIS merchant."
+                                            value={bankForm.qrisCode || ''}
+                                            onChange={e => setBankForm({ ...bankForm, qrisCode: e.target.value })}
+                                        />
+                                        <p className="text-[10px] text-slate-400 mt-1">💡 Scan QR QRIS statis Anda lalu paste teksnya di sini. QR pembayaran akan otomatis bisa di-scan oleh semua aplikasi bank.</p>
                                     </div>
                                     <div className="pt-4 flex gap-3">
                                         <button onClick={() => setIsBankModalOpen(false)} className="flex-1 text-slate-500 py-2 text-sm hover:bg-slate-50 rounded-lg">Batal</button>

@@ -9,6 +9,7 @@ import { generatePrintInvoice } from '../utils/printHelpers';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { playBeep } from '../utils/soundEffect';
+import { PaymentQRCode } from '../components/ui/PaymentQRCode';
 
 const FlyingItem = ({ item, cartRect }: { item: any, cartRect?: DOMRect }) => {
   const [animate, setAnimate] = useState(false);
@@ -48,6 +49,7 @@ export const POS: React.FC = () => {
   const customers = useData(() => StorageService.getCustomers(), [], 'customers') || [];
   const banks = useData(() => StorageService.getBanks(), [], 'banks') || [];
   const categories = useData(() => StorageService.getCategories(), [], 'categories') || [];
+  const storeSettings = useData(() => StorageService.getStoreSettings(), [], 'store_settings');
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -887,6 +889,18 @@ export const POS: React.FC = () => {
                     </select>
                   </div>
                 )}
+
+                {/* QR Code for Transfer Payment */}
+                {paymentMethod === PaymentMethod.TRANSFER && selectedBankId && (() => {
+                  const selectedBank = banks.find(b => b.id === selectedBankId);
+                  return selectedBank ? (
+                    <PaymentQRCode
+                      amount={totalAmount}
+                      bank={selectedBank}
+                      storeName={storeSettings?.name}
+                    />
+                  ) : null;
+                })()}
 
                 <div>
                   <div className="flex justify-between items-center mb-2">
