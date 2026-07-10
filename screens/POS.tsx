@@ -773,9 +773,7 @@ export const POS: React.FC = () => {
 
             ))}
           </div>
-
           </div>
-        </div>
 
         {/* Sticky Pay Button Area */}
         <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-4px_15px_rgba(0,0,0,0.05)] shrink-0 z-10 relative">
