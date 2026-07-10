@@ -1044,49 +1044,55 @@ export const POS: React.FC = () => {
       {/* QRIS Dedicated Popup Modal */}
       {
         showQrisModal && paymentMethod === PaymentMethod.TRANSFER && selectedBankId && createPortal(
-          <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-slate-900/80 backdrop-blur-md z-[10000] flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col items-center p-8 relative animate-scale-in">
+          <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-slate-900/95 backdrop-blur-md z-[10000] flex items-center justify-center p-4 md:p-8 animate-fade-in">
+            <div className="bg-white rounded-[2rem] w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col md:flex-row relative animate-scale-in">
               <button 
                 onClick={() => setShowQrisModal(false)} 
-                className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-full transition-colors"
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-full transition-colors z-10"
               >
                 <X size={24} />
               </button>
-              
-              <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-4">
-                <ScanLine size={32} />
+
+              {/* Left Side: QR Code Area */}
+              <div className="w-full md:w-1/2 bg-slate-50 p-8 md:p-12 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-200">
+                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 mb-6 w-full max-w-[320px] aspect-square flex items-center justify-center">
+                  {(() => {
+                    const selectedBank = banks.find(b => b.id === selectedBankId);
+                    return selectedBank ? (
+                      <PaymentQRCode
+                        amount={totalAmount}
+                        bank={selectedBank}
+                        storeName={storeSettings?.name}
+                      />
+                    ) : null;
+                  })()}
+                </div>
+                <div className="flex items-center gap-2 text-slate-500 font-medium text-center">
+                  <ScanLine size={20} className="text-primary"/> 
+                  <span>Scan dengan aplikasi M-Banking atau E-Wallet</span>
+                </div>
               </div>
-              
-              <h3 className="text-2xl font-black text-slate-800 text-center mb-1">Scan QRIS</h3>
-              <p className="text-slate-500 text-sm text-center mb-6">Minta pelanggan memindai QR code ini</p>
-              
-              <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100 w-full flex justify-center mb-6">
-                {(() => {
-                  const selectedBank = banks.find(b => b.id === selectedBankId);
-                  return selectedBank ? (
-                    <PaymentQRCode
-                      amount={totalAmount}
-                      bank={selectedBank}
-                      storeName={storeSettings?.name}
-                    />
-                  ) : null;
-                })()}
+
+              {/* Right Side: Details and Action */}
+              <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
+                <h3 className="text-3xl font-black text-slate-800 mb-2">Selesaikan Pembayaran</h3>
+                <p className="text-slate-500 mb-10 text-lg">Mohon tunjukkan layar ini kepada pelanggan untuk dipindai.</p>
+                
+                <div className="mb-12">
+                  <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Total Tagihan</p>
+                  <p className="text-5xl font-black text-primary">{formatIDR(totalAmount)}</p>
+                </div>
+                
+                <button 
+                  onClick={() => {
+                    setShowQrisModal(false);
+                    handleCheckout(); // Actually process the transaction
+                  }} 
+                  className="w-full py-5 bg-emerald-500 text-white rounded-2xl font-bold shadow-xl shadow-emerald-500/30 hover:bg-emerald-600 hover:-translate-y-1 active:translate-y-0 transition-all flex items-center justify-center gap-3 text-xl"
+                >
+                  Konfirmasi Sukses <Printer size={28}/>
+                </button>
               </div>
-              
-              <div className="w-full text-center mb-8">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Tagihan</p>
-                <p className="text-3xl font-black text-primary">{formatIDR(totalAmount)}</p>
-              </div>
-              
-              <button 
-                onClick={() => {
-                  setShowQrisModal(false);
-                  handleCheckout(); // Actually process the transaction
-                }} 
-                className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/30 hover:bg-emerald-600 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 text-lg"
-              >
-                Konfirmasi Sukses <Printer size={22}/>
-              </button>
             </div>
           </div>,
           document.body
