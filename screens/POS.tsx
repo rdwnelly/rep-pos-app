@@ -1054,8 +1054,8 @@ export const POS: React.FC = () => {
               </button>
 
               {/* Left Side: QR Code Area */}
-              <div className="w-full md:w-1/2 bg-slate-50 p-8 md:p-12 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-200">
-                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 mb-6 w-full max-w-[320px] aspect-square flex items-center justify-center">
+              <div className="w-full md:w-1/2 bg-slate-50 p-6 md:p-8 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-200">
+                <div className="w-full max-w-[420px] transform scale-105 origin-center">
                   {(() => {
                     const selectedBank = banks.find(b => b.id === selectedBankId);
                     return selectedBank ? (
@@ -1063,13 +1063,10 @@ export const POS: React.FC = () => {
                         amount={totalAmount}
                         bank={selectedBank}
                         storeName={storeSettings?.name}
+                        size={350}
                       />
                     ) : null;
                   })()}
-                </div>
-                <div className="flex items-center gap-2 text-slate-500 font-medium text-center">
-                  <ScanLine size={20} className="text-primary"/> 
-                  <span>Scan dengan aplikasi M-Banking atau E-Wallet</span>
                 </div>
               </div>
 
