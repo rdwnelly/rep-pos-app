@@ -72,7 +72,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'pos', label: 'Kasir (POS)', icon: ShoppingCart },
 
-      { id: 'laporan-rekapan', label: 'Laporan Rekapan', icon: FileText },
+      { id: 'berita-acara', label: 'Berita Acara', icon: FileText },
       { id: 'products', label: 'Produk', icon: Package },
       { id: 'transactions', label: 'Riwayat & Utang', icon: Receipt },
       { id: 'people', label: 'Kontak', icon: Users },

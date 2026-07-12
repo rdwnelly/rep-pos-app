@@ -241,3 +241,18 @@ export interface StockAdjustment {
   userId?: string;
   userName?: string;
 }
+
+export interface BeritaAcaraArchive extends BaseEntity {
+  id: string;
+  title: string;
+  date: string;
+  salesTunai: string[];
+  salesQR: string[];
+  expenses: string[];
+  customExpenses: any[]; // The detailed rows
+  catatan: string;
+  totalIncome: number;
+  totalExpense: number;
+  totalClean: number;
+  createdAt: number;
+}

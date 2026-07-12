@@ -23,7 +23,7 @@ import {
   SupplierHistory,
   TransferHistory,
 } from "../../screens";
-import LaporanRekapanPage from "./laporan-rekapan/page";
+import BeritaAcaraPage from "./berita-acara/page";
 
 const pageMap: Record<
   string,
@@ -57,7 +57,7 @@ const pageMap: Record<
   settings: { component: Settings },
   about: { component: About },
   barcode: { component: BarcodeGenerator },
-  "laporan-rekapan": { component: LaporanRekapanPage },
+  "berita-acara": { component: BeritaAcaraPage },
 };
 
 export default function ProtectedLayout({

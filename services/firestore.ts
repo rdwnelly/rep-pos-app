@@ -383,6 +383,14 @@ export const FirestoreService = {
       deleteCollection("banks"),
       deleteCollection("users"),
       deleteCollection("store_settings"),
+      deleteCollection("berita_acara_archives"),
     ]);
   },
+  
+  getBeritaAcaraArchives: async (): Promise<any[]> =>
+    getCollectionOrdered<any>("berita_acara_archives", "createdAt", "desc"),
+  saveBeritaAcaraArchive: async (archive: any) =>
+    saveEntity<any>("berita_acara_archives", archive),
+  deleteBeritaAcaraArchive: async (id: string) =>
+    deleteDoc(doc(collectionRef("berita_acara_archives"), id)),
 };
