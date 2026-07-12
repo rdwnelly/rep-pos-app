@@ -58,8 +58,21 @@ export const StorageService = {
     return await ApiService.getCategories();
   },
   saveCategory: async (category: Category) => {
-    if (!category.id) await ApiService.saveCategory(category);
-    else await ApiService.updateCategory(category);
+    if (!category.id) {
+        await ApiService.saveCategory(category);
+    } else {
+        await ApiService.updateCategory(category);
+        
+        // Cascade the name update to all products that use this category
+        const allProducts = await ApiService.getProducts();
+        const productsToUpdate = allProducts.filter(p => p.categoryId === category.id && p.categoryName !== category.name);
+        
+        if (productsToUpdate.length > 0) {
+            const updatedProducts = productsToUpdate.map(p => ({ ...p, categoryName: category.name }));
+            await ApiService.saveProductsBulk(updatedProducts);
+            notifyListeners('products');
+        }
+    }
     notifyListeners('categories');
   },
   deleteCategory: async (id: string) => {
@@ -252,4 +265,16 @@ export const StorageService = {
     notifyListeners(); // All changed
   },
 
+  // Berita Acara Archives
+  getBeritaAcaraArchives: async (): Promise<any[]> => {
+    return await ApiService.getBeritaAcaraArchives();
+  },
+  saveBeritaAcaraArchive: async (archive: any) => {
+    await ApiService.saveBeritaAcaraArchive(archive);
+    notifyListeners('berita_acara_archives');
+  },
+  deleteBeritaAcaraArchive: async (id: string) => {
+    await ApiService.deleteBeritaAcaraArchive(id);
+    notifyListeners('berita_acara_archives');
+  },
 };

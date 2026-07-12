@@ -542,7 +542,7 @@ export const POS: React.FC = () => {
         fixed inset-0 z-[60] transition-transform duration-300 ease-in-out
         ${showMobileCart ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
       `}>
-        <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col h-full lg:h-full overflow-hidden">
+        <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col flex-1 overflow-hidden">
 
           {/* Mobile Header for Cart */}
           <div className="lg:hidden flex items-center gap-3 mb-4 pb-4 border-b border-slate-200">
@@ -776,7 +776,7 @@ export const POS: React.FC = () => {
           </div>
 
         {/* Sticky Pay Button Area */}
-        <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-4px_15px_rgba(0,0,0,0.05)] shrink-0 z-10 relative">
+        <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-4px_15px_rgba(0,0,0,0.05)] shrink-0 z-20 sticky bottom-0 mt-auto">
           <button
             onClick={() => {
               if (discountType === 'PERCENTAGE' && discount > 100) {
