@@ -25,6 +25,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     const suppliers = useData(() => StorageService.getSuppliers(), [], 'suppliers') || [];
     const customers = useData(() => StorageService.getCustomers(), [], 'customers') || [];
     const banks = useData(() => StorageService.getBanks(), [], 'banks') || [];
+    const divisions = useData(() => StorageService.getDivisions(), [], 'divisions') || [];
     const users = useMemo(() => {
         // 1. Group by ID first to merge "username" vs "FullName" for the same user ID
         const usersById = new Map<string, string>(); // ID -> Name
@@ -142,6 +143,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     const [cfType, setCfType] = useState<CashFlowType>(CashFlowType.OUT);
     const [cfDesc, setCfDesc] = useState('');
     const [cfCategory, setCfCategory] = useState(''); // New State
+    const [cfDivisionId, setCfDivisionId] = useState('');
     const [cfPaymentMethod, setCfPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
     const [cfBankId, setCfBankId] = useState('');
 
@@ -484,8 +486,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                 return {
                     ...product,
                     qty: i.qty,
-                    finalPrice: i.price,
-                    selectedPriceType: 'ECERAN'
+                    finalPrice: i.price
                 } as any;
             }) : [],
             totalAmount: -totalRefund,
@@ -901,8 +902,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                 return {
                     ...product,
                     qty: i.qty,
-                    finalPrice: i.price, // Purchase price (HPP)
-                    selectedPriceType: 'UMUM'
+                    finalPrice: i.price // Purchase price (HPP)
                 };
             });
         } else {
@@ -997,6 +997,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         }
 
         const selectedBank = banks.find(b => b.id === cfBankId);
+        const selectedDivision = divisions.find(d => d.id === cfDivisionId);
 
         await StorageService.addCashFlow({
             id: '',
@@ -1009,11 +1010,14 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             bankId: cfBankId,
             bankName: selectedBank?.bankName,
             userId: currentUser?.id,
-            userName: currentUser?.name
+            userName: currentUser?.name,
+            divisionId: cfDivisionId || undefined,
+            divisionName: selectedDivision?.name || undefined
         });
         setCfAmount('');
         setCfDesc('');
         setCfCategory(''); // Reset category
+        setCfDivisionId('');
         setCfPaymentMethod(PaymentMethod.CASH);
         setCfBankId('');
     };
@@ -3015,6 +3019,19 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                             <option value="Pengeluaran Lain">Pengeluaran Lain</option>
                                         </>
                                     )}
+                                </select>
+
+                                {/* Division Selection */}
+                                <label htmlFor="cfDivision" className="sr-only">Divisi (Opsional)</label>
+                                <select
+                                    id="cfDivision"
+                                    name="cfDivision"
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg outline-none focus:border-blue-500 text-sm"
+                                    value={cfDivisionId}
+                                    onChange={e => setCfDivisionId(e.target.value)}
+                                >
+                                    <option value="">-- Pilih Divisi (Opsional) --</option>
+                                    {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                                 </select>
 
                                 <label htmlFor="cfDesc" className="sr-only">Keterangan</label>

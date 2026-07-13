@@ -22,6 +22,7 @@ import {
   SoldItems,
   SupplierHistory,
   TransferHistory,
+  MonthlyReport,
 } from "../../screens";
 import BeritaAcaraPage from "./berita-acara/page";
 
@@ -58,6 +59,7 @@ const pageMap: Record<
   about: { component: About },
   barcode: { component: BarcodeGenerator },
   "berita-acara": { component: BeritaAcaraPage },
+  monthly_report: { component: MonthlyReport, requiresCurrentUser: true },
 };
 
 export default function ProtectedLayout({

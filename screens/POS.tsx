@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Search, Trash2, User, Plus, Minus, ShoppingBag, Printer, CreditCard, Banknote, Clock, ScanLine, StickyNote, Image as ImageIcon, X, ChevronLeft, ClipboardList } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
-import { Product, CartItem, PriceType, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, Category } from '../types';
+import { Product, CartItem, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, Category } from '../types';
 import { formatIDR, getPriceByType, generateId, formatDate, toMySQLDate } from '../utils';
 import { generatePrintInvoice, PrintInvoiceOptions } from '../utils/printHelpers';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
@@ -75,7 +75,6 @@ export const POS: React.FC = () => {
   const [showQrisModal, setShowQrisModal] = useState(false);
 
   // Settings
-  const [defaultPriceType, setDefaultPriceType] = useState<PriceType>(PriceType.RETAIL);
 
   const currentUser = JSON.parse(localStorage.getItem('pos_current_user') || '{}') as UserType; // Need to grab current user
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -102,13 +101,9 @@ export const POS: React.FC = () => {
       const c = customers.find(cust => cust.id === selectedCustomerId);
       if (c) {
         setCustomerName(c.name);
-        if (c.defaultPriceType) {
-          setDefaultPriceType(c.defaultPriceType);
-        }
       }
     } else {
       setCustomerName('Pelanggan Umum');
-      setDefaultPriceType(PriceType.RETAIL); // Default back to Retail for walk-in
     }
   }, [selectedCustomerId, customers]);
 
@@ -126,8 +121,7 @@ export const POS: React.FC = () => {
   };
 
   const addToCart = (product: Product, event?: React.MouseEvent) => {
-    // Validate Price: Prevent adding items with 0 price
-    const price = getPriceByType(product, defaultPriceType);
+    const price = product.price;
     if (price === 0) {
       alert(`Peringatan: Harga produk "${product.name}" adalah 0 / belum diset untuk tipe harga ini. Item tidak dapat ditambahkan.`);
       return;
@@ -144,16 +138,16 @@ export const POS: React.FC = () => {
         return prev;
       }
 
-      const existing = prev.find(item => item.id === product.id && item.selectedPriceType === defaultPriceType);
+      const existing = prev.find(item => item.id === product.id);
       if (existing) {
         return prev.map(item =>
-          (item.id === product.id && item.selectedPriceType === defaultPriceType)
+          (item.id === product.id)
             ? { ...item, qty: item.qty + 1 }
             : item
         );
       }
       // price calculated above is used here
-      return [...prev, { ...product, qty: 1, selectedPriceType: defaultPriceType, finalPrice: price }];
+      return [...prev, { ...product, qty: 1, finalPrice: price }];
     });
 
     if (event && cartIconRef.current) {
@@ -172,9 +166,6 @@ export const POS: React.FC = () => {
     setCart(prev => {
       const newCart = [...prev];
       newCart[index] = { ...newCart[index], ...updates };
-      if (updates.selectedPriceType) {
-        newCart[index].finalPrice = getPriceByType(newCart[index], updates.selectedPriceType as PriceType);
-      }
       return newCart;
     });
   };
@@ -432,35 +423,9 @@ export const POS: React.FC = () => {
             )}
             <ScanLine className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           </div>
-          <label htmlFor="priceTypeSelect" className="sr-only">Pilih Tipe Harga</label>
-          <select
-            id="priceTypeSelect"
-            name="priceTypeSelect"
-            className="hidden sm:block px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-600"
-            value={defaultPriceType}
-            onChange={(e) => setDefaultPriceType(e.target.value as PriceType)}
-          >
-            <option value={PriceType.RETAIL}>Eceran</option>
-            <option value={PriceType.WHOLESALE}>Grosir</option>
-            <option value={PriceType.EMPLOYEE}>Karyawan</option>
-          </select>
         </div>
 
-        {/* Mobile Price Type Selector (Visible only on small screens) */}
-        <div className="sm:hidden px-4 pb-4 border-b border-slate-100 bg-white">
-          <label htmlFor="priceTypeSelectMobile" className="sr-only">Pilih Tipe Harga</label>
-          <select
-            id="priceTypeSelectMobile"
-            name="priceTypeSelectMobile"
-            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-600"
-            value={defaultPriceType}
-            onChange={(e) => setDefaultPriceType(e.target.value as PriceType)}
-          >
-            <option value={PriceType.RETAIL}>Harga Eceran</option>
-            <option value={PriceType.WHOLESALE}>Harga Grosir</option>
-            <option value={PriceType.EMPLOYEE}>Harga Karyawan</option>
-          </select>
-        </div>
+
 
         {/* Category Filter Horizontal Scroll */}
         <div className="bg-white border-b border-slate-100 px-4 py-3 sticky top-0 z-10 overflow-x-auto hide-scrollbar">
@@ -502,11 +467,8 @@ export const POS: React.FC = () => {
               </div>
               <h4 className="font-semibold text-slate-800 line-clamp-2 text-sm h-10">{product.name}</h4>
               <div className="mt-2 w-full">
-                <span className={`block font-bold ${defaultPriceType === PriceType.RETAIL ? 'text-primary' :
-                  defaultPriceType === PriceType.WHOLESALE ? 'text-blue-600' :
-                    defaultPriceType === PriceType.EMPLOYEE ? 'text-purple-600' : 'text-slate-800'
-                  }`}>
-                  {getPriceByType(product, defaultPriceType) === 0 ? '0' : formatIDR(getPriceByType(product, defaultPriceType))}
+                <span className="block font-bold text-primary">
+                  {product.price === 0 ? '0' : formatIDR(product.price)}
                 </span>
               </div>
             </button>
@@ -696,18 +658,6 @@ export const POS: React.FC = () => {
                 <div className="flex-1">
                   <h5 className="font-medium text-slate-800 text-sm">{item.name} <span className="text-xs text-slate-400 font-normal">({item.unit || 'Pcs'})</span></h5>
                   <div className="flex items-center gap-2 mt-1">
-                    <label htmlFor={`priceType-${idx}`} className="sr-only">Price Type</label>
-                    <select
-                      id={`priceType-${idx}`}
-                      name={`priceType-${idx}`}
-                      className="text-xs bg-slate-100 border-none rounded px-1 py-0.5 text-slate-600"
-                      value={item.selectedPriceType}
-                      onChange={(e) => updateCartItem(idx, { selectedPriceType: e.target.value as PriceType })}
-                    >
-                      <option value={PriceType.RETAIL}>Eceran</option>
-                      <option value={PriceType.WHOLESALE}>Grosir</option>
-                      <option value={PriceType.EMPLOYEE}>Karyawan</option>
-                    </select>
                     <span className="text-xs text-slate-400">@{formatIDR(item.finalPrice)}</span>
                   </div>
                 </div>

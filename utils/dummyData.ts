@@ -1,4 +1,4 @@
-import { Category, Product, Customer, Supplier, PriceType } from "../types";
+import { Category, Product, Customer, Supplier } from "../types";
 import { generateUUID } from "../utils";
 
 export const DUMMY_CATEGORIES: Category[] = [
@@ -36,28 +36,24 @@ export const DUMMY_CUSTOMERS: Customer[] = [
     name: "Pelanggan Umum",
     phone: "-",
     address: "-",
-    defaultPriceType: PriceType.RETAIL,
   },
   {
     id: generateUUID(),
     name: "Warung Bu Siti",
     phone: "085678901234",
     address: "Jl. Kampung Melayu",
-    defaultPriceType: PriceType.WHOLESALE,
   },
   {
     id: generateUUID(),
     name: "Toko Kelontong Pak Budi",
     phone: "081298765432",
     address: "Jl. Raya Bogor",
-    defaultPriceType: PriceType.WHOLESALE,
   },
   {
     id: generateUUID(),
     name: "Kantin Sekolah SD 01",
     phone: "087712345678",
     address: "Jl. Pendidikan",
-    defaultPriceType: PriceType.WHOLESALE,
   },
 ];
 
@@ -70,9 +66,7 @@ export const DUMMY_PRODUCTS: Product[] = [
     categoryName: DUMMY_CATEGORIES[0].name,
     stock: 50,
     hpp: 10000,
-    priceRetail: 15000,
-    priceEmployee: 14000,
-    priceWholesale: 12500,
+    price: 15000,
     unit: "pcs",
   },
   {
@@ -83,9 +77,7 @@ export const DUMMY_PRODUCTS: Product[] = [
     categoryName: DUMMY_CATEGORIES[0].name,
     stock: 100,
     hpp: 5000,
-    priceRetail: 8000,
-    priceEmployee: 7500,
-    priceWholesale: 6500,
+    price: 8000,
     unit: "pcs",
   },
   {
@@ -96,9 +88,7 @@ export const DUMMY_PRODUCTS: Product[] = [
     categoryName: DUMMY_CATEGORIES[1].name,
     stock: 30,
     hpp: 18000,
-    priceRetail: 25000,
-    priceEmployee: 24000,
-    priceWholesale: 22000,
+    price: 25000,
     unit: "toples",
   },
   {
@@ -109,9 +99,7 @@ export const DUMMY_PRODUCTS: Product[] = [
     categoryName: DUMMY_CATEGORIES[1].name,
     stock: 20,
     hpp: 2000,
-    priceRetail: 3500,
-    priceEmployee: 3000,
-    priceWholesale: 2500,
+    price: 3500,
     unit: "pcs",
   },
   {
@@ -122,9 +110,7 @@ export const DUMMY_PRODUCTS: Product[] = [
     categoryName: DUMMY_CATEGORIES[2].name,
     stock: 40,
     hpp: 12000,
-    priceRetail: 18000,
-    priceEmployee: 17000,
-    priceWholesale: 15000,
+    price: 18000,
     unit: "bks",
   },
   {
@@ -135,9 +121,7 @@ export const DUMMY_PRODUCTS: Product[] = [
     categoryName: DUMMY_CATEGORIES[2].name,
     stock: 25,
     hpp: 25000,
-    priceRetail: 35000,
-    priceEmployee: 33000,
-    priceWholesale: 30000,
+    price: 35000,
     unit: "bks",
   },
   {
@@ -148,9 +132,7 @@ export const DUMMY_PRODUCTS: Product[] = [
     categoryName: DUMMY_CATEGORIES[3].name,
     stock: 100,
     hpp: 1500,
-    priceRetail: 3000,
-    priceEmployee: 3000,
-    priceWholesale: 2500,
+    price: 3000,
     unit: "cup",
   },
   {
@@ -161,9 +143,7 @@ export const DUMMY_PRODUCTS: Product[] = [
     categoryName: DUMMY_CATEGORIES[3].name,
     stock: 48,
     hpp: 2000,
-    priceRetail: 4000,
-    priceEmployee: 3500,
-    priceWholesale: 3000,
+    price: 4000,
     unit: "btl",
   },
 ];

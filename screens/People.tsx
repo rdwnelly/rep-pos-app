@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
-import { Customer, Supplier, PriceType, UserRole } from '../types';
+import { Customer, Supplier, UserRole } from '../types';
 import { Plus, Edit2, Trash2, Phone, MapPin, Search, User, Truck, Download, Printer, Upload, X, FileSpreadsheet, Users, Mail, ArrowUpDown } from 'lucide-react';
 import { exportToCSV, generateUUID, compressImage, exportToExcel } from '../utils';
 
@@ -25,7 +25,7 @@ export const People: React.FC = () => {
     // Modal
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [formData, setFormData] = useState<{ name: string, phone: string, address: string, email: string, image: string, defaultPriceType?: PriceType }>({ name: '', phone: '', address: '', email: '', image: '', defaultPriceType: PriceType.RETAIL });
+    const [formData, setFormData] = useState<{ name: string, phone: string, address: string, email: string, image: string }>({ name: '', phone: '', address: '', email: '', image: '' });
 
 
 
@@ -38,12 +38,11 @@ export const People: React.FC = () => {
                 phone: data.phone,
                 address: data.address || '',
                 email: data.email || '',
-                image: data.image || '',
-                defaultPriceType: isCust ? (data as Customer).defaultPriceType || PriceType.RETAIL : undefined
+                image: data.image || ''
             });
         } else {
             setEditingId(null);
-            setFormData({ name: '', phone: '', address: '', email: '', image: '', defaultPriceType: PriceType.RETAIL });
+            setFormData({ name: '', phone: '', address: '', email: '', image: '' });
         }
         setIsModalOpen(true);
     };
@@ -58,7 +57,7 @@ export const People: React.FC = () => {
             address: formData.address,
             email: formData.email,
             image: formData.image,
-            defaultPriceType: activeTab === 'customers' ? formData.defaultPriceType : undefined
+
         };
 
         if (activeTab === 'customers') {
@@ -101,12 +100,10 @@ export const People: React.FC = () => {
     const handleExport = () => {
         const data = activeTab === 'customers' ? customers : suppliers;
         const filename = activeTab === 'customers' ? 'data-pelanggan.csv' : 'data-supplier.csv';
-        const headers = ['ID', 'Nama', 'Telepon', 'Alamat', 'Email', ...(activeTab === 'customers' ? ['Harga Default'] : [])];
+        const headers = ['ID', 'Nama', 'Telepon', 'Alamat', 'Email'];
         const rows = data.map(d => {
             const row = [d.id, d.name, d.phone, d.address || '', d.email || ''];
-            if (activeTab === 'customers') {
-                row.push((d as Customer).defaultPriceType || 'ECERAN');
-            }
+
             return row;
         });
         exportToCSV(filename, headers, rows);
@@ -123,7 +120,7 @@ export const People: React.FC = () => {
             'Telepon': d.phone,
             'Alamat': d.address || '',
             'Email': d.email || '',
-            ...(activeTab === 'customers' ? { 'Harga Default': (d as Customer).defaultPriceType || 'ECERAN' } : {})
+
         }));
 
         const cols = [
@@ -132,7 +129,7 @@ export const People: React.FC = () => {
             { wch: 15 }, // Telepon
             { wch: 40 }, // Alamat
             { wch: 25 }, // Email
-            ...(activeTab === 'customers' ? [{ wch: 15 }] : []) // Harga Default
+
         ];
 
         exportToExcel(exportData, fileNamePrefix, sheetName, cols);
@@ -153,7 +150,7 @@ export const People: React.FC = () => {
               <td>${item.phone}</td>
               <td>${item.address || '-'}</td>
               <td>${item.email || '-'}</td>
-              ${isCustomer ? `<td>${(item as Customer).defaultPriceType || '-'}</td>` : ''}
+
           </tr>
       `).join('');
 
@@ -297,12 +294,7 @@ export const People: React.FC = () => {
 
                 if (activeTab === 'customers') {
                     // Default Price Type mapping
-                    let priceType = PriceType.RETAIL;
-                    const rawPriceType = getValue(colMap.priceType).toUpperCase();
-                    if (Object.values(PriceType).includes(rawPriceType as PriceType)) {
-                        priceType = rawPriceType as PriceType;
-                    }
-                    item.defaultPriceType = priceType;
+
                     newItems.push(item as Customer);
                 } else {
                     newItems.push(item as Supplier);
@@ -510,13 +502,6 @@ export const People: React.FC = () => {
                                     <span className="line-clamp-1">{item.email}</span>
                                 </div>
                             )}
-                            {activeTab === 'customers' && (item as Customer).defaultPriceType && (
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                                        Harga: {(item as Customer).defaultPriceType}
-                                    </span>
-                                </div>
-                            )}
                         </div>
                     </div>
                 ))}
@@ -615,24 +600,6 @@ export const People: React.FC = () => {
                                     onChange={e => setFormData({ ...formData, address: e.target.value })}
                                 />
                             </div>
-
-                            {activeTab === 'customers' && (
-                                <div>
-                                    <label htmlFor="priceType" className="block text-sm font-medium text-slate-700 mb-1">Kategori Harga Default</label>
-                                    <select
-                                        id="priceType"
-                                        name="priceType"
-                                        className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white"
-                                        value={formData.defaultPriceType}
-                                        onChange={e => setFormData({ ...formData, defaultPriceType: e.target.value as PriceType })}
-                                    >
-                                        <option value={PriceType.RETAIL}>Eceran (Retail)</option>
-                                        <option value={PriceType.WHOLESALE}>Grosir</option>
-                                        <option value={PriceType.EMPLOYEE}>Karyawan</option>
-                                    </select>
-                                    <p className="text-xs text-slate-500 mt-1">Kategori harga ini akan otomatis terpilih saat pelanggan ini dipilih di kasir.</p>
-                                </div>
-                            )}
 
                             <div className="flex gap-3 pt-4">
                                 <button onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 text-slate-600 hover:bg-slate-50 rounded-lg font-medium">Batal</button>
