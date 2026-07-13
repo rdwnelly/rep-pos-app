@@ -9,9 +9,7 @@ const Product = sequelize.define('Product', {
     categoryName: { type: DataTypes.STRING },
     stock: { type: DataTypes.INTEGER, defaultValue: 0 },
     hpp: { type: DataTypes.FLOAT, defaultValue: 0 },
-    priceRetail: { type: DataTypes.FLOAT, defaultValue: 0 },
-    priceGeneral: { type: DataTypes.FLOAT, defaultValue: 0 },
-    priceWholesale: { type: DataTypes.FLOAT, defaultValue: 0 },
+    price: { type: DataTypes.FLOAT, defaultValue: 0 },
     pricePromo: { type: DataTypes.FLOAT },
     image: { type: DataTypes.TEXT('long') }
 }, { tableName: 'products' });
@@ -26,8 +24,7 @@ const Customer = sequelize.define('Customer', {
     name: { type: DataTypes.STRING, allowNull: false },
     phone: { type: DataTypes.STRING },
     address: { type: DataTypes.STRING },
-    image: { type: DataTypes.TEXT('long') },
-    defaultPriceType: { type: DataTypes.STRING }
+    image: { type: DataTypes.TEXT('long') }
 }, { tableName: 'customers' });
 
 const Supplier = sequelize.define('Supplier', {

@@ -33,6 +33,7 @@ import {
   TransactionType,
   User,
   UserRole,
+  Division,
 } from "../types";
 
 const collectionRef = (name: string) => collection(db, name);
@@ -348,6 +349,11 @@ export const FirestoreService = {
   saveUser: async (user: User) => saveEntity<User>("users", user),
   updateUser: async (user: User) => saveEntity<User>("users", user),
   deleteUser: async (id: string) => deleteDoc(doc(collectionRef("users"), id)),
+
+  // Divisions
+  getDivisions: async (): Promise<Division[]> => getCollection<Division>("divisions"),
+  saveDivision: async (division: Division) => saveEntity<Division>("divisions", division),
+  deleteDivision: async (id: string) => deleteDoc(doc(collectionRef("divisions"), id)),
 
   resetProducts: async () => deleteCollection("products"),
   resetTransactions: async (startDate?: string, endDate?: string) => deleteCollectionByDateRange("transactions", startDate, endDate),

@@ -1,4 +1,4 @@
-import { Product, Transaction, User, CashFlow, Category, Customer, Supplier, Purchase, StoreSettings, BankAccount, SyncQueueItem } from "../types";
+import { Product, Transaction, User, CashFlow, Category, Division, Customer, Supplier, Purchase, StoreSettings, BankAccount, SyncQueueItem } from "../types";
 import { ApiService } from "./api";
 
 // Simple Event Bus for Data Changes
@@ -51,6 +51,19 @@ export const StorageService = {
   deleteBank: async (id: string) => {
     await ApiService.deleteBank(id);
     notifyListeners('banks');
+  },
+
+  // Divisions
+  getDivisions: async (): Promise<Division[]> => {
+    return await ApiService.getDivisions();
+  },
+  saveDivision: async (division: Division) => {
+    await ApiService.saveDivision(division);
+    notifyListeners('divisions');
+  },
+  deleteDivision: async (id: string) => {
+    await ApiService.deleteDivision(id);
+    notifyListeners('divisions');
   },
 
   // Categories

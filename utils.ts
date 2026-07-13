@@ -1,4 +1,4 @@
-import { PriceType, Product } from "./types";
+import { Product } from "./types";
 
 export const formatIDR = (amount: number): string => {
   return new Intl.NumberFormat('id-ID', {
@@ -31,14 +31,7 @@ export const formatDateDateOnly = (dateString: string): string => {
   }).format(new Date(dateString));
 };
 
-export const getPriceByType = (product: Product, type: PriceType): number => {
-  switch (type) {
-    case PriceType.WHOLESALE: return product.priceWholesale;
-    case PriceType.EMPLOYEE: return product.priceEmployee || 0;
-    case PriceType.RETAIL: return product.priceRetail;
-    default: return product.priceRetail;
-  }
-};
+
 
 export const generateId = (): string => {
   return Math.random().toString(36).substr(2, 9);

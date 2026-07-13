@@ -84,7 +84,9 @@ export default function BeritaAcaraPage() {
 
     // States for editable tables
     const [salesTunai, setSalesTunai] = useState(Array(10).fill(""));
+    const [hppTunai, setHppTunai] = useState(Array(10).fill(""));
     const [salesQR, setSalesQR] = useState(Array(10).fill(""));
+    const [hppQR, setHppQR] = useState(Array(10).fill(""));
     const [salesTunaiNames, setSalesTunaiNames] = useState([...FIXED_SALES_CATEGORIES]);
     const [salesQRNames, setSalesQRNames] = useState([...FIXED_SALES_CATEGORIES]);
 
@@ -113,7 +115,9 @@ export default function BeritaAcaraPage() {
 
         // Reset to predefined
         const newSalesTunai = Array(10).fill(0);
+        const newHppTunai = Array(10).fill(0);
         const newSalesQR = Array(10).fill(0);
+        const newHppQR = Array(10).fill(0);
         const newExpenses = Array(10).fill(0);
         
         let hasData = false;
@@ -128,8 +132,10 @@ export default function BeritaAcaraPage() {
                 t.items.forEach(item => {
                     const catName = item.categoryName?.toLowerCase() || '';
                     let itemTotal = item.finalPrice * item.qty;
+                    let itemHpp = (item.hpp || 0) * item.qty;
                     if (t.type === TransactionType.RETURN) {
                         itemTotal = -itemTotal;
+                        itemHpp = -itemHpp;
                     }
 
                     // Try to map to fixed categories roughly
@@ -148,8 +154,10 @@ export default function BeritaAcaraPage() {
 
                     if (t.paymentMethod === PaymentMethod.CASH) {
                         newSalesTunai[targetIndex] += itemTotal;
+                        newHppTunai[targetIndex] += itemHpp;
                     } else {
                         newSalesQR[targetIndex] += itemTotal;
+                        newHppQR[targetIndex] += itemHpp;
                     }
                 });
             }
@@ -197,11 +205,15 @@ export default function BeritaAcaraPage() {
 
         if (hasData) {
             setSalesTunai(newSalesTunai.map(v => v === 0 ? "" : String(v)));
+            setHppTunai(newHppTunai.map(v => v === 0 ? "" : String(v)));
             setSalesQR(newSalesQR.map(v => v === 0 ? "" : String(v)));
+            setHppQR(newHppQR.map(v => v === 0 ? "" : String(v)));
             setExpenses(newExpenses.map(v => v === 0 ? "" : String(v)));
         } else {
             setSalesTunai(Array(10).fill(""));
+            setHppTunai(Array(10).fill(""));
             setSalesQR(Array(10).fill(""));
+            setHppQR(Array(10).fill(""));
             setExpenses(Array(10).fill(""));
         }
     }, [tanggal, transactionsStr, cashflowsStr, JSON.stringify(customExpenses)]);
@@ -227,7 +239,9 @@ export default function BeritaAcaraPage() {
             kasir,
             lokasi,
             salesTunai,
+            hppTunai,
             salesQR,
+            hppQR,
             expenses,
             customExpenses,
             catatan,
@@ -254,7 +268,9 @@ export default function BeritaAcaraPage() {
     const currentKasir = viewingArchive ? viewingArchive.kasir : kasir;
     const currentLokasi = viewingArchive ? viewingArchive.lokasi : lokasi;
     const currentSalesTunai = viewingArchive ? viewingArchive.salesTunai : salesTunai;
+    const currentHppTunai = viewingArchive && viewingArchive.hppTunai ? viewingArchive.hppTunai : hppTunai;
     const currentSalesQR = viewingArchive ? viewingArchive.salesQR : salesQR;
+    const currentHppQR = viewingArchive && viewingArchive.hppQR ? viewingArchive.hppQR : hppQR;
     const currentExpenses = viewingArchive ? viewingArchive.expenses : expenses;
     const currentCustomExpenses = viewingArchive ? viewingArchive.customExpenses : customExpenses;
     const currentCatatan = viewingArchive ? viewingArchive.catatan : catatan;
@@ -277,14 +293,28 @@ export default function BeritaAcaraPage() {
     }, [currentCustomExpenses]);
 
     const handleSalesChange = (type, index, value) => {
+        const val = value.replace(/[^0-9]/g, "");
         if (type === 'tunai') {
             const newData = [...salesTunai];
-            newData[index] = value;
+            newData[index] = val;
             setSalesTunai(newData);
         } else {
             const newData = [...salesQR];
-            newData[index] = value;
+            newData[index] = val;
             setSalesQR(newData);
+        }
+    };
+
+    const handleHppChange = (type, index, value) => {
+        const val = value.replace(/[^0-9]/g, "");
+        if (type === 'tunai') {
+            const newData = [...hppTunai];
+            newData[index] = val;
+            setHppTunai(newData);
+        } else {
+            const newData = [...hppQR];
+            newData[index] = val;
+            setHppQR(newData);
         }
     };
 
@@ -357,10 +387,14 @@ export default function BeritaAcaraPage() {
         return result;
     }, [customExpenses]);
 
-    const totalSalesTunai = salesTunai.reduce((sum, val) => sum + (Number(val) || 0), 0);
-    const totalSalesQR = salesQR.reduce((sum, val) => sum + (Number(val) || 0), 0);
+    const totalSalesTunai = currentSalesTunai.reduce((sum, val) => sum + (Number(val) || 0), 0);
+    const totalHppTunai = currentHppTunai.reduce((sum, val) => sum + (Number(val) || 0), 0);
+    const totalProfitTunai = totalSalesTunai - totalHppTunai;
+    const totalSalesQR = currentSalesQR.reduce((sum, val) => sum + (Number(val) || 0), 0);
+    const totalHppQR = currentHppQR.reduce((sum, val) => sum + (Number(val) || 0), 0);
+    const totalProfitQR = totalSalesQR - totalHppQR;
     const totalAllSales = totalSalesTunai + totalSalesQR;
-    const totalPengeluaran = expenses.reduce((sum, val) => sum + (Number(val) || 0), 0);
+    const totalPengeluaran = currentExpenses.reduce((sum, val) => sum + (Number(val) || 0), 0);
     const netto = totalSalesTunai - totalPengeluaran;
 
     return (
@@ -684,86 +718,130 @@ export default function BeritaAcaraPage() {
                     </div>
 
                     {/* Section II & III */}
-                    <div className="flex gap-4 mb-4">
+                    <div className="flex flex-col gap-6 mb-6">
                         {/* Section II */}
-                        <div className="w-1/2">
+                        <div className="w-full">
                             <div className="brown-header">II. LAPORAN PENJUALAN</div>
                             <table className="report-table">
                                 <thead>
                                     <tr>
-                                        <th style={{ width: '10%' }}>No</th>
-                                        <th style={{ width: '60%' }}>Sumber Pendapatan</th>
-                                        <th style={{ width: '30%' }}>Jumlah (Rp)</th>
+                                        <th style={{ width: '5%' }}>No</th>
+                                        <th style={{ width: '35%' }}>Sumber Pendapatan</th>
+                                        <th style={{ width: '20%' }}>Pendapatan (Rp)</th>
+                                        <th style={{ width: '20%' }}>Modal (Rp)</th>
+                                        <th style={{ width: '20%' }}>Keuntungan (Rp)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {salesTunai.map((val, idx) => (
-                                        <tr key={`sales-${idx}`}>
-                                            <td className="text-center">{idx + 1}</td>
-                                            <td>
-                                                <input 
-                                                    type="text" 
-                                                    className="editable-cell" 
-                                                    value={salesTunaiNames[idx]} 
-                                                    onChange={(e) => handleSalesNameChange('tunai', idx, e.target.value)} 
-                                                />
-                                            </td>
-                                            <td>
-                                                <input 
-                                                    type="text" 
-                                                    className="editable-cell text-right" 
-                                                    value={val} 
-                                                    onChange={(e) => handleSalesChange('tunai', idx, e.target.value)} 
-                                                    placeholder="0"
-                                                />
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {currentSalesTunai.map((val, idx) => {
+                                        const pendapatan = Number(val) || 0;
+                                        const modal = Number(currentHppTunai[idx]) || 0;
+                                        const keuntungan = pendapatan - modal;
+                                        const isRowEmpty = !val && !currentHppTunai[idx];
+                                        return (
+                                            <tr key={`sales-${idx}`}>
+                                                <td className="text-center">{idx + 1}</td>
+                                                <td>
+                                                    <input 
+                                                        type="text" 
+                                                        className="editable-cell" 
+                                                        value={salesTunaiNames[idx]} 
+                                                        onChange={(e) => handleSalesNameChange('tunai', idx, e.target.value)} 
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input 
+                                                        type="text" 
+                                                        className="editable-cell text-right" 
+                                                        value={val} 
+                                                        onChange={(e) => handleSalesChange('tunai', idx, e.target.value)} 
+                                                        placeholder="0"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input 
+                                                        type="text" 
+                                                        className="editable-cell text-right text-red-700/80" 
+                                                        value={currentHppTunai[idx]} 
+                                                        onChange={(e) => handleHppChange('tunai', idx, e.target.value)} 
+                                                        placeholder="0"
+                                                    />
+                                                </td>
+                                                <td className="text-right font-medium text-green-700 bg-slate-50/50 pr-2">
+                                                    {isRowEmpty ? '' : keuntungan.toLocaleString('id-ID')}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                     <tr className="bg-[#f5e6d3] font-bold">
                                         <td colSpan={2} className="text-right">TOTAL PENJUALAN</td>
                                         <td className="text-right">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
+                                        <td className="text-right text-red-700">Rp {totalHppTunai.toLocaleString('id-ID')}</td>
+                                        <td className="text-right text-green-700">Rp {totalProfitTunai.toLocaleString('id-ID')}</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
 
                         {/* Section III */}
-                        <div className="w-1/2">
+                        <div className="w-full">
                             <div className="brown-header">III. LAPORAN PENJUALAN (QR)</div>
                             <table className="report-table">
                                 <thead>
                                     <tr>
-                                        <th style={{ width: '10%' }}>No</th>
-                                        <th style={{ width: '60%' }}>Sumber Pendapatan (QR)</th>
-                                        <th style={{ width: '30%' }}>Jumlah (Rp)</th>
+                                        <th style={{ width: '5%' }}>No</th>
+                                        <th style={{ width: '35%' }}>Sumber Pendapatan (QR)</th>
+                                        <th style={{ width: '20%' }}>Pendapatan (Rp)</th>
+                                        <th style={{ width: '20%' }}>Modal (Rp)</th>
+                                        <th style={{ width: '20%' }}>Keuntungan (Rp)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {salesQR.map((val, idx) => (
-                                        <tr key={`salesQR-${idx}`}>
-                                            <td className="text-center">{idx + 1}</td>
-                                            <td>
-                                                <input 
-                                                    type="text" 
-                                                    className="editable-cell" 
-                                                    value={salesQRNames[idx]} 
-                                                    onChange={(e) => handleSalesNameChange('qr', idx, e.target.value)} 
-                                                />
-                                            </td>
-                                            <td>
-                                                <input 
-                                                    type="text" 
-                                                    className="editable-cell text-right" 
-                                                    value={val} 
-                                                    onChange={(e) => handleSalesChange('qr', idx, e.target.value)} 
-                                                    placeholder="0"
-                                                />
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {currentSalesQR.map((val, idx) => {
+                                        const pendapatan = Number(val) || 0;
+                                        const modal = Number(currentHppQR[idx]) || 0;
+                                        const keuntungan = pendapatan - modal;
+                                        const isRowEmpty = !val && !currentHppQR[idx];
+                                        return (
+                                            <tr key={`salesQR-${idx}`}>
+                                                <td className="text-center">{idx + 1}</td>
+                                                <td>
+                                                    <input 
+                                                        type="text" 
+                                                        className="editable-cell" 
+                                                        value={salesQRNames[idx]} 
+                                                        onChange={(e) => handleSalesNameChange('qr', idx, e.target.value)} 
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input 
+                                                        type="text" 
+                                                        className="editable-cell text-right" 
+                                                        value={val} 
+                                                        onChange={(e) => handleSalesChange('qr', idx, e.target.value)} 
+                                                        placeholder="0"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input 
+                                                        type="text" 
+                                                        className="editable-cell text-right text-red-700/80" 
+                                                        value={currentHppQR[idx]} 
+                                                        onChange={(e) => handleHppChange('qr', idx, e.target.value)} 
+                                                        placeholder="0"
+                                                    />
+                                                </td>
+                                                <td className="text-right font-medium text-green-700 bg-slate-50/50 pr-2">
+                                                    {isRowEmpty ? '' : keuntungan.toLocaleString('id-ID')}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                     <tr className="bg-[#f5e6d3] font-bold">
-                                        <td colSpan={2} className="text-right">TOTAL PENJUALAN</td>
+                                        <td colSpan={2} className="text-right">TOTAL PENJUALAN (QR)</td>
                                         <td className="text-right">Rp {totalSalesQR.toLocaleString('id-ID')}</td>
+                                        <td className="text-right text-red-700">Rp {totalHppQR.toLocaleString('id-ID')}</td>
+                                        <td className="text-right text-green-700">Rp {totalProfitQR.toLocaleString('id-ID')}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -773,14 +851,15 @@ export default function BeritaAcaraPage() {
                     {/* Section IV (Rekapitulasi) */}
                     <div className="mb-4">
                         <div className="brown-header">IV. REKAPITULASI</div>
-                        <div className="border border-[#d1d5db] p-4 flex justify-between gap-12 text-sm font-bold">
-                            <div className="w-1/2">
+                        <div className="border border-[#d1d5db] p-4 flex flex-col md:flex-row justify-between gap-8 text-sm font-bold">
+                            <div className="w-full md:w-1/3">
+                                <div className="text-center bg-slate-100 p-1 mb-2">Pemasukan</div>
                                 <div className="flex justify-between mb-2">
-                                    <span>Total Penjualan</span>
+                                    <span>Penjualan Tunai</span>
                                     <span className="border-b border-black w-32 text-right text-gray-700 font-medium">Rp {totalSalesTunai.toLocaleString('id-ID')}</span>
                                 </div>
                                 <div className="flex justify-between mb-2">
-                                    <span>Total Penjualan (QR)</span>
+                                    <span>Penjualan QR</span>
                                     <span className="border-b border-black w-32 text-right text-gray-700 font-medium">Rp {totalSalesQR.toLocaleString('id-ID')}</span>
                                 </div>
                                 <div className="flex justify-between text-amber-900 mt-4">
@@ -788,17 +867,35 @@ export default function BeritaAcaraPage() {
                                     <span>Rp {totalAllSales.toLocaleString('id-ID')}</span>
                                 </div>
                             </div>
-                            <div className="w-1/2">
+                            
+                            <div className="w-full md:w-1/3 border-t md:border-t-0 md:border-l border-slate-300 pt-4 md:pt-0 md:pl-8">
+                                <div className="text-center bg-blue-50 text-blue-900 p-1 mb-2">Laba Penjualan</div>
                                 <div className="flex justify-between mb-2">
-                                    <span>Total Penjualan</span>
+                                    <span>Total Pendapatan</span>
                                     <span className="border-b border-black w-32 text-right text-gray-700 font-medium">Rp {totalAllSales.toLocaleString('id-ID')}</span>
                                 </div>
                                 <div className="flex justify-between mb-2">
-                                    <span>Pengeluaran</span>
-                                    <span className="border-b border-black w-32 text-right text-gray-700 font-medium">Rp {totalPengeluaran.toLocaleString('id-ID')}</span>
+                                    <span>Total HPP (Modal)</span>
+                                    <span className="border-b border-black w-32 text-right text-red-700 font-medium">Rp {(totalHppTunai + totalHppQR).toLocaleString('id-ID')}</span>
                                 </div>
-                                <div className="flex justify-between mt-4">
-                                    <span>NETTO</span>
+                                <div className="flex justify-between text-green-700 mt-4">
+                                    <span>KEUNTUNGAN</span>
+                                    <span className="border-b border-black w-32 text-right">Rp {((totalSalesTunai + totalSalesQR) - (totalHppTunai + totalHppQR)).toLocaleString('id-ID')}</span>
+                                </div>
+                            </div>
+
+                            <div className="w-full md:w-1/3 border-t md:border-t-0 md:border-l border-slate-300 pt-4 md:pt-0 md:pl-8">
+                                <div className="text-center bg-slate-100 p-1 mb-2">Setoran Fisik (Tunai)</div>
+                                <div className="flex justify-between mb-2">
+                                    <span>Penjualan Tunai</span>
+                                    <span className="border-b border-black w-32 text-right text-gray-700 font-medium">Rp {totalSalesTunai.toLocaleString('id-ID')}</span>
+                                </div>
+                                <div className="flex justify-between mb-2">
+                                    <span>Pengeluaran</span>
+                                    <span className="border-b border-black w-32 text-right text-red-700 font-medium">Rp {totalPengeluaran.toLocaleString('id-ID')}</span>
+                                </div>
+                                <div className="flex justify-between mt-4 text-slate-800">
+                                    <span>NETTO (Uang Kasir)</span>
                                     <span className="border-b border-black w-32 text-right">Rp {netto.toLocaleString('id-ID')}</span>
                                 </div>
                             </div>

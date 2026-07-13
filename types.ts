@@ -16,13 +16,12 @@ export interface User {
   image?: string; // Base64 string
 }
 
-export enum PriceType {
-  RETAIL = 'ECERAN', // Highest price
-  WHOLESALE = 'GROSIR', // Lowest price
-  EMPLOYEE = 'KARYAWAN' // Employee price
+export interface Category {
+  id: string;
+  name: string;
 }
 
-export interface Category {
+export interface Division {
   id: string;
   name: string;
 }
@@ -34,7 +33,6 @@ export interface Customer {
   address?: string;
   email?: string;
   image?: string;
-  defaultPriceType?: PriceType; // Default pricing tier for this customer
 }
 
 export interface Supplier {
@@ -54,16 +52,15 @@ export interface Product {
   categoryName: string; // Denormalized for easier display/export
   stock: number;
   hpp: number; // Harga Pokok Penjualan (Cost Price)
-  priceRetail: number;
-  priceWholesale: number;
-  priceEmployee?: number; // Optional employee price
+  price: number; // Harga Jual
   image?: string;
   unit?: string; // e.g. Pcs, Kg, Box
+  divisionId?: string; // Optional: Link to Division
+  divisionName?: string; // Denormalized division name
 }
 
 export interface CartItem extends Product {
   qty: number;
-  selectedPriceType: PriceType;
   finalPrice: number;
 }
 
@@ -179,6 +176,8 @@ export interface CashFlow {
   userId?: string; // New: Track who created this record
   userName?: string; // New
   referenceId?: string; // New: Link to Transaction/Purchase ID
+  divisionId?: string; // New: If related to a specific division (e.g., Kasbon)
+  divisionName?: string; // New: Snapshot of division name
 }
 
 export interface DashboardStats {

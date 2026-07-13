@@ -63,7 +63,7 @@ export const BarcodeGenerator: React.FC = () => {
               <div class="barcode-item">
                 <div class="product-name">${p.name}</div>
                 ${svg.outerHTML}
-                <div class="product-price">${formatIDR(p.priceRetail)} / ${p.unit || 'Pcs'}</div>
+                <div class="product-price">${formatIDR(p.price)} / ${p.unit || 'Pcs'}</div>
               </div>
             `;
         }).join('');
