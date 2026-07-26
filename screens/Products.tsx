@@ -63,6 +63,27 @@ export const Products: React.FC = () => {
       return;
     }
 
+    // Cegah duplikat saat mode tambah baru (bukan edit)
+    if (!editingId) {
+      const skuExists = products.some(
+        p => p.sku.trim().toLowerCase() === formData.sku!.trim().toLowerCase()
+      );
+      if (skuExists) {
+        alert(`Produk dengan SKU "${formData.sku}" sudah ada!\nGunakan tombol Edit untuk mengubah produk yang sudah ada.`);
+        return;
+      }
+
+      const nameExists = products.some(
+        p => p.name.trim().toLowerCase() === formData.name!.trim().toLowerCase()
+      );
+      if (nameExists) {
+        const confirmAnyway = confirm(
+          `Produk dengan nama "${formData.name}" sudah ada.\n\nApakah Anda yakin ingin menambahkan produk baru dengan nama yang sama?`
+        );
+        if (!confirmAnyway) return;
+      }
+    }
+
     const selectedCat = categories.find(c => c.id === formData.categoryId);
 
     const payload = {
@@ -715,12 +736,12 @@ export const Products: React.FC = () => {
 
               <div className="col-span-2 md:col-span-1">
                 <label htmlFor="productName" className="block text-sm font-medium text-slate-700 mb-1">Nama Produk</label>
-                <input id="productName" name="productName" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Contoh: Keripik..." />
+                <input id="productName" name="productName" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.name ?? ''} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Contoh: Keripik..." />
               </div>
               <div className="col-span-2 md:col-span-1">
                 <label htmlFor="sku" className="block text-sm font-medium text-slate-700 mb-1">Kode SKU / Barcode</label>
                 <div className="flex gap-2">
-                  <input id="sku" name="sku" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none font-mono" value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value })} placeholder="Scan atau ketik..." />
+                  <input id="sku" name="sku" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none font-mono" value={formData.sku ?? ''} onChange={e => setFormData({ ...formData, sku: e.target.value })} placeholder="Scan atau ketik..." />
                   <button onClick={handleGenerateCode} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg" title="Generate Code"><Barcode size={20} /></button>
                 </div>
               </div>
@@ -734,7 +755,7 @@ export const Products: React.FC = () => {
                   id="category"
                   name="category"
                   className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white"
-                  value={formData.categoryId}
+                  value={formData.categoryId ?? ''}
                   onChange={e => setFormData({ ...formData, categoryId: e.target.value })}
                 >
                   <option value="">-- Pilih Kategori --</option>
@@ -743,7 +764,7 @@ export const Products: React.FC = () => {
               </div>
               <div className="col-span-2 md:col-span-1">
                 <label htmlFor="stock" className="block text-sm font-medium text-slate-700 mb-1">Stok Awal</label>
-                <input id="stock" name="stock" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.stock} onChange={e => handleNumericInput('stock', e.target.value)} />
+                <input id="stock" name="stock" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.stock ?? ''} onChange={e => handleNumericInput('stock', e.target.value)} />
               </div>
 
               <div className="col-span-2 my-2 p-4 bg-slate-50 rounded-xl border border-slate-200">
@@ -765,13 +786,13 @@ export const Products: React.FC = () => {
                       </div>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">Rp</span>
-                        <input id="hpp" name="hpp" type="text" className="w-full border border-red-200 bg-red-50/50 p-2 pl-8 rounded-lg focus:ring-2 focus:ring-red-500 outline-none" value={formData.hpp} onChange={e => handleNumericInput('hpp', e.target.value)} />
+                        <input id="hpp" name="hpp" type="text" className="w-full border border-red-200 bg-red-50/50 p-2 pl-8 rounded-lg focus:ring-2 focus:ring-red-500 outline-none" value={formData.hpp ?? ''} onChange={e => handleNumericInput('hpp', e.target.value)} />
                       </div>
                     </div>
                   )}
                   <div className="col-span-2 md:col-span-2">
                     <label htmlFor="price" className="block text-xs text-slate-500 mb-1">Harga Jual</label>
-                    <input id="price" name="price" type="text" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.price} onChange={e => handleNumericInput('price', e.target.value)} />
+                    <input id="price" name="price" type="text" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.price ?? ''} onChange={e => handleNumericInput('price', e.target.value)} />
                   </div>
                 </div>
               </div>

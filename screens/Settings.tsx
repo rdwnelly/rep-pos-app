@@ -760,8 +760,8 @@ export const Settings: React.FC = () => {
                                 </div>
                                 
                                 <div className="mt-4 p-4 border border-blue-100 bg-blue-50/50 rounded-lg">
-                                    <h5 className="font-semibold text-slate-800 mb-2 flex items-center gap-2"><Bluetooth size={16} className="text-blue-600" /> Bluetooth Printer (Silent Print)</h5>
-                                    <p className="text-xs text-slate-600 mb-3">Gunakan Web Bluetooth API untuk mencetak langsung ke printer thermal tanpa popup dialog browser.</p>
+                                    <h5 className="font-semibold text-slate-800 mb-2 flex items-center gap-2"><Bluetooth size={16} className="text-blue-600" /> Bluetooth Printer (Auto-Connect)</h5>
+                                    <p className="text-xs text-slate-600 mb-3">Terhubung otomatis ke printer <strong>RPP02N</strong>. Pairing hanya dilakukan sekali, selanjutnya koneksi otomatis.</p>
                                     
                                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                                         <label htmlFor="useBluetoothPrinter" className="flex items-center gap-2 cursor-pointer">
@@ -770,24 +770,50 @@ export const Settings: React.FC = () => {
                                         </label>
 
                                         {storeSettings.useBluetoothPrinter && (
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={async () => {
-                                                        try {
-                                                            await bluetooth.connect();
-                                                        } catch (err: any) {
-                                                            alert(err.message || 'Gagal koneksi ke printer');
-                                                        }
-                                                    }}
-                                                    className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
-                                                >
-                                                    <Bluetooth size={14} /> {bluetooth.isConnected ? 'Hubungkan Ulang' : 'Cari Printer'}
-                                                </button>
-                                                
-                                                {bluetooth.isConnected && (
-                                                    <span className="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded">
-                                                        Terhubung: {bluetooth.deviceName}
-                                                    </span>
+                                            <div className="flex flex-col gap-2 w-full sm:w-auto">
+                                                <div className="flex items-center gap-3">
+                                                    <button
+                                                        onClick={async () => {
+                                                            try {
+                                                                await bluetooth.connect();
+                                                            } catch {
+                                                                // error sudah disimpan di bluetooth.errorMessage
+                                                            }
+                                                        }}
+                                                        disabled={bluetooth.status === 'connecting'}
+                                                        className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors flex items-center gap-1 disabled:opacity-60"
+                                                    >
+                                                        <Bluetooth size={14} />
+                                                        {bluetooth.status === 'connecting' ? 'Menghubungkan...' :
+                                                         bluetooth.isConnected ? 'Hubungkan Ulang' : 'Sambungkan RPP02N'}
+                                                    </button>
+
+                                                    {/* Status Badge */}
+                                                    {bluetooth.isConnected && (
+                                                        <span className="text-xs text-green-700 font-medium bg-green-100 px-2 py-1 rounded-full flex items-center gap-1">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block"></span>
+                                                            Terhubung: {bluetooth.deviceName}
+                                                        </span>
+                                                    )}
+                                                    {bluetooth.status === 'connecting' && !bluetooth.isConnected && (
+                                                        <span className="text-xs text-blue-700 font-medium bg-blue-100 px-2 py-1 rounded-full">
+                                                            Menghubungkan...
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Notifikasi error — hanya muncul saat BT mati atau gagal */}
+                                                {(bluetooth.status === 'bt_off' || bluetooth.status === 'error') && bluetooth.errorMessage && (
+                                                    <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2">
+                                                        <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+                                                        <span>{bluetooth.errorMessage}</span>
+                                                    </div>
+                                                )}
+                                                {bluetooth.status === 'disconnected' && !bluetooth.isConnected && (
+                                                    <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg px-3 py-2">
+                                                        <Bluetooth size={13} />
+                                                        <span>Printer terputus. Tekan "Sambungkan RPP02N" untuk menghubungkan kembali.</span>
+                                                    </div>
                                                 )}
                                             </div>
                                         )}
