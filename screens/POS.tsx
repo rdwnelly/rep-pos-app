@@ -364,15 +364,13 @@ export const POS: React.FC = () => {
         if (bluetooth.isConnected) {
           const escposData = generateESCPOSReceipt(tx, settings);
           await bluetooth.print(escposData);
-          return; // berhasil cetak via bluetooth
         }
       } catch (error: any) {
-        // Jika user batalkan dialog atau BT mati, langsung fallback ke browser print
-        // tanpa alert — status error sudah tercatat di hook
-        if (error.name === 'NotFoundError' || error.message?.includes('tidak aktif')) {
-          // fallthrough ke browser print
-        }
+        // Jika gagal cetak via bluetooth (printer mati, dll), biarkan gagal silently
+        // Tidak perlu fallback ke browser print agar tidak muncul popup/tab baru di HP
+        console.error("Bluetooth print failed silently:", error);
       }
+      return; // Berhenti di sini jika mode bluetooth aktif
     }
 
     // Default Browser Print
