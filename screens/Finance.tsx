@@ -1735,17 +1735,19 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     const printBluetoothInvoice = async (tx: Transaction) => {
         try {
             const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
-            const escposData = generateESCPOSReceipt(tx, settings);
-            
             if (!bluetooth.isConnected) {
-                console.log("Mencoba koneksi bluetooth sebelum cetak...");
                 await bluetooth.connect();
             }
-            
-            await bluetooth.print(escposData);
-        } catch (error) {
-            console.error('Error printing via bluetooth:', error);
-            alert('Gagal mencetak: ' + (error instanceof Error ? error.message : 'Unknown error'));
+            if (bluetooth.isConnected) {
+                const escposData = generateESCPOSReceipt(tx, settings);
+                await bluetooth.print(escposData);
+            }
+        } catch (error: any) {
+            // Jika user batal atau BT mati, tidak tampilkan alert
+            // Status error sudah tersimpan di hook (bluetooth.status / bluetooth.errorMessage)
+            if (error.name !== 'NotFoundError') {
+                console.error('Error printing via bluetooth:', error);
+            }
         }
     };
 

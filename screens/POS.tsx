@@ -359,18 +359,19 @@ export const POS: React.FC = () => {
     if (settings.useBluetoothPrinter) {
       try {
         if (!bluetooth.isConnected) {
-          console.log("Mencoba koneksi bluetooth sebelum cetak...");
           await bluetooth.connect();
         }
-        
-        const escposData = generateESCPOSReceipt(tx, settings);
-        await bluetooth.print(escposData);
-        console.log("Cetak via Bluetooth berhasil.");
-        return;
+        if (bluetooth.isConnected) {
+          const escposData = generateESCPOSReceipt(tx, settings);
+          await bluetooth.print(escposData);
+          return; // berhasil cetak via bluetooth
+        }
       } catch (error: any) {
-        console.error("Bluetooth print error:", error);
-        alert("Gagal cetak via Bluetooth: " + error.message + ".\nSistem akan menggunakan cetak standar browser.");
-        // Fallback to browser print below
+        // Jika user batalkan dialog atau BT mati, langsung fallback ke browser print
+        // tanpa alert — status error sudah tercatat di hook
+        if (error.name === 'NotFoundError' || error.message?.includes('tidak aktif')) {
+          // fallthrough ke browser print
+        }
       }
     }
 
