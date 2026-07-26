@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Trash2, User, Plus, Minus, ShoppingBag, Printer, CreditCard, Banknote, Clock, ScanLine, StickyNote, Image as ImageIcon, X, ChevronLeft, ClipboardList } from 'lucide-react';
+import { Search, Trash2, User, Plus, Minus, ShoppingBag, Printer, CreditCard, Banknote, Clock, ScanLine, StickyNote, Image as ImageIcon, X, ChevronLeft, ClipboardList, CheckCircle } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Product, CartItem, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, Category } from '../types';
@@ -73,6 +73,7 @@ export const POS: React.FC = () => {
   const [discount, setDiscount] = useState<number>(0);
   const [discountType, setDiscountType] = useState<'PERCENTAGE' | 'FIXED'>('FIXED');
   const [showQrisModal, setShowQrisModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Settings
 
@@ -348,7 +349,13 @@ export const POS: React.FC = () => {
       setTableNumber('');
       setShowPaymentModal(false);
       searchInputRef.current?.focus();
-      alert('Transaksi Kasir REP Berhasil!');
+      setShowSuccessModal(true);
+      
+      // Auto close after 3 seconds
+      setTimeout(() => {
+        setShowSuccessModal(false);
+      }, 3000);
+      
     } catch (error) {
       console.error(error);
       alert('Gagal memproses transaksi. Silakan coba lagi.');
