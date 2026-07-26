@@ -3,7 +3,7 @@ import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { TransactionType, UserRole, User } from '../types';
 import { formatIDR, exportToCSV, exportToExcel } from '../utils';
-import { Download, Search, Filter, RotateCcw, X, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, ShoppingBag, Printer, Calendar } from 'lucide-react';
+import { Download, Search, Filter, RotateCcw, X, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, ShoppingBag, Printer, Calendar, Trash2 } from 'lucide-react';
 
 interface SoldItemsProps {
     currentUser: User | null;
@@ -131,6 +131,19 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
             }
         };
     }, [loadMoreRef.current, soldItems]);
+
+    const handleDeleteTransaction = async (transactionId: string) => {
+        if (!confirm('Yakin ingin menghapus transaksi ini? Seluruh item dalam transaksi ini akan ikut terhapus. Aksi ini tidak dapat dibatalkan.')) return;
+        try {
+            await StorageService.deleteTransaction(transactionId);
+            window.dispatchEvent(new Event('transactions_updated'));
+            window.dispatchEvent(new Event('products_updated'));
+            alert('Transaksi berhasil dihapus.');
+        } catch (error) {
+            console.error("Failed to delete transaction:", error);
+            alert("Gagal menghapus transaksi.");
+        }
+    };
 
     const handleSort = (key: string) => {
         setSortConfig(current => ({
@@ -442,12 +455,13 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                     <div className="flex items-center">Kasir <SortIcon column="cashierName" /></div>
                                 </th>
                                 <th className="p-4 font-medium">Status</th>
+                                <th className="p-4 font-medium text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {soldItems.length === 0 && (
                                 <tr>
-                                    <td colSpan={11} className="p-8 text-center text-slate-400">Tidak ada data barang terjual.</td>
+                                    <td colSpan={12} className="p-8 text-center text-slate-400">Tidak ada data barang terjual.</td>
                                 </tr>
                             )}
                             {visibleSoldItems.map((item, idx) => (
@@ -481,11 +495,16 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                             {item.transactionType === TransactionType.RETURN ? 'RETUR' : item.isReturned ? 'Retur Sebagian' : 'Normal'}
                                         </span>
                                     </td>
+                                    <td className="p-4 text-right">
+                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(item.transactionId); }} className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100 inline-flex items-center gap-1" title="Hapus Transaksi">
+                                            <Trash2 size={12} /> Hapus
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                             {visibleSoldItems.length < soldItems.length && (
                                 <tr>
-                                    <td colSpan={11} className="p-4 text-center text-slate-400">
+                                    <td colSpan={12} className="p-4 text-center text-slate-400">
                                         <div ref={loadMoreRef}>Loading more...</div>
                                     </td>
                                 </tr>

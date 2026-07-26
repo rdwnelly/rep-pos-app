@@ -1039,6 +1039,32 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         }
     };
 
+    const handleDeleteTransaction = async (id: string) => {
+        if (!confirm('Yakin ingin menghapus transaksi ini? Aksi ini tidak dapat dibatalkan.')) return;
+        try {
+            await StorageService.deleteTransaction(id);
+            window.dispatchEvent(new Event('transactions_updated'));
+            window.dispatchEvent(new Event('products_updated'));
+            alert("Transaksi berhasil dihapus.");
+        } catch (error) {
+            console.error("Failed to delete transaction:", error);
+            alert("Gagal menghapus transaksi.");
+        }
+    };
+
+    const handleDeletePurchase = async (id: string) => {
+        if (!confirm('Yakin ingin menghapus pembelian ini? Aksi ini tidak dapat dibatalkan.')) return;
+        try {
+            await StorageService.deletePurchase(id);
+            window.dispatchEvent(new Event('purchases_updated'));
+            window.dispatchEvent(new Event('products_updated'));
+            alert("Pembelian berhasil dihapus.");
+        } catch (error) {
+            console.error("Failed to delete purchase:", error);
+            alert("Gagal menghapus pembelian.");
+        }
+    };
+
     // Profit Loss Calculation
     const calculateProfitLoss = () => {
         const txs = filteredTransactions; // Already date filtered
@@ -2443,6 +2469,9 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                     <button onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded hover:bg-slate-200 flex items-center gap-1" title="Detail">
                                                         <Eye size={12} />
                                                     </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }} className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100 flex items-center gap-1" title="Hapus Transaksi">
+                                                        <Trash2 size={12} />
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -2683,6 +2712,9 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button onClick={(e) => { e.stopPropagation(); printPurchaseNote(p); }} className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 flex items-center gap-1" title="Cetak Nota">
                                                         <Printer size={12} /> Nota
+                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDeletePurchase(p.id); }} className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100 flex items-center gap-1" title="Hapus Pembelian">
+                                                        <Trash2 size={12} />
                                                     </button>
                                                 </div>
                                             </td>
