@@ -6,16 +6,33 @@ import { StorageService } from "../../../services/storage";
 import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
 import { Plus, Trash2, Info, Save, Archive, FileText, X, Printer, Eye } from "lucide-react";
 
-const FIXED_SALES_CATEGORIES = [
-    "Tiket Masuk & Sewa Kostum",
+// Kategori penjualan dasar yang selalu muncul (urutan tampilan default)
+// Tiket Masuk dan Sewa Kostum kini dipisah menjadi 2 kategori berbeda
+const BASE_SALES_CATEGORIES = [
+    "Tiket Masuk",
+    "Sewa Kostum",
     "Toko / Souvenir",
     "Kafe & Resto",
     "Kios",
     "Paket Sopendo / Saswar / Edukasi",
     "Jasa Fotografer",
     "Sewa kostum keluar",
-    "", "", ""
 ];
+
+// Mapping dari categoryName (lowercase) ke nama tampilan pada Berita Acara
+// Jika kategori tidak cocok dengan pola ini, akan ditambahkan sebagai baris baru secara otomatis
+const mapCategoryNameToSalesRow = (catName) => {
+    const lower = catName.toLowerCase();
+    if (lower.includes("tiket")) return "Tiket Masuk";
+    if (lower.includes("sewa kostum") || lower.includes("kostum")) return "Sewa Kostum";
+    if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "Toko / Souvenir";
+    if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) return "Kafe & Resto";
+    if (lower.includes("kios")) return "Kios";
+    if (lower.includes("sopendo") || lower.includes("saswar") || lower.includes("edukasi")) return "Paket Sopendo / Saswar / Edukasi";
+    if (lower.includes("fotografer") || lower.includes("foto")) return "Jasa Fotografer";
+    // Kembalikan nama asli kategori agar muncul sebagai baris baru otomatis
+    return catName;
+};
 
 const FIXED_EXPENSE_CATEGORIES = [
     "CAFÉ",
@@ -83,12 +100,11 @@ export default function BeritaAcaraPage() {
     const [viewingArchive, setViewingArchive] = useState(null);
 
     // States for editable tables
-    const [salesTunai, setSalesTunai] = useState(Array(10).fill(""));
-    const [hppTunai, setHppTunai] = useState(Array(10).fill(""));
-    const [salesQR, setSalesQR] = useState(Array(10).fill(""));
-    const [hppQR, setHppQR] = useState(Array(10).fill(""));
-    const [salesTunaiNames, setSalesTunaiNames] = useState([...FIXED_SALES_CATEGORIES]);
-    const [salesQRNames, setSalesQRNames] = useState([...FIXED_SALES_CATEGORIES]);
+    // State penjualan kini dinamis: array of { name, tunai, hppTunai, qr, hppQR }
+    // Setiap kategori dari transaksi otomatis ditambahkan sebagai baris baru
+    const [salesRows, setSalesRows] = useState(
+        BASE_SALES_CATEGORIES.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" }))
+    );
 
     // Summary Expense Table (Page 1)
     const [expenses, setExpenses] = useState(Array(10).fill(""));
@@ -113,24 +129,30 @@ export default function BeritaAcaraPage() {
         const endDate = new Date(tanggal);
         endDate.setHours(23, 59, 59, 999);
 
-        // Reset to predefined
-        const newSalesTunai = Array(10).fill(0);
-        const newHppTunai = Array(10).fill(0);
-        const newSalesQR = Array(10).fill(0);
-        const newHppQR = Array(10).fill(0);
         const newExpenses = Array(10).fill(0);
-        
         let hasData = false;
 
         const currentTransactions = JSON.parse(transactionsStr);
         const currentCashflows = JSON.parse(cashflowsStr);
+
+        // === LOGIKA PENJUALAN DINAMIS BERBASIS KATEGORI ===
+        // Map: rowName -> { tunai, hppTunai, qr, hppQR }
+        const salesMap = {};
+
+        // Inisialisasi dengan kategori dasar agar urutan tampilan tetap terjaga
+        BASE_SALES_CATEGORIES.forEach(name => {
+            salesMap[name] = { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
+        });
 
         currentTransactions.forEach(t => {
             const tDate = new Date(t.date);
             if (tDate >= startDate && tDate <= endDate) {
                 hasData = true;
                 t.items.forEach(item => {
-                    const catName = item.categoryName?.toLowerCase() || '';
+                    // Gunakan categoryName langsung dari item transaksi
+                    const originalCatName = item.categoryName || 'Lainnya';
+                    const rowName = mapCategoryNameToSalesRow(originalCatName);
+
                     let itemTotal = item.finalPrice * item.qty;
                     let itemHpp = (item.hpp || 0) * item.qty;
                     if (t.type === TransactionType.RETURN) {
@@ -138,31 +160,32 @@ export default function BeritaAcaraPage() {
                         itemHpp = -itemHpp;
                     }
 
-                    // Try to map to fixed categories roughly
-                    let targetIndex = -1;
-                    if (catName.includes("tiket") || catName.includes("kostum")) targetIndex = 0;
-                    else if (catName.includes("toko") || catName.includes("souvenir") || catName.includes("sovenir")) targetIndex = 1;
-                    else if (catName.includes("kafe") || catName.includes("cafe") || catName.includes("resto")) targetIndex = 2;
-                    else if (catName.includes("kios")) targetIndex = 3;
-                    else if (catName.includes("sopendo") || catName.includes("saswar") || catName.includes("edukasi")) targetIndex = 4;
-                    else if (catName.includes("fotografer") || catName.includes("foto")) targetIndex = 5;
-
-                    if (targetIndex === -1) {
-                        // Find first empty slot
-                        targetIndex = 7; // Just put in the 8th row as a fallback
+                    // Jika kategori belum ada di map, tambahkan sebagai baris baru otomatis
+                    if (!salesMap[rowName]) {
+                        salesMap[rowName] = { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
                     }
 
                     if (t.paymentMethod === PaymentMethod.CASH) {
-                        newSalesTunai[targetIndex] += itemTotal;
-                        newHppTunai[targetIndex] += itemHpp;
+                        salesMap[rowName].tunai += itemTotal;
+                        salesMap[rowName].hppTunai += itemHpp;
                     } else {
-                        newSalesQR[targetIndex] += itemTotal;
-                        newHppQR[targetIndex] += itemHpp;
+                        salesMap[rowName].qr += itemTotal;
+                        salesMap[rowName].hppQR += itemHpp;
                     }
                 });
             }
         });
 
+        // Konversi salesMap ke array rows, hanya tampilkan yang ada nilai atau kategori dasar
+        const newSalesRows = Object.entries(salesMap).map(([name, vals]) => ({
+            name,
+            tunai: vals.tunai === 0 ? "" : String(vals.tunai),
+            hppTunai: vals.hppTunai === 0 ? "" : String(vals.hppTunai),
+            qr: vals.qr === 0 ? "" : String(vals.qr),
+            hppQR: vals.hppQR === 0 ? "" : String(vals.hppQR),
+        }));
+
+        // === LOGIKA PENGELUARAN (tetap seperti semula) ===
         currentCashflows.forEach(cf => {
             const cfDate = new Date(cf.date);
             if (cfDate >= startDate && cfDate <= endDate && cf.type === CashFlowType.OUT) {
@@ -204,16 +227,10 @@ export default function BeritaAcaraPage() {
         });
 
         if (hasData) {
-            setSalesTunai(newSalesTunai.map(v => v === 0 ? "" : String(v)));
-            setHppTunai(newHppTunai.map(v => v === 0 ? "" : String(v)));
-            setSalesQR(newSalesQR.map(v => v === 0 ? "" : String(v)));
-            setHppQR(newHppQR.map(v => v === 0 ? "" : String(v)));
+            setSalesRows(newSalesRows);
             setExpenses(newExpenses.map(v => v === 0 ? "" : String(v)));
         } else {
-            setSalesTunai(Array(10).fill(""));
-            setHppTunai(Array(10).fill(""));
-            setSalesQR(Array(10).fill(""));
-            setHppQR(Array(10).fill(""));
+            setSalesRows(BASE_SALES_CATEGORIES.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" })));
             setExpenses(Array(10).fill(""));
         }
     }, [tanggal, transactionsStr, cashflowsStr, JSON.stringify(customExpenses)]);
@@ -227,8 +244,8 @@ export default function BeritaAcaraPage() {
         const title = prompt("Masukkan nama/judul untuk arsip ini:", `Berita Acara - ${tanggal}`);
         if (!title) return;
 
-        const totalTunai = salesTunai.reduce((sum, val) => sum + (Number(val) || 0), 0);
-        const totalQR = salesQR.reduce((sum, val) => sum + (Number(val) || 0), 0);
+        const totalTunai = salesRows.reduce((sum, row) => sum + (Number(row.tunai) || 0), 0);
+        const totalQR = salesRows.reduce((sum, row) => sum + (Number(row.qr) || 0), 0);
         const totalExpenses = expenses.reduce((sum, val) => sum + (Number(val) || 0), 0);
 
         const archive = {
@@ -238,10 +255,7 @@ export default function BeritaAcaraPage() {
             periode,
             kasir,
             lokasi,
-            salesTunai,
-            hppTunai,
-            salesQR,
-            hppQR,
+            salesRows,
             expenses,
             customExpenses,
             catatan,
@@ -267,10 +281,18 @@ export default function BeritaAcaraPage() {
     const currentPeriode = viewingArchive ? viewingArchive.periode : periode;
     const currentKasir = viewingArchive ? viewingArchive.kasir : kasir;
     const currentLokasi = viewingArchive ? viewingArchive.lokasi : lokasi;
-    const currentSalesTunai = viewingArchive ? viewingArchive.salesTunai : salesTunai;
-    const currentHppTunai = viewingArchive && viewingArchive.hppTunai ? viewingArchive.hppTunai : hppTunai;
-    const currentSalesQR = viewingArchive ? viewingArchive.salesQR : salesQR;
-    const currentHppQR = viewingArchive && viewingArchive.hppQR ? viewingArchive.hppQR : hppQR;
+    // Support arsip lama (salesTunai/salesQR array) dan arsip baru (salesRows)
+    const currentSalesRows = viewingArchive
+        ? (viewingArchive.salesRows
+            ? viewingArchive.salesRows
+            : BASE_SALES_CATEGORIES.map((name, idx) => ({
+                name,
+                tunai: viewingArchive.salesTunai?.[idx] ?? "",
+                hppTunai: viewingArchive.hppTunai?.[idx] ?? "",
+                qr: viewingArchive.salesQR?.[idx] ?? "",
+                hppQR: viewingArchive.hppQR?.[idx] ?? "",
+            })))
+        : salesRows;
     const currentExpenses = viewingArchive ? viewingArchive.expenses : expenses;
     const currentCustomExpenses = viewingArchive ? viewingArchive.customExpenses : customExpenses;
     const currentCatatan = viewingArchive ? viewingArchive.catatan : catatan;
@@ -292,42 +314,10 @@ export default function BeritaAcaraPage() {
         return result;
     }, [currentCustomExpenses]);
 
-    const handleSalesChange = (type, index, value) => {
-        const val = value.replace(/[^0-9]/g, "");
-        if (type === 'tunai') {
-            const newData = [...salesTunai];
-            newData[index] = val;
-            setSalesTunai(newData);
-        } else {
-            const newData = [...salesQR];
-            newData[index] = val;
-            setSalesQR(newData);
-        }
-    };
-
-    const handleHppChange = (type, index, value) => {
-        const val = value.replace(/[^0-9]/g, "");
-        if (type === 'tunai') {
-            const newData = [...hppTunai];
-            newData[index] = val;
-            setHppTunai(newData);
-        } else {
-            const newData = [...hppQR];
-            newData[index] = val;
-            setHppQR(newData);
-        }
-    };
-
-    const handleSalesNameChange = (type, index, value) => {
-        if (type === 'tunai') {
-            const newData = [...salesTunaiNames];
-            newData[index] = value;
-            setSalesTunaiNames(newData);
-        } else {
-            const newData = [...salesQRNames];
-            newData[index] = value;
-            setSalesQRNames(newData);
-        }
+    // Handler untuk edit nama / nilai di baris penjualan (dinamis)
+    const handleSalesRowChange = (index, field, value) => {
+        const val = field === 'name' ? value : value.replace(/[^0-9-]/g, "");
+        setSalesRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: val } : row));
     };
 
     const handleExpenseChange = (index, value) => {
@@ -387,11 +377,11 @@ export default function BeritaAcaraPage() {
         return result;
     }, [customExpenses]);
 
-    const totalSalesTunai = currentSalesTunai.reduce((sum, val) => sum + (Number(val) || 0), 0);
-    const totalHppTunai = currentHppTunai.reduce((sum, val) => sum + (Number(val) || 0), 0);
+    const totalSalesTunai = currentSalesRows.reduce((sum, row) => sum + (Number(row.tunai) || 0), 0);
+    const totalHppTunai = currentSalesRows.reduce((sum, row) => sum + (Number(row.hppTunai) || 0), 0);
     const totalProfitTunai = totalSalesTunai - totalHppTunai;
-    const totalSalesQR = currentSalesQR.reduce((sum, val) => sum + (Number(val) || 0), 0);
-    const totalHppQR = currentHppQR.reduce((sum, val) => sum + (Number(val) || 0), 0);
+    const totalSalesQR = currentSalesRows.reduce((sum, row) => sum + (Number(row.qr) || 0), 0);
+    const totalHppQR = currentSalesRows.reduce((sum, row) => sum + (Number(row.hppQR) || 0), 0);
     const totalProfitQR = totalSalesQR - totalHppQR;
     const totalAllSales = totalSalesTunai + totalSalesQR;
     const totalPengeluaran = currentExpenses.reduce((sum, val) => sum + (Number(val) || 0), 0);
@@ -717,11 +707,11 @@ export default function BeritaAcaraPage() {
                         </div>
                     </div>
 
-                    {/* Section II & III */}
+                    {/* Section II & III - Gabungan dalam satu tabel dinamis */}
                     <div className="flex flex-col gap-6 mb-6">
-                        {/* Section II */}
+                        {/* Section II - Tunai */}
                         <div className="w-full">
-                            <div className="brown-header">II. LAPORAN PENJUALAN</div>
+                            <div className="brown-header">II. LAPORAN PENJUALAN (TUNAI)</div>
                             <table className="report-table">
                                 <thead>
                                     <tr>
@@ -733,11 +723,11 @@ export default function BeritaAcaraPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {currentSalesTunai.map((val, idx) => {
-                                        const pendapatan = Number(val) || 0;
-                                        const modal = Number(currentHppTunai[idx]) || 0;
+                                    {currentSalesRows.map((row, idx) => {
+                                        const pendapatan = Number(row.tunai) || 0;
+                                        const modal = Number(row.hppTunai) || 0;
                                         const keuntungan = pendapatan - modal;
-                                        const isRowEmpty = !val && !currentHppTunai[idx];
+                                        const isRowEmpty = !row.tunai && !row.hppTunai;
                                         return (
                                             <tr key={`sales-${idx}`}>
                                                 <td className="text-center">{idx + 1}</td>
@@ -745,26 +735,29 @@ export default function BeritaAcaraPage() {
                                                     <input 
                                                         type="text" 
                                                         className="editable-cell" 
-                                                        value={salesTunaiNames[idx]} 
-                                                        onChange={(e) => handleSalesNameChange('tunai', idx, e.target.value)} 
+                                                        value={row.name} 
+                                                        onChange={(e) => handleSalesRowChange(idx, 'name', e.target.value)} 
+                                                        readOnly={!!viewingArchive}
                                                     />
                                                 </td>
                                                 <td>
                                                     <input 
                                                         type="text" 
                                                         className="editable-cell text-right" 
-                                                        value={val} 
-                                                        onChange={(e) => handleSalesChange('tunai', idx, e.target.value)} 
+                                                        value={row.tunai} 
+                                                        onChange={(e) => handleSalesRowChange(idx, 'tunai', e.target.value)} 
                                                         placeholder="0"
+                                                        readOnly={!!viewingArchive}
                                                     />
                                                 </td>
                                                 <td>
                                                     <input 
                                                         type="text" 
                                                         className="editable-cell text-right text-red-700/80" 
-                                                        value={currentHppTunai[idx]} 
-                                                        onChange={(e) => handleHppChange('tunai', idx, e.target.value)} 
+                                                        value={row.hppTunai} 
+                                                        onChange={(e) => handleSalesRowChange(idx, 'hppTunai', e.target.value)} 
                                                         placeholder="0"
+                                                        readOnly={!!viewingArchive}
                                                     />
                                                 </td>
                                                 <td className="text-right font-medium text-green-700 bg-slate-50/50 pr-2">
@@ -783,9 +776,9 @@ export default function BeritaAcaraPage() {
                             </table>
                         </div>
 
-                        {/* Section III */}
+                        {/* Section III - QR */}
                         <div className="w-full">
-                            <div className="brown-header">III. LAPORAN PENJUALAN (QR)</div>
+                            <div className="brown-header">III. LAPORAN PENJUALAN (QR / TRANSFER)</div>
                             <table className="report-table">
                                 <thead>
                                     <tr>
@@ -797,11 +790,11 @@ export default function BeritaAcaraPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {currentSalesQR.map((val, idx) => {
-                                        const pendapatan = Number(val) || 0;
-                                        const modal = Number(currentHppQR[idx]) || 0;
+                                    {currentSalesRows.map((row, idx) => {
+                                        const pendapatan = Number(row.qr) || 0;
+                                        const modal = Number(row.hppQR) || 0;
                                         const keuntungan = pendapatan - modal;
-                                        const isRowEmpty = !val && !currentHppQR[idx];
+                                        const isRowEmpty = !row.qr && !row.hppQR;
                                         return (
                                             <tr key={`salesQR-${idx}`}>
                                                 <td className="text-center">{idx + 1}</td>
@@ -809,26 +802,28 @@ export default function BeritaAcaraPage() {
                                                     <input 
                                                         type="text" 
                                                         className="editable-cell" 
-                                                        value={salesQRNames[idx]} 
-                                                        onChange={(e) => handleSalesNameChange('qr', idx, e.target.value)} 
+                                                        value={row.name} 
+                                                        readOnly
                                                     />
                                                 </td>
                                                 <td>
                                                     <input 
                                                         type="text" 
                                                         className="editable-cell text-right" 
-                                                        value={val} 
-                                                        onChange={(e) => handleSalesChange('qr', idx, e.target.value)} 
+                                                        value={row.qr} 
+                                                        onChange={(e) => handleSalesRowChange(idx, 'qr', e.target.value)} 
                                                         placeholder="0"
+                                                        readOnly={!!viewingArchive}
                                                     />
                                                 </td>
                                                 <td>
                                                     <input 
                                                         type="text" 
                                                         className="editable-cell text-right text-red-700/80" 
-                                                        value={currentHppQR[idx]} 
-                                                        onChange={(e) => handleHppChange('qr', idx, e.target.value)} 
+                                                        value={row.hppQR} 
+                                                        onChange={(e) => handleSalesRowChange(idx, 'hppQR', e.target.value)} 
                                                         placeholder="0"
+                                                        readOnly={!!viewingArchive}
                                                     />
                                                 </td>
                                                 <td className="text-right font-medium text-green-700 bg-slate-50/50 pr-2">

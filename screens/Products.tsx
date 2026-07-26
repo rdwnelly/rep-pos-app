@@ -10,7 +10,6 @@ import { HPPCalculatorModal } from '../components/HPPCalculatorModal';
 export const Products: React.FC = () => {
   const products = useData(() => StorageService.getProducts(), [], 'products') || [];
   const categories = useData(() => StorageService.getCategories(), [], 'categories') || [];
-  const divisions = useData(() => StorageService.getDivisions(), [], 'divisions') || [];
 
   // Filters
   const [filterCategory, setFilterCategory] = useState('ALL');
@@ -19,7 +18,6 @@ export const Products: React.FC = () => {
   // Modals
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [isDivisionModalOpen, setIsDivisionModalOpen] = useState(false);
   const [isHPPModalOpen, setIsHPPModalOpen] = useState(false);
 
   // Sort State
@@ -45,11 +43,10 @@ export const Products: React.FC = () => {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [categoryFormName, setCategoryFormName] = useState('');
-  const [divisionFormName, setDivisionFormName] = useState('');
 
   // Product Form State
   const [formData, setFormData] = useState<Partial<Product>>({
-    name: '', sku: '', stock: 0, hpp: 0, price: 0, categoryId: '', categoryName: '', divisionId: '', divisionName: '', image: '', unit: 'Pcs'
+    name: '', sku: '', stock: 0, hpp: 0, price: 0, categoryId: '', categoryName: '', image: '', unit: 'Pcs'
   });
 
 
@@ -68,15 +65,11 @@ export const Products: React.FC = () => {
 
     const selectedCat = categories.find(c => c.id === formData.categoryId);
 
-    const selectedDiv = divisions.find(d => d.id === formData.divisionId);
-
     const payload = {
       ...formData,
       id: editingId || undefined,
       categoryName: selectedCat?.name || 'Umum',
       categoryId: formData.categoryId || '',
-      divisionName: selectedDiv?.name || 'Umum',
-      divisionId: formData.divisionId || '',
       image: formData.image || ''
     } as Product;
 
@@ -103,7 +96,7 @@ export const Products: React.FC = () => {
   };
 
   const resetProductForm = () => {
-    setFormData({ name: '', sku: '', stock: 0, hpp: 0, price: 0, categoryId: '', categoryName: '', divisionId: '', divisionName: '', image: '', unit: 'Pcs' });
+    setFormData({ name: '', sku: '', stock: 0, hpp: 0, price: 0, categoryId: '', categoryName: '', image: '', unit: 'Pcs' });
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,22 +145,9 @@ export const Products: React.FC = () => {
     setEditingId(null);
   };
 
-  const handleSaveDivision = async () => {
-    if (!divisionFormName) return;
-    await StorageService.saveDivision({ id: editingId || '', name: divisionFormName });
-    setDivisionFormName('');
-    setEditingId(null);
-  };
-
   const handleDeleteCategory = async (id: string) => {
     if (confirm('Yakin hapus kategori? Produk dalam kategori ini akan tetap ada namun tanpa kategori.')) {
       await StorageService.deleteCategory(id);
-    }
-  };
-
-  const handleDeleteDivision = async (id: string) => {
-    if (confirm('Yakin hapus divisi?')) {
-      await StorageService.deleteDivision(id);
     }
   };
 
@@ -511,9 +491,6 @@ export const Products: React.FC = () => {
           <button onClick={() => setIsCategoryModalOpen(true)} className="bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 text-sm font-medium">
             <Tag size={16} /> Kategori
           </button>
-          <button onClick={() => setIsDivisionModalOpen(true)} className="bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 text-sm font-medium">
-            <Package size={16} /> Divisi
-          </button>
 
           {/* Hide Import CSV for Cashier and Warehouse */}
           {['CASHIER', 'GUDANG'].indexOf((JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role) === -1 && (
@@ -652,7 +629,6 @@ export const Products: React.FC = () => {
                     <span className="font-semibold text-slate-800 block">{p.name}</span>
                     <div className="flex gap-1 mt-0.5">
                       <span className="text-xs text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded">{p.categoryName}</span>
-                      {p.divisionName && <span className="text-xs text-blue-600 px-1.5 py-0.5 bg-blue-50 rounded">{p.divisionName}</span>}
                     </div>
                   </div>
                 </td>
@@ -766,19 +742,6 @@ export const Products: React.FC = () => {
                 </select>
               </div>
               <div className="col-span-2 md:col-span-1">
-                <label htmlFor="division" className="block text-sm font-medium text-slate-700 mb-1">Divisi (Opsional)</label>
-                <select
-                  id="division"
-                  name="division"
-                  className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white"
-                  value={formData.divisionId || ''}
-                  onChange={e => setFormData({ ...formData, divisionId: e.target.value })}
-                >
-                  <option value="">-- Pilih Divisi --</option>
-                  {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-              </div>
-              <div className="col-span-2 md:col-span-1">
                 <label htmlFor="stock" className="block text-sm font-medium text-slate-700 mb-1">Stok Awal</label>
                 <input id="stock" name="stock" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.stock} onChange={e => handleNumericInput('stock', e.target.value)} />
               </div>
@@ -842,35 +805,6 @@ export const Products: React.FC = () => {
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => { setCategoryFormName(c.name); setEditingId(c.id); }} className="text-primary hover:bg-primary/10 p-1 rounded"><Edit2 size={14} /></button>
                     <button onClick={() => handleDeleteCategory(c.id)} className="text-red-600 hover:bg-red-100 p-1 rounded"><Trash2 size={14} /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* DIVISION MODAL */}
-      {isDivisionModalOpen && createPortal(
-        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-black/40 backdrop-blur-md z-[99999] flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-xl">
-            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-slate-800">Kelola Divisi</h3>
-              <button onClick={() => setIsDivisionModalOpen(false)}><X size={20} className="text-slate-400" /></button>
-            </div>
-            <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2">
-              <label htmlFor="newDivisionName" className="sr-only">Nama Divisi Baru</label>
-              <input id="newDivisionName" name="newDivisionName" type="text" className="flex-1 border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={divisionFormName} onChange={e => setDivisionFormName(e.target.value)} placeholder="Nama divisi baru..." onKeyDown={e => e.key === 'Enter' && handleSaveDivision()} />
-              <button onClick={handleSaveDivision} className="px-4 bg-primary text-white rounded-lg hover:bg-primary-hover font-bold shadow-md shadow-primary/20 transition-all"><Plus size={20} /></button>
-            </div>
-            <div className="max-h-64 overflow-y-auto p-4 space-y-2">
-              {divisions.map(d => (
-                <div key={d.id} className="flex justify-between items-center border border-slate-100 p-3 rounded-lg bg-white shadow-sm group">
-                  <span className="font-medium text-slate-700">{d.name}</span>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => { setDivisionFormName(d.name); setEditingId(d.id); }} className="text-primary hover:bg-primary/10 p-1 rounded"><Edit2 size={14} /></button>
-                    <button onClick={() => handleDeleteDivision(d.id)} className="text-red-600 hover:bg-red-100 p-1 rounded"><Trash2 size={14} /></button>
                   </div>
                 </div>
               ))}
