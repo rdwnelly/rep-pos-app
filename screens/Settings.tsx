@@ -770,6 +770,13 @@ export const Settings: React.FC = () => {
                                         </label>
 
                                         {storeSettings.useBluetoothPrinter && (
+                                            <label htmlFor="openCashDrawer" className="flex items-center gap-2 cursor-pointer ml-6">
+                                                <input id="openCashDrawer" name="openCashDrawer" type="checkbox" checked={storeSettings.openCashDrawer || false} onChange={e => setStoreSettings({ ...storeSettings, openCashDrawer: e.target.checked })} className="w-4 h-4 text-emerald-600 rounded" />
+                                                <span className="text-sm font-medium text-slate-700">Buka Laci Kasir Otomatis (RJ11)</span>
+                                            </label>
+                                        )}
+
+                                        {storeSettings.useBluetoothPrinter && (
                                             <div className="flex flex-col gap-2 w-full sm:w-auto">
                                                 <div className="flex items-center gap-3">
                                                     <button

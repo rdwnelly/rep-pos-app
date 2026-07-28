@@ -3,10 +3,14 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 // Nama target printer thermal mobile
 const TARGET_PRINTER_NAME = 'RPP02N';
 
-// UUID service printer thermal ESC/POS (common)
+// UUID service printer thermal ESC/POS (common untuk berbagai merek)
 const PRINTER_SERVICE_UUIDS = [
     '000018f0-0000-1000-8000-00805f9b34fb', // Standard ESC/POS
     'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Mini thermal
+    '0000ff00-0000-1000-8000-00805f9b34fb', // Common Chinese BLE printers (FFxx series)
+    '0000ffe0-0000-1000-8000-00805f9b34fb', // HM-10 UART module (banyak dipakai KZ-58BT dll)
+    '0000ae00-0000-1000-8000-00805f9b34fb', // Alternate thermal printer service
+    '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISSC/Microchip BLE UART
 ];
 
 // Key untuk menyimpan perangkat yang sudah terpilih
@@ -42,16 +46,45 @@ export const useBluetoothPrinter = () => {
 
     // --- Ambil karakteristik dari GATT server ---
     const setupCharacteristic = async (server: any): Promise<any> => {
-        const services = await server.getPrimaryServices();
-        for (const service of services) {
-            const characteristics = await service.getCharacteristics();
-            for (const characteristic of characteristics) {
-                if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
-                    return characteristic;
+        // Strategi 1: Coba setiap UUID service yang diketahui satu per satu
+        for (const uuid of PRINTER_SERVICE_UUIDS) {
+            try {
+                const service = await server.getPrimaryService(uuid);
+                console.log('[BT Printer] Ditemukan service:', uuid);
+                const characteristics = await service.getCharacteristics();
+                for (const characteristic of characteristics) {
+                    console.log('[BT Printer] Characteristic:', characteristic.uuid, 
+                        'write:', characteristic.properties.write,
+                        'writeWithoutResponse:', characteristic.properties.writeWithoutResponse);
+                    if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+                        console.log('[BT Printer] Menggunakan characteristic:', characteristic.uuid);
+                        return characteristic;
+                    }
                 }
+            } catch {
+                // Service UUID ini tidak tersedia pada printer ini, lanjut ke berikutnya
             }
         }
-        throw new Error('Tidak menemukan karakteristik write pada printer ini.');
+
+        // Strategi 2: Fallback — ambil semua service yang tersedia
+        try {
+            const services = await server.getPrimaryServices();
+            console.log('[BT Printer] Fallback: ditemukan', services.length, 'service(s)');
+            for (const service of services) {
+                console.log('[BT Printer] Service UUID:', service.uuid);
+                const characteristics = await service.getCharacteristics();
+                for (const characteristic of characteristics) {
+                    if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+                        console.log('[BT Printer] Fallback — menggunakan characteristic:', characteristic.uuid, 'dari service:', service.uuid);
+                        return characteristic;
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('[BT Printer] Gagal getPrimaryServices():', e);
+        }
+
+        throw new Error('Tidak menemukan karakteristik write pada printer ini. Pastikan printer mendukung BLE.');
     };
 
     // --- Auto-reconnect handler saat terputus ---
@@ -114,23 +147,20 @@ export const useBluetoothPrinter = () => {
 
             // Langkah 1: Coba ambil perangkat yang sudah dipilih sebelumnya (tanpa dialog)
             if (getBluetooth().getDevices) {
-                const pairedDevices: any[] = await getBluetooth().getDevices();
-                device = pairedDevices.find((d: any) =>
-                    d.name === TARGET_PRINTER_NAME || d.id === localStorage.getItem(STORAGE_KEY)
-                ) || null;
+                const savedId = localStorage.getItem(STORAGE_KEY);
+                if (savedId) {
+                    const pairedDevices: any[] = await getBluetooth().getDevices();
+                    device = pairedDevices.find((d: any) => d.id === savedId) || null;
+                }
             }
 
-            // Langkah 2: Kalau belum ada, tampilkan dialog SEKALI saja dengan filter nama RPP02N
+            // Langkah 2: Kalau belum ada, tampilkan dialog pemilihan printer
             if (!device) {
+                // Gunakan acceptAllDevices agar SEMUA printer bluetooth muncul di dialog
+                // (tidak terbatas pada nama/service tertentu)
                 device = await getBluetooth().requestDevice({
-                    filters: [{ name: TARGET_PRINTER_NAME }],
+                    acceptAllDevices: true,
                     optionalServices: PRINTER_SERVICE_UUIDS,
-                }).catch(async () => {
-                    // Fallback: filter by services kalau nama tidak ditemukan
-                    return await getBluetooth().requestDevice({
-                        filters: [{ services: PRINTER_SERVICE_UUIDS }],
-                        optionalServices: PRINTER_SERVICE_UUIDS,
-                    });
                 });
 
                 if (device) {
@@ -212,33 +242,48 @@ export const useBluetoothPrinter = () => {
 
     // --- Print ---
     const print = useCallback(async (data: Uint8Array): Promise<boolean> => {
-        if (!characteristicRef.current || !isConnected) {
-            // Coba reconnect otomatis sebelum print
-            await connect();
-            if (!characteristicRef.current) {
-                throw new Error('Printer tidak terhubung.');
-            }
+        // Cek characteristicRef saja (bukan isConnected state yang bisa belum ter-update).
+        // characteristicRef.current sudah di-set langsung oleh connect() via ref,
+        // sedangkan isConnected adalah React state yang update-nya asinkron.
+        if (!characteristicRef.current) {
+            throw new Error('Printer tidak terhubung. Sambungkan printer terlebih dahulu.');
         }
 
-        const maxChunk = 100;
+        console.log('[BT Printer] Mulai cetak, total bytes:', data.length);
+        console.log('[BT Printer] Characteristic:', characteristicRef.current.uuid,
+            'write:', characteristicRef.current.properties.write,
+            'writeWithoutResponse:', characteristicRef.current.properties.writeWithoutResponse);
+
+        // Chunk size kecil (20 bytes) lebih aman untuk printer BLE murah
+        // Beberapa printer (KZ-58BT dll) tidak bisa menerima chunk besar
+        const maxChunk = 20;
         let offset = 0;
+        let chunkIndex = 0;
 
         while (offset < data.length) {
             const end = Math.min(offset + maxChunk, data.length);
             const chunk = data.slice(offset, end);
 
-            if (characteristicRef.current.properties.writeWithoutResponse) {
-                await characteristicRef.current.writeValueWithoutResponse(chunk);
-            } else {
-                await characteristicRef.current.writeValue(chunk);
+            try {
+                if (characteristicRef.current.properties.writeWithoutResponse) {
+                    await characteristicRef.current.writeValueWithoutResponse(chunk);
+                } else {
+                    await characteristicRef.current.writeValue(chunk);
+                }
+            } catch (err) {
+                console.error(`[BT Printer] Gagal kirim chunk ${chunkIndex} (offset ${offset}):`, err);
+                throw err;
             }
 
             offset = end;
-            await new Promise(resolve => setTimeout(resolve, 20));
+            chunkIndex++;
+            // Delay 50ms antar chunk — beberapa printer BLE butuh waktu proses
+            await new Promise(resolve => setTimeout(resolve, 50));
         }
 
+        console.log('[BT Printer] Selesai cetak,', chunkIndex, 'chunk(s) terkirim.');
         return true;
-    }, [isConnected, connect]);
+    }, []);
 
     return {
         isConnected,

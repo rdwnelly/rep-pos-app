@@ -234,6 +234,18 @@ export const POS: React.FC = () => {
   }, [loadMoreRef.current, filteredProducts]);
 
   const handleCheckout = async () => {
+    // PENTING: connect bluetooth SEGERA di awal handler (dalam user gesture context).
+    // requestDevice() akan ditolak browser jika dipanggil setelah beberapa await,
+    // karena gesture context sudah hilang.
+    if (storeSettings?.useBluetoothPrinter && !bluetooth.isConnected) {
+      try {
+        await bluetooth.connect();
+      } catch (e: any) {
+        console.error("Bluetooth connect failed:", e);
+        // Lanjut proses transaksi — print akan di-skip jika tidak terhubung
+      }
+    }
+
     let paid = parseFloat(amountPaid) || 0;
 
     // Validation: Check for zero price items
@@ -365,17 +377,13 @@ export const POS: React.FC = () => {
   const printReceipt = async (tx: Transaction, settings: StoreSettings, printOptions?: PrintInvoiceOptions) => {
     if (settings.useBluetoothPrinter) {
       try {
-        if (!bluetooth.isConnected) {
-          await bluetooth.connect();
-        }
-        if (bluetooth.isConnected) {
-          const escposData = generateESCPOSReceipt(tx, settings);
-          await bluetooth.print(escposData);
-        }
+        // Tidak perlu connect() di sini — sudah dilakukan di awal handleCheckout
+        // dalam user gesture context. Di sini langsung cetak saja.
+        const escposData = generateESCPOSReceipt(tx, settings);
+        await bluetooth.print(escposData);
       } catch (error: any) {
-        // Jika gagal cetak via bluetooth (printer mati, dll), biarkan gagal silently
-        // Tidak perlu fallback ke browser print agar tidak muncul popup/tab baru di HP
-        console.error("Bluetooth print failed silently:", error);
+        console.error("[BT Printer] Cetak gagal:", error);
+        alert(`Gagal mencetak struk: ${error.message || 'Periksa koneksi printer.'}`);
       }
       return; // Berhenti di sini jika mode bluetooth aktif
     }
@@ -1052,6 +1060,38 @@ export const POS: React.FC = () => {
           document.body
         )
       }
+
+      {/* Success Modal */}
+      {showSuccessModal && createPortal(
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowSuccessModal(false)}
+          style={{ animation: 'fadeIn 0.2s ease-out' }}
+        >
+          <div 
+            className="bg-white rounded-3xl shadow-2xl p-10 flex flex-col items-center gap-4 max-w-sm mx-4"
+            onClick={e => e.stopPropagation()}
+            style={{ animation: 'scaleIn 0.3s ease-out' }}
+          >
+            <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center">
+              <CheckCircle size={48} className="text-emerald-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-800">Transaksi Berhasil!</h3>
+            <p className="text-slate-500 text-center text-sm">Transaksi telah berhasil diproses dan disimpan.</p>
+            <button 
+              onClick={() => setShowSuccessModal(false)}
+              className="mt-2 px-8 py-3 bg-emerald-500 text-white rounded-xl font-semibold hover:bg-emerald-600 active:scale-95 transition-all shadow-lg shadow-emerald-500/25"
+            >
+              OK
+            </button>
+          </div>
+          <style>{`
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes scaleIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+          `}</style>
+        </div>,
+        document.body
+      )}
 
     </div>
   );

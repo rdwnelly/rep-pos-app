@@ -208,6 +208,7 @@ export interface StoreSettings {
   showTiktok?: boolean;
   printerType?: PrinterType;
   useBluetoothPrinter?: boolean;
+  openCashDrawer?: boolean; // Buka cash drawer otomatis via RJ11 saat cetak struk
   autoSyncMySQL?: boolean; // Auto sync dari MySQL saat startup
   useMySQLPrimary?: boolean; // Gunakan MySQL sebagai database utama (read dari MySQL)
 }
