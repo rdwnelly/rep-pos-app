@@ -69,6 +69,16 @@ export class EscPosEncoder {
         return this;
     }
 
+    // Buka cash drawer via port RJ11
+    // ESC p m t1 t2 — kirim pulse ke pin connector
+    // m=0: pin 2 (drawer 1), m=1: pin 5 (drawer 2)
+    // t1: durasi ON (n × 2ms), t2: durasi OFF (n × 2ms)
+    public openCashDrawer(pin: 0 | 1 = 0) {
+        // ESC p 0 25 250 → pulse 50ms ON, 500ms OFF (standar untuk kebanyakan cash drawer)
+        this.addBytes([0x1B, 0x70, pin, 0x19, 0xFA]);
+        return this;
+    }
+
     public getBuffer(): Uint8Array {
         return new Uint8Array(this.buffer);
     }
@@ -174,6 +184,13 @@ export const generateESCPOSReceipt = (tx: Transaction, settings: StoreSettings):
     }
     if (settings.footerMessage) {
         encoder.textLine(settings.footerMessage);
+    }
+
+    // Buka cash drawer jika diaktifkan di settings
+    if (settings.openCashDrawer) {
+        encoder.openCashDrawer(0); // Pin 2 (drawer 1)
+        // Beberapa cash drawer menggunakan pin 5, kirim juga untuk kompatibilitas
+        encoder.openCashDrawer(1); // Pin 5 (drawer 2)
     }
 
     // Add extra newlines so it can be torn properly
