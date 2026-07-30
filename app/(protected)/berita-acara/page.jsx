@@ -4,7 +4,15 @@ import { useState, useMemo, useEffect } from "react";
 import { useData } from "../../../hooks/useData";
 import { StorageService } from "../../../services/storage";
 import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
-import { Plus, Trash2, Info, Save, Archive, FileText, X, Printer, Eye } from "lucide-react";
+import { Plus, Trash2, Info, Save, Archive, FileText, X, Printer, Eye, FolderPlus, Download, Loader2 } from "lucide-react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+
+const WhatsAppIcon = ({ size = 16 }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984a9.932 9.932 0 001.332 4.982L2 22l5.237-1.343a9.96 9.96 0 004.775 1.216h.004c5.505 0 9.988-4.478 9.989-9.984 0-2.667-1.037-5.176-2.922-7.062A9.923 9.923 0 0012.012 2zm5.834 14.164c-.247.692-1.246 1.34-1.745 1.408-.475.064-1.077.096-1.724-.112-.417-.133-.96-.31-1.666-.615-2.949-1.272-4.869-4.28-5.016-4.476-.146-.197-1.196-1.591-1.196-3.036 0-1.445.758-2.158 1.026-2.45.247-.269.544-.336.726-.336.183 0 .366.002.525.009.17.008.396-.065.62.472.247.592.84 2.052.913 2.2.073.149.122.323.024.518-.098.196-.147.32-.293.491-.146.172-.307.385-.438.518-.146.147-.298.307-.128.598.17.292.756 1.248 1.626 2.024 1.12.998 2.062 1.308 2.355 1.455.293.147.464.123.635-.073.17-.197.733-.853.929-1.147.196-.293.391-.245.659-.147.269.098 1.708.805 2.001.951.293.147.488.221.561.344.073.123.073.715-.174 1.407z"/>
+    </svg>
+);
 
 // Kategori penjualan dasar yang selalu muncul (urutan tampilan default)
 // Tiket Masuk dan Sewa Kostum kini dipisah menjadi 2 kategori berbeda
@@ -60,7 +68,7 @@ const DETAILED_EXPENSE_CONFIG = [
     { title: "V. URAIAN PENGELUARAN (Lain-lain)", rows: 1 }
 ];
 
-const CATEGORY_OPTIONS = [
+const DEFAULT_CATEGORY_OPTIONS = [
     "1) CAFÉ", 
     "2) KIOS", 
     "3) REPARASI", 
@@ -75,6 +83,7 @@ const CATEGORY_OPTIONS = [
 
 // Helper to map category dropdown to the correct printable table
 const mapCategoryToSection = (cat) => {
+    if (!cat) return "V. URAIAN PENGELUARAN (Lain-lain)";
     if (cat.includes("CAFÉ")) return "V. URAIAN PENGELUARAN (Pembelanjaan Café)";
     if (cat.includes("REPARASI")) return "V. URAIAN PENGELUARAN (REPARASI)";
     if (cat.includes("TRANSPORTASI")) return "V. URAIAN PENGELUARAN (Transportasi)";
@@ -84,7 +93,9 @@ const mapCategoryToSection = (cat) => {
     if (cat.includes("SOVENIR")) return "V. URAIAN PENGELUARAN (Sovenir)";
     if (cat.includes("PERLENGKAPAN")) return "V. URAIAN PENGELUARAN (Perlengkapan)";
     if (cat.includes("PANJAR")) return "V. URAIAN PENGELUARAN (Panjar)";
-    return "V. URAIAN PENGELUARAN (Lain-lain)";
+    if (cat.includes("LAIN-LAIN")) return "V. URAIAN PENGELUARAN (Lain-lain)";
+    const cleaned = cat.replace(/^\d+\)\s*/, '');
+    return `V. URAIAN PENGELUARAN (${cleaned})`;
 };
 
 export default function BeritaAcaraPage() {
@@ -94,16 +105,31 @@ export default function BeritaAcaraPage() {
     const [lokasi, setLokasi] = useState("Aimas - Klamono KM 21, Kabupaten Sorong, Papua Barat Daya");
 
     const transactions = useData(() => StorageService.getTransactions(), [], 'transactions') || [];
+    const categories = useData(() => StorageService.getCategories(), [], 'categories') || [];
     const cashflows = useData(() => StorageService.getCashFlow(), [], 'cashflow') || [];
     const archives = useData(() => StorageService.getBeritaAcaraArchives(), [], 'berita_acara_archives') || [];
     const [activeTab, setActiveTab] = useState("input");
     const [viewingArchive, setViewingArchive] = useState(null);
 
+    // Gabungkan kategori penjualan dasar dengan seluruh kategori penjualan dari POS master data
+    const allSalesCategories = useMemo(() => {
+        const list = [...BASE_SALES_CATEGORIES];
+        categories.forEach(cat => {
+            if (cat && cat.name && cat.name.trim()) {
+                const rowName = mapCategoryNameToSalesRow(cat.name.trim());
+                if (!list.includes(rowName)) {
+                    list.push(rowName);
+                }
+            }
+        });
+        return list;
+    }, [categories]);
+
     // States for editable tables
     // State penjualan kini dinamis: array of { name, tunai, hppTunai, qr, hppQR }
-    // Setiap kategori dari transaksi otomatis ditambahkan sebagai baris baru
-    const [salesRows, setSalesRows] = useState(
-        BASE_SALES_CATEGORIES.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" }))
+    // Setiap kategori dari master data & transaksi otomatis dimasukkan
+    const [salesRows, setSalesRows] = useState(() =>
+        allSalesCategories.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" }))
     );
 
     // Summary Expense Table (Page 1)
@@ -120,6 +146,7 @@ export default function BeritaAcaraPage() {
     // Auto-calculate logic from transactions
     const transactionsStr = JSON.stringify(transactions);
     const cashflowsStr = JSON.stringify(cashflows);
+    const categoriesStr = JSON.stringify(allSalesCategories);
 
     useEffect(() => {
         if (!tanggal) return;
@@ -139,8 +166,8 @@ export default function BeritaAcaraPage() {
         // Map: rowName -> { tunai, hppTunai, qr, hppQR }
         const salesMap = {};
 
-        // Inisialisasi dengan kategori dasar agar urutan tampilan tetap terjaga
-        BASE_SALES_CATEGORIES.forEach(name => {
+        // Inisialisasi dengan seluruh kategori penjualan (dasar + baru dari POS)
+        allSalesCategories.forEach(name => {
             salesMap[name] = { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
         });
 
@@ -176,7 +203,7 @@ export default function BeritaAcaraPage() {
             }
         });
 
-        // Konversi salesMap ke array rows, hanya tampilkan yang ada nilai atau kategori dasar
+        // Konversi salesMap ke array rows
         const newSalesRows = Object.entries(salesMap).map(([name, vals]) => ({
             name,
             tunai: vals.tunai === 0 ? "" : String(vals.tunai),
@@ -223,6 +250,7 @@ export default function BeritaAcaraPage() {
                 else if (item.category.includes("PERLENGKAPAN")) newExpenses[7] += val;
                 else if (item.category.includes("Makan Siang")) newExpenses[8] += val;
                 else if (item.category.includes("PANJAR")) newExpenses[9] += val;
+                else newExpenses[6] += val;
             }
         });
 
@@ -230,13 +258,143 @@ export default function BeritaAcaraPage() {
             setSalesRows(newSalesRows);
             setExpenses(newExpenses.map(v => v === 0 ? "" : String(v)));
         } else {
-            setSalesRows(BASE_SALES_CATEGORIES.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" })));
+            setSalesRows(allSalesCategories.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" })));
             setExpenses(Array(10).fill(""));
         }
-    }, [tanggal, transactionsStr, cashflowsStr, JSON.stringify(customExpenses)]);
+    }, [tanggal, transactionsStr, cashflowsStr, categoriesStr, JSON.stringify(customExpenses)]);
+
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
     const handlePrint = () => {
         window.print();
+    };
+
+    const generateBeritaAcaraPdf = async () => {
+        const page1El = document.getElementById("berita-acara-page-1");
+        if (!page1El) return null;
+
+        const pdf = new jsPDF({
+            orientation: "portrait",
+            unit: "mm",
+            format: "a4"
+        });
+
+        const pdfWidth = 210;
+        const pdfHeight = 297;
+
+        // Render Halaman 1
+        const canvas1 = await html2canvas(page1El, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: "#ffffff",
+            windowWidth: 1200
+        });
+        const imgData1 = canvas1.toDataURL("image/png");
+        const imgHeight1 = (canvas1.height * pdfWidth) / canvas1.width;
+        pdf.addImage(imgData1, "PNG", 0, 0, pdfWidth, Math.min(pdfHeight, imgHeight1));
+
+        // Render Halaman 2 jika ada rincian pengeluaran
+        const page2El = document.getElementById("berita-acara-page-2");
+        if (page2El && page2El.clientHeight > 10) {
+            const canvas2 = await html2canvas(page2El, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: "#ffffff",
+                windowWidth: 1200
+            });
+            const imgData2 = canvas2.toDataURL("image/png");
+            const imgHeight2 = (canvas2.height * pdfWidth) / canvas2.width;
+            pdf.addPage();
+            pdf.addImage(imgData2, "PNG", 0, 0, pdfWidth, Math.min(pdfHeight, imgHeight2));
+        }
+
+        return pdf;
+    };
+
+    const handleDownloadPdf = async () => {
+        try {
+            setIsGeneratingPdf(true);
+            const pdf = await generateBeritaAcaraPdf();
+            if (pdf) {
+                const fileName = `Berita_Acara_${currentTanggal}.pdf`;
+                pdf.save(fileName);
+            } else {
+                alert("Gagal membuat dokumen PDF. Silakan coba lagi.");
+            }
+        } catch (error) {
+            console.error("Error generating PDF:", error);
+            alert("Terjadi kesalahan saat mengunduh PDF: " + (error.message || error));
+        } finally {
+            setIsGeneratingPdf(false);
+        }
+    };
+
+    const handleShareWhatsApp = async () => {
+        try {
+            setIsGeneratingPdf(true);
+            const pdf = await generateBeritaAcaraPdf();
+            if (!pdf) {
+                alert("Gagal membuat dokumen PDF.");
+                return;
+            }
+
+            const fileName = `Berita_Acara_${currentTanggal}.pdf`;
+            const pdfBlob = pdf.output("blob");
+            const file = new File([pdfBlob], fileName, { type: "application/pdf" });
+
+            const textMessage = 
+`*BERITA ACARA REKAPAN PENJUALAN & PENGELUARAN*
+📅 Tanggal: ${currentTanggal}
+👤 Kasir: ${currentKasir || '-'}
+📍 Lokasi: ${currentLokasi || '-'}
+
+💰 Total Pendapatan: Rp ${totalAllSales.toLocaleString('id-ID')}
+💸 Total Pengeluaran: Rp ${totalPengeluaran.toLocaleString('id-ID')}
+💵 Netto (Kas Bersih): Rp ${netto.toLocaleString('id-ID')}
+
+📌 Dokumen lengkap Berita Acara terlampir dalam file PDF.`;
+
+            // 1. Coba fitur Web Share API langsung ke aplikasi WhatsApp (Perangkat Seluler)
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        title: `Berita Acara - ${currentTanggal}`,
+                        text: textMessage,
+                        files: [file]
+                    });
+                    return;
+                } catch (shareError) {
+                    console.log("Web Share dibatalkan/tidak didukung, beralih ke fallback download", shareError);
+                }
+            }
+
+            // 2. Fallback untuk browser PC/Desktop atau browser tanpa dukungan Berkas Web Share
+            pdf.save(fileName);
+
+            const encodedText = encodeURIComponent(
+                textMessage + "\n\n(File PDF telah otomatis diunduh ke perangkat Anda. Silakan lampirkan berkas PDF tersebut ke pesan WhatsApp)."
+            );
+
+            const targetPhone = prompt("Masukkan nomor WhatsApp tujuan (opsional, kosongkan jika ingin memilih di aplikasi WhatsApp):", "");
+            let waUrl = "";
+            if (targetPhone && targetPhone.trim()) {
+                const cleanPhone = targetPhone.trim().replace(/[^0-9]/g, "");
+                const formattedPhone = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
+                waUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodedText}`;
+            } else {
+                waUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
+            }
+
+            window.open(waUrl, "_blank");
+            alert("File PDF Berita Acara telah diunduh ke perangkat Anda. Silakan lampirkan file PDF tersebut pada jendela WhatsApp yang baru saja dibuka!");
+        } catch (error) {
+            console.error("Error sharing PDF to WhatsApp:", error);
+            alert("Gagal membagikan ke WhatsApp: " + (error.message || error));
+        } finally {
+            setIsGeneratingPdf(false);
+        }
     };
 
 
@@ -285,7 +443,7 @@ export default function BeritaAcaraPage() {
     const currentSalesRows = viewingArchive
         ? (viewingArchive.salesRows
             ? viewingArchive.salesRows
-            : BASE_SALES_CATEGORIES.map((name, idx) => ({
+            : allSalesCategories.map((name, idx) => ({
                 name,
                 tunai: viewingArchive.salesTunai?.[idx] ?? "",
                 hppTunai: viewingArchive.hppTunai?.[idx] ?? "",
@@ -293,6 +451,23 @@ export default function BeritaAcaraPage() {
                 hppQR: viewingArchive.hppQR?.[idx] ?? "",
             })))
         : salesRows;
+
+    const addSalesRow = () => {
+        const name = prompt("Masukkan nama kategori penjualan baru:");
+        if (name && name.trim()) {
+            const trimmedName = name.trim();
+            setSalesRows(prev => {
+                if (prev.some(r => r.name.toLowerCase() === trimmedName.toLowerCase())) return prev;
+                return [...prev, { name: trimmedName, tunai: "", hppTunai: "", qr: "", hppQR: "" }];
+            });
+        }
+    };
+
+    const deleteSalesRow = (index) => {
+        if (confirm("Hapus baris kategori penjualan ini?")) {
+            setSalesRows(prev => prev.filter((_, i) => i !== index));
+        }
+    };
     const currentExpenses = viewingArchive ? viewingArchive.expenses : expenses;
     const currentCustomExpenses = viewingArchive ? viewingArchive.customExpenses : customExpenses;
     const currentCatatan = viewingArchive ? viewingArchive.catatan : catatan;
@@ -332,9 +507,102 @@ export default function BeritaAcaraPage() {
         setExpenseNames(newData);
     };
 
+    // Custom Categories State & Management
+    const [categoryOptions, setCategoryOptions] = useState(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                const saved = localStorage.getItem('custom_expense_categories');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        const combined = [...DEFAULT_CATEGORY_OPTIONS];
+                        parsed.forEach(c => {
+                            if (c && !combined.includes(c)) combined.push(c);
+                        });
+                        return combined;
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading custom expense categories:', e);
+            }
+        }
+        return DEFAULT_CATEGORY_OPTIONS;
+    });
+
+    const [showCategoryModal, setShowCategoryModal] = useState(false);
+    const [newCatInput, setNewCatInput] = useState("");
+
+    const handleAddCategory = (catNameInput, targetExpId = null) => {
+        const trimmed = (catNameInput || "").trim();
+        if (!trimmed) return;
+
+        setCategoryOptions(prev => {
+            if (prev.includes(trimmed)) return prev;
+            const updated = [...prev, trimmed];
+            try {
+                const customOnly = updated.filter(c => !DEFAULT_CATEGORY_OPTIONS.includes(c));
+                localStorage.setItem('custom_expense_categories', JSON.stringify(customOnly));
+            } catch (e) {
+                console.error('Error saving custom categories:', e);
+            }
+            return updated;
+        });
+
+        if (targetExpId) {
+            updateCustomExpense(targetExpId, 'category', trimmed);
+        }
+    };
+
+    const handleDeleteCategory = (catName) => {
+        if (DEFAULT_CATEGORY_OPTIONS.includes(catName)) {
+            alert("Kategori bawaan sistem tidak dapat dihapus.");
+            return;
+        }
+        if (confirm(`Hapus kategori custom "${catName}"?`)) {
+            setCategoryOptions(prev => {
+                const updated = prev.filter(c => c !== catName);
+                try {
+                    const customOnly = updated.filter(c => !DEFAULT_CATEGORY_OPTIONS.includes(c));
+                    localStorage.setItem('custom_expense_categories', JSON.stringify(customOnly));
+                } catch (e) {
+                    console.error('Error deleting custom category:', e);
+                }
+                return updated;
+            });
+        }
+    };
+
+    const handleCategorySelect = (expId, selectedVal) => {
+        if (selectedVal === '__ADD_NEW__') {
+            const input = prompt("Masukkan nama kategori pengeluaran baru:");
+            if (input && input.trim()) {
+                handleAddCategory(input.trim(), expId);
+            }
+        } else {
+            updateCustomExpense(expId, 'category', selectedVal);
+        }
+    };
+
+    useEffect(() => {
+        if (currentCustomExpenses && currentCustomExpenses.length > 0) {
+            setCategoryOptions(prev => {
+                let updated = [...prev];
+                let changed = false;
+                currentCustomExpenses.forEach(item => {
+                    if (item.category && !updated.includes(item.category)) {
+                        updated.push(item.category);
+                        changed = true;
+                    }
+                });
+                return changed ? updated : prev;
+            });
+        }
+    }, [currentCustomExpenses]);
+
     // Modern Table Handlers
     const addCustomExpense = () => {
-        setCustomExpenses([...customExpenses, { id: Date.now(), category: '1) CAFÉ', keterangan: '', qty: '', harga: '', total: '' }]);
+        const defaultCat = categoryOptions[0] || '1) CAFÉ';
+        setCustomExpenses([...customExpenses, { id: Date.now(), category: defaultCat, keterangan: '', qty: '', harga: '', total: '' }]);
     };
 
     const removeCustomExpense = (id) => {
@@ -448,14 +716,24 @@ export default function BeritaAcaraPage() {
             {(activeTab === 'input' || viewingArchive) && (
                 <>
                 {viewingArchive && (
-                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-6 flex justify-between items-center print:hidden shadow-sm">
+                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden shadow-sm">
                         <div>
                             <h3 className="font-bold text-amber-800 flex items-center gap-2"><Eye size={18} /> Sedang Melihat Arsip: {viewingArchive.title}</h3>
                             <p className="text-sm text-amber-700 mt-1">Anda dalam mode Read-Only. Untuk mengubah data, silakan kembali ke tab Input Baru.</p>
                         </div>
-                        <div className="flex gap-2">
-                            <button onClick={handlePrint} className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold flex items-center gap-2 shadow-md"><Printer size={16}/> Cetak Arsip</button>
-                            <button onClick={() => setViewingArchive(null)} className="p-2 bg-amber-200 hover:bg-amber-300 text-amber-800 rounded-lg"><X size={20}/></button>
+                        <div className="flex flex-wrap gap-2 items-center shrink-0">
+                            <button onClick={handleDownloadPdf} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
+                                {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Download PDF
+                            </button>
+                            <button onClick={handleShareWhatsApp} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
+                                {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />} Kirim WhatsApp
+                            </button>
+                            <button onClick={handlePrint} className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
+                                <Printer size={14}/> Cetak
+                            </button>
+                            <button onClick={() => setViewingArchive(null)} className="p-2 bg-amber-200 hover:bg-amber-300 text-amber-800 rounded-lg transition-colors">
+                                <X size={18}/>
+                            </button>
                         </div>
                     </div>
                 )}
@@ -491,18 +769,34 @@ export default function BeritaAcaraPage() {
                         className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
                     />
                 </div>
-                <div className="ml-auto flex gap-3">
+                <div className="ml-auto flex flex-wrap gap-2 sm:gap-3 items-center">
                     <button
                         onClick={handleSaveArchive}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg font-medium transition-colors shadow-md flex items-center gap-2"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-md flex items-center gap-2 text-sm"
                     >
-                        <Save size={18} /> Simpan sebagai Arsip
+                        <Save size={16} /> Simpan Arsip
+                    </button>
+                    <button
+                        onClick={handleDownloadPdf}
+                        disabled={isGeneratingPdf}
+                        className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-md flex items-center gap-2 text-sm"
+                    >
+                        {isGeneratingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} 
+                        Download PDF
+                    </button>
+                    <button
+                        onClick={handleShareWhatsApp}
+                        disabled={isGeneratingPdf}
+                        className="bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-md flex items-center gap-2 text-sm"
+                    >
+                        {isGeneratingPdf ? <Loader2 size={16} className="animate-spin" /> : <WhatsAppIcon size={16} />} 
+                        Kirim WhatsApp
                     </button>
                     <button
                         onClick={handlePrint}
-                        className="bg-amber-700 hover:bg-amber-800 text-white px-6 py-2 rounded-lg font-medium transition-colors shadow-md flex items-center gap-2"
+                        className="bg-amber-700 hover:bg-amber-800 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-md flex items-center gap-2 text-sm"
                     >
-                        <Printer size={18} /> Cetak Berita Acara
+                        <Printer size={16} /> Cetak
                     </button>
                 </div>
             </div>
@@ -514,13 +808,19 @@ export default function BeritaAcaraPage() {
                         <h3 className="text-lg font-bold text-gray-800">Input Rincian Pengeluaran</h3>
                         <p className="text-sm text-gray-500">Tabel ini akan otomatis mengisi tabel rincian (Halaman 2) dan laporan utama (Halaman 1) di format cetak.</p>
                     </div>
+                    <button
+                        onClick={() => setShowCategoryModal(true)}
+                        className="flex items-center gap-2 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-3.5 py-2 rounded-lg transition-colors shadow-sm shrink-0"
+                    >
+                        <FolderPlus size={16} className="text-amber-700" /> Kelola / Tambah Kategori
+                    </button>
                 </div>
                 
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
                     <table className="w-full text-sm text-left text-gray-600">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                             <tr>
-                                <th className="px-4 py-3 w-48">Kategori</th>
+                                <th className="px-4 py-3 w-56">Kategori</th>
                                 <th className="px-4 py-3">Keterangan</th>
                                 <th className="px-4 py-3 w-24">QTY</th>
                                 <th className="px-4 py-3 w-32">Harga</th>
@@ -533,13 +833,18 @@ export default function BeritaAcaraPage() {
                                 <tr key={exp.id} className="border-b hover:bg-gray-50 transition-colors">
                                     <td className="p-2">
                                         <select 
-                                            className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+                                            className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 text-sm font-medium text-gray-700"
                                             value={exp.category}
-                                            onChange={(e) => updateCustomExpense(exp.id, 'category', e.target.value)}
+                                            onChange={(e) => handleCategorySelect(exp.id, e.target.value)}
                                         >
-                                            {CATEGORY_OPTIONS.map(cat => (
-                                                <option key={cat} value={cat}>{cat}</option>
-                                            ))}
+                                            <optgroup label="Pilih Kategori">
+                                                {categoryOptions.map(cat => (
+                                                    <option key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                            </optgroup>
+                                            <optgroup label="Opsi Tambahan">
+                                                <option value="__ADD_NEW__">➕ + Tambah Kategori Baru...</option>
+                                            </optgroup>
                                         </select>
                                     </td>
                                     <td className="p-2">
@@ -663,7 +968,7 @@ export default function BeritaAcaraPage() {
                 `}</style>
 
                 {/* Page 1 */}
-                <div className="print-page mb-4">
+                <div id="berita-acara-page-1" className="print-page mb-4">
                     {/* Header */}
                     <div className="flex items-center justify-between border-b-2 border-amber-900 pb-4 mb-4">
                         <div className="w-1/4">
@@ -942,16 +1247,12 @@ export default function BeritaAcaraPage() {
                         <div className="w-1/2 pt-6 pl-4">
                             <h4 className="font-bold text-sm mb-2">KATEGORI PENGELUARAN :</h4>
                             <div className="text-xs space-y-1 font-medium">
-                                <p>1) CAFÉ</p>
-                                <p>2) KIOS</p>
-                                <p>3) REPARASI</p>
-                                <p>4) LISTRIK PLN</p>
-                                <p>5) TRANSPORTASI</p>
-                                <p>6) SOVENIR</p>
-                                <p>7) LAIN-LAIN</p>
-                                <p>8) PERLENGKAPAN</p>
-                                <p>9) Makan Siang Karyawan (MSK)</p>
-                                <p>10) PANJAR</p>
+                                {categoryOptions.map((cat, idx) => {
+                                    const hasNum = /^\d+\)/.test(cat);
+                                    return (
+                                        <p key={cat}>{hasNum ? cat : `${idx + 1}) ${cat}`}</p>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
@@ -983,7 +1284,7 @@ export default function BeritaAcaraPage() {
                 <div className="page-break"></div>
 
                 {/* Page 2: Detailed Expenses (Dynamic Masonry Layout) */}
-                <div className="print-page pb-8">
+                <div id="berita-acara-page-2" className="print-page pb-8">
                     {(() => {
                         const activeTables = DETAILED_EXPENSE_CONFIG.map(config => ({
                             config,
@@ -1061,6 +1362,89 @@ export default function BeritaAcaraPage() {
             </div>
             </div>
                 </>
+            )}
+            {/* Category Management Modal */}
+            {showCategoryModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:hidden">
+                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 animate-fadeIn">
+                        <div className="flex justify-between items-center pb-4 border-b">
+                            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                <FolderPlus className="text-amber-600" size={20} /> Kelola Kategori Pengeluaran
+                            </h3>
+                            <button 
+                                onClick={() => setShowCategoryModal(false)}
+                                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="my-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Tambah Kategori Baru</label>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text"
+                                    placeholder="Contoh: BBM & Transportasi Khusus"
+                                    className="flex-1 border border-gray-300 rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                                    value={newCatInput}
+                                    onChange={(e) => setNewCatInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            handleAddCategory(newCatInput);
+                                            setNewCatInput("");
+                                        }
+                                    }}
+                                />
+                                <button
+                                    onClick={() => {
+                                        handleAddCategory(newCatInput);
+                                        setNewCatInput("");
+                                    }}
+                                    className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-1 shrink-0"
+                                >
+                                    <Plus size={16} /> Tambah
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="mt-4">
+                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Daftar Kategori Saat Ini</h4>
+                            <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                                {categoryOptions.map((cat, idx) => {
+                                    const isDefault = DEFAULT_CATEGORY_OPTIONS.includes(cat);
+                                    return (
+                                        <div key={cat} className="flex justify-between items-center p-2.5 text-sm hover:bg-gray-50 transition-colors">
+                                            <span className="font-medium text-gray-800 flex items-center gap-2">
+                                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono">{idx + 1}</span>
+                                                {cat}
+                                            </span>
+                                            {isDefault ? (
+                                                <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-semibold">Bawaan</span>
+                                            ) : (
+                                                <button 
+                                                    onClick={() => handleDeleteCategory(cat)}
+                                                    className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded transition-colors"
+                                                    title="Hapus Kategori Custom"
+                                                >
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="mt-6 pt-4 border-t flex justify-end">
+                            <button
+                                onClick={() => setShowCategoryModal(false)}
+                                className="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2 rounded-lg font-medium text-sm transition-colors"
+                            >
+                                Selesai
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
