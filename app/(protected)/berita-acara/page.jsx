@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useData } from "../../../hooks/useData";
 import { StorageService } from "../../../services/storage";
 import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
-import { Plus, Trash2, Info, Save, Archive, FileText, X, Printer, Eye, FolderPlus, Download, Loader2 } from "lucide-react";
+import { Plus, Trash2, Info, Save, Archive, FileText, X, Printer, Eye, FolderPlus, Download, Loader2, CheckCircle2 } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -56,16 +56,16 @@ const FIXED_EXPENSE_CATEGORIES = [
 ];
 
 const DETAILED_EXPENSE_CONFIG = [
-    { title: "V. URAIAN PENGELUARAN (Pembelanjaan Café)", rows: 21 },
-    { title: "V. URAIAN PENGELUARAN (REPARASI)", rows: 3 },
-    { title: "V. URAIAN PENGELUARAN (Transportasi)", rows: 2 },
-    { title: "V. URAIAN PENGELUARAN (Listrik)", rows: 2 },
-    { title: "V. URAIAN PENGELUARAN (Biaya Kios)", rows: 10 },
-    { title: "V. URAIAN PENGELUARAN (Makan Siang Karyawan)", rows: 4 },
-    { title: "V. URAIAN PENGELUARAN (Sovenir)", rows: 1 },
-    { title: "V. URAIAN PENGELUARAN (Perlengkapan)", rows: 1 },
-    { title: "V. URAIAN PENGELUARAN (Panjar)", rows: 1 },
-    { title: "V. URAIAN PENGELUARAN (Lain-lain)", rows: 1 }
+    { title: "VI. URAIAN PENGELUARAN (Pembelanjaan Café)", rows: 21 },
+    { title: "VI. URAIAN PENGELUARAN (REPARASI)", rows: 3 },
+    { title: "VI. URAIAN PENGELUARAN (Transportasi)", rows: 2 },
+    { title: "VI. URAIAN PENGELUARAN (Listrik)", rows: 2 },
+    { title: "VI. URAIAN PENGELUARAN (Biaya Kios)", rows: 10 },
+    { title: "VI. URAIAN PENGELUARAN (Makan Siang Karyawan)", rows: 4 },
+    { title: "VI. URAIAN PENGELUARAN (Sovenir)", rows: 1 },
+    { title: "VI. URAIAN PENGELUARAN (Perlengkapan)", rows: 1 },
+    { title: "VI. URAIAN PENGELUARAN (Panjar)", rows: 1 },
+    { title: "VI. URAIAN PENGELUARAN (Lain-lain)", rows: 1 }
 ];
 
 const DEFAULT_CATEGORY_OPTIONS = [
@@ -83,19 +83,19 @@ const DEFAULT_CATEGORY_OPTIONS = [
 
 // Helper to map category dropdown to the correct printable table
 const mapCategoryToSection = (cat) => {
-    if (!cat) return "V. URAIAN PENGELUARAN (Lain-lain)";
-    if (cat.includes("CAFÉ")) return "V. URAIAN PENGELUARAN (Pembelanjaan Café)";
-    if (cat.includes("REPARASI")) return "V. URAIAN PENGELUARAN (REPARASI)";
-    if (cat.includes("TRANSPORTASI")) return "V. URAIAN PENGELUARAN (Transportasi)";
-    if (cat.includes("LISTRIK")) return "V. URAIAN PENGELUARAN (Listrik)";
-    if (cat.includes("KIOS")) return "V. URAIAN PENGELUARAN (Biaya Kios)";
-    if (cat.includes("Makan Siang")) return "V. URAIAN PENGELUARAN (Makan Siang Karyawan)";
-    if (cat.includes("SOVENIR")) return "V. URAIAN PENGELUARAN (Sovenir)";
-    if (cat.includes("PERLENGKAPAN")) return "V. URAIAN PENGELUARAN (Perlengkapan)";
-    if (cat.includes("PANJAR")) return "V. URAIAN PENGELUARAN (Panjar)";
-    if (cat.includes("LAIN-LAIN")) return "V. URAIAN PENGELUARAN (Lain-lain)";
+    if (!cat) return "VI. URAIAN PENGELUARAN (Lain-lain)";
+    if (cat.includes("CAFÉ")) return "VI. URAIAN PENGELUARAN (Pembelanjaan Café)";
+    if (cat.includes("REPARASI")) return "VI. URAIAN PENGELUARAN (REPARASI)";
+    if (cat.includes("TRANSPORTASI")) return "VI. URAIAN PENGELUARAN (Transportasi)";
+    if (cat.includes("LISTRIK")) return "VI. URAIAN PENGELUARAN (Listrik)";
+    if (cat.includes("KIOS")) return "VI. URAIAN PENGELUARAN (Biaya Kios)";
+    if (cat.includes("Makan Siang")) return "VI. URAIAN PENGELUARAN (Makan Siang Karyawan)";
+    if (cat.includes("SOVENIR")) return "VI. URAIAN PENGELUARAN (Sovenir)";
+    if (cat.includes("PERLENGKAPAN")) return "VI. URAIAN PENGELUARAN (Perlengkapan)";
+    if (cat.includes("PANJAR")) return "VI. URAIAN PENGELUARAN (Panjar)";
+    if (cat.includes("LAIN-LAIN")) return "VI. URAIAN PENGELUARAN (Lain-lain)";
     const cleaned = cat.replace(/^\d+\)\s*/, '');
-    return `V. URAIAN PENGELUARAN (${cleaned})`;
+    return `VI. URAIAN PENGELUARAN (${cleaned})`;
 };
 
 export default function BeritaAcaraPage() {
@@ -263,6 +263,56 @@ export default function BeritaAcaraPage() {
         }
     }, [tanggal, transactionsStr, cashflowsStr, categoriesStr, JSON.stringify(customExpenses)]);
 
+    const [autoSaveStatus, setAutoSaveStatus] = useState("idle");
+
+    // Auto-save Berita Acara to Archives whenever data for a date changes
+    useEffect(() => {
+        if (viewingArchive) return;
+        if (!tanggal) return;
+
+        const totalTunai = salesRows.reduce((sum, row) => sum + (Number(row.tunai) || 0), 0);
+        const totalQR = salesRows.reduce((sum, row) => sum + (Number(row.qr) || 0), 0);
+        const totalExp = expenses.reduce((sum, val) => sum + (Number(val) || 0), 0);
+        const totalInc = totalTunai + totalQR;
+
+        const hasData = totalInc > 0 || totalExp > 0 || kasir || periode || catatan || customExpenses.some(c => c.keterangan || c.total);
+        if (!hasData) return;
+
+        const timer = setTimeout(async () => {
+            try {
+                setAutoSaveStatus("saving");
+                const existingArchives = await StorageService.getBeritaAcaraArchives();
+                const existingForDate = existingArchives.find(arch => arch.date === tanggal);
+
+                const archiveData = {
+                    id: existingForDate ? existingForDate.id : Date.now().toString(),
+                    title: existingForDate ? existingForDate.title : `Berita Acara - ${tanggal}`,
+                    date: tanggal,
+                    periode,
+                    kasir,
+                    lokasi,
+                    salesRows,
+                    expenses,
+                    customExpenses,
+                    catatan,
+                    totalIncome: totalInc,
+                    totalExpense: totalExp,
+                    totalClean: totalInc - totalExp,
+                    createdAt: existingForDate ? (existingForDate.createdAt || Date.now()) : Date.now(),
+                    updatedAt: Date.now()
+                };
+
+                await StorageService.saveBeritaAcaraArchive(archiveData);
+                setAutoSaveStatus("saved");
+            } catch (err) {
+                console.error("Auto save archive error:", err);
+                setAutoSaveStatus("idle");
+            }
+        }, 1000);
+
+        return () => clearTimeout(timer);
+    }, [tanggal, periode, kasir, lokasi, JSON.stringify(salesRows), JSON.stringify(expenses), JSON.stringify(customExpenses), catatan, viewingArchive]);
+
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
     const handlePrint = () => {
@@ -282,14 +332,47 @@ export default function BeritaAcaraPage() {
         const pdfWidth = 210;
         const pdfHeight = 297;
 
-        // Render Halaman 1
-        const canvas1 = await html2canvas(page1El, {
+        const canvasOptions = {
             scale: 2,
             useCORS: true,
             logging: false,
             backgroundColor: "#ffffff",
-            windowWidth: 1200
-        });
+            onclone: (clonedDoc) => {
+                const p1 = clonedDoc.getElementById("berita-acara-page-1");
+                const p2 = clonedDoc.getElementById("berita-acara-page-2");
+                [p1, p2].forEach(container => {
+                    if (!container) return;
+                    const inputs = container.querySelectorAll("input, textarea");
+                    inputs.forEach(input => {
+                        const parent = input.parentNode;
+                        if (!parent) return;
+                        const replacement = clonedDoc.createElement("div");
+                        replacement.textContent = input.value || "";
+                        replacement.className = input.className;
+                        replacement.style.cssText = window.getComputedStyle(input).cssText;
+                        replacement.style.border = "none";
+                        replacement.style.background = "transparent";
+                        replacement.style.padding = "0";
+                        replacement.style.margin = "0";
+                        replacement.style.lineHeight = "1.3";
+                        replacement.style.minHeight = "14px";
+                        replacement.style.boxSizing = "border-box";
+                        if (input.classList.contains("text-right")) {
+                            replacement.style.textAlign = "right";
+                        } else if (input.classList.contains("text-center")) {
+                            replacement.style.textAlign = "center";
+                        }
+                        if (input.tagName.toLowerCase() === "textarea") {
+                            replacement.style.whiteSpace = "pre-wrap";
+                        }
+                        parent.replaceChild(replacement, input);
+                    });
+                });
+            }
+        };
+
+        // Render Halaman 1
+        const canvas1 = await html2canvas(page1El, canvasOptions);
         const imgData1 = canvas1.toDataURL("image/png");
         const imgHeight1 = (canvas1.height * pdfWidth) / canvas1.width;
         pdf.addImage(imgData1, "PNG", 0, 0, pdfWidth, Math.min(pdfHeight, imgHeight1));
@@ -297,13 +380,7 @@ export default function BeritaAcaraPage() {
         // Render Halaman 2 jika ada rincian pengeluaran
         const page2El = document.getElementById("berita-acara-page-2");
         if (page2El && page2El.clientHeight > 10) {
-            const canvas2 = await html2canvas(page2El, {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                backgroundColor: "#ffffff",
-                windowWidth: 1200
-            });
+            const canvas2 = await html2canvas(page2El, canvasOptions);
             const imgData2 = canvas2.toDataURL("image/png");
             const imgHeight2 = (canvas2.height * pdfWidth) / canvas2.width;
             pdf.addPage();
@@ -435,6 +512,27 @@ export default function BeritaAcaraPage() {
         }
     };
 
+    const handleArchiveDownloadPdf = (arch) => {
+        setViewingArchive(arch);
+        setTimeout(() => {
+            handleDownloadPdf();
+        }, 150);
+    };
+
+    const handleArchivePrint = (arch) => {
+        setViewingArchive(arch);
+        setTimeout(() => {
+            handlePrint();
+        }, 150);
+    };
+
+    const handleArchiveShareWhatsApp = (arch) => {
+        setViewingArchive(arch);
+        setTimeout(() => {
+            handleShareWhatsApp();
+        }, 150);
+    };
+
     const currentTanggal = viewingArchive ? viewingArchive.date : tanggal;
     const currentPeriode = viewingArchive ? viewingArchive.periode : periode;
     const currentKasir = viewingArchive ? viewingArchive.kasir : kasir;
@@ -514,12 +612,8 @@ export default function BeritaAcaraPage() {
                 const saved = localStorage.getItem('custom_expense_categories');
                 if (saved) {
                     const parsed = JSON.parse(saved);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        const combined = [...DEFAULT_CATEGORY_OPTIONS];
-                        parsed.forEach(c => {
-                            if (c && !combined.includes(c)) combined.push(c);
-                        });
-                        return combined;
+                    if (Array.isArray(parsed)) {
+                        return parsed;
                     }
                 }
             } catch (e) {
@@ -540,8 +634,7 @@ export default function BeritaAcaraPage() {
             if (prev.includes(trimmed)) return prev;
             const updated = [...prev, trimmed];
             try {
-                const customOnly = updated.filter(c => !DEFAULT_CATEGORY_OPTIONS.includes(c));
-                localStorage.setItem('custom_expense_categories', JSON.stringify(customOnly));
+                localStorage.setItem('custom_expense_categories', JSON.stringify(updated));
             } catch (e) {
                 console.error('Error saving custom categories:', e);
             }
@@ -554,21 +647,27 @@ export default function BeritaAcaraPage() {
     };
 
     const handleDeleteCategory = (catName) => {
-        if (DEFAULT_CATEGORY_OPTIONS.includes(catName)) {
-            alert("Kategori bawaan sistem tidak dapat dihapus.");
-            return;
-        }
-        if (confirm(`Hapus kategori custom "${catName}"?`)) {
+        if (confirm(`Apakah Anda yakin ingin menghapus kategori "${catName}"?`)) {
             setCategoryOptions(prev => {
                 const updated = prev.filter(c => c !== catName);
                 try {
-                    const customOnly = updated.filter(c => !DEFAULT_CATEGORY_OPTIONS.includes(c));
-                    localStorage.setItem('custom_expense_categories', JSON.stringify(customOnly));
+                    localStorage.setItem('custom_expense_categories', JSON.stringify(updated));
                 } catch (e) {
-                    console.error('Error deleting custom category:', e);
+                    console.error('Error deleting category:', e);
                 }
                 return updated;
             });
+        }
+    };
+
+    const handleResetCategories = () => {
+        if (confirm("Kembalikan daftar kategori pengeluaran ke kategori bawaan awal?")) {
+            setCategoryOptions(DEFAULT_CATEGORY_OPTIONS);
+            try {
+                localStorage.removeItem('custom_expense_categories');
+            } catch (e) {
+                console.error('Error resetting categories:', e);
+            }
         }
     };
 
@@ -582,22 +681,6 @@ export default function BeritaAcaraPage() {
             updateCustomExpense(expId, 'category', selectedVal);
         }
     };
-
-    useEffect(() => {
-        if (currentCustomExpenses && currentCustomExpenses.length > 0) {
-            setCategoryOptions(prev => {
-                let updated = [...prev];
-                let changed = false;
-                currentCustomExpenses.forEach(item => {
-                    if (item.category && !updated.includes(item.category)) {
-                        updated.push(item.category);
-                        changed = true;
-                    }
-                });
-                return changed ? updated : prev;
-            });
-        }
-    }, [currentCustomExpenses]);
 
     // Modern Table Handlers
     const addCustomExpense = () => {
@@ -696,13 +779,24 @@ export default function BeritaAcaraPage() {
                                             <td className="p-3 font-medium text-gray-800">{arch.title}</td>
                                             <td className="p-3 text-emerald-600 font-bold">Rp {arch.totalIncome?.toLocaleString('id-ID')}</td>
                                             <td className="p-3 text-red-600 font-bold">Rp {arch.totalExpense?.toLocaleString('id-ID')}</td>
-                                            <td className="p-3 text-center flex justify-center gap-2">
-                                                <button onClick={() => setViewingArchive(arch)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors tooltip" title="Lihat & Cetak">
-                                                    <Eye size={16} />
-                                                </button>
-                                                <button onClick={() => handleDeleteArchive(arch.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors tooltip" title="Hapus Arsip">
-                                                    <Trash2 size={16} />
-                                                </button>
+                                            <td className="p-3 text-center">
+                                                <div className="flex justify-center gap-1.5 flex-wrap">
+                                                    <button onClick={() => setViewingArchive(arch)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors tooltip" title="Lihat Detail">
+                                                        <Eye size={16} />
+                                                    </button>
+                                                    <button onClick={() => handleArchiveDownloadPdf(arch)} disabled={isGeneratingPdf} className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 disabled:opacity-50 rounded-lg transition-colors tooltip" title="Download PDF">
+                                                        {isGeneratingPdf && viewingArchive?.id === arch.id ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                                                    </button>
+                                                    <button onClick={() => handleArchivePrint(arch)} className="p-2 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg transition-colors tooltip" title="Cetak Dokumen">
+                                                        <Printer size={16} />
+                                                    </button>
+                                                    <button onClick={() => handleArchiveShareWhatsApp(arch)} disabled={isGeneratingPdf} className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 disabled:opacity-50 rounded-lg transition-colors tooltip" title="Kirim WhatsApp">
+                                                        <WhatsAppIcon size={16} />
+                                                    </button>
+                                                    <button onClick={() => handleDeleteArchive(arch.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors tooltip" title="Hapus Arsip">
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -770,12 +864,16 @@ export default function BeritaAcaraPage() {
                     />
                 </div>
                 <div className="ml-auto flex flex-wrap gap-2 sm:gap-3 items-center">
-                    <button
-                        onClick={handleSaveArchive}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-md flex items-center gap-2 text-sm"
-                    >
-                        <Save size={16} /> Simpan Arsip
-                    </button>
+                    {autoSaveStatus === "saving" && (
+                        <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg flex items-center gap-1.5 font-medium animate-pulse">
+                            <Loader2 size={14} className="animate-spin text-amber-600" /> Menyimpan Otomatis...
+                        </span>
+                    )}
+                    {autoSaveStatus === "saved" && (
+                        <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg flex items-center gap-1.5 font-medium">
+                            <CheckCircle2 size={14} className="text-emerald-600" /> Otomatis Tersimpan ke Arsip
+                        </span>
+                    )}
                     <button
                         onClick={handleDownloadPdf}
                         disabled={isGeneratingPdf}
@@ -913,19 +1011,32 @@ export default function BeritaAcaraPage() {
             </div>
 
             {/* Printable Area */}
-            <div className="w-full overflow-x-auto pb-8 print:pb-0">
-                <div className="bg-white mx-auto print:shadow-none text-black w-[210mm] min-w-[210mm] shadow-lg mb-8 print:mb-0">
+            <div className="w-full overflow-x-auto no-scrollbar pb-8 print:pb-0">
+                <div className="bg-white mx-auto print:shadow-none text-black w-[210mm] max-w-full p-4 print:p-2 shadow-lg mb-8 print:mb-0">
                 <style>{`
+                    .no-scrollbar::-webkit-scrollbar,
+                    .no-scrollbar::-webkit-scrollbar-thumb,
+                    .no-scrollbar::-webkit-scrollbar-track {
+                        display: none !important;
+                        width: 0 !important;
+                        height: 0 !important;
+                        background: transparent !important;
+                    }
+                    .no-scrollbar {
+                        -ms-overflow-style: none !important;
+                        scrollbar-width: none !important;
+                    }
                     @media print {
                         @page {
                             size: A4 portrait;
-                            margin: 10mm;
+                            margin: 6mm;
                         }
                         html, body {
                             height: auto;
                             min-height: 100%;
                             -webkit-print-color-adjust: exact;
                             print-color-adjust: exact;
+                            background: white !important;
                         }
                         .page-break {
                             page-break-before: always;
@@ -934,33 +1045,54 @@ export default function BeritaAcaraPage() {
                         /* Ensure flex containers don't force page cuts */
                         .print-page {
                             page-break-inside: avoid;
+                            break-inside: avoid;
+                        }
+                        input, textarea {
+                            border: none !important;
+                            box-shadow: none !important;
+                            outline: none !important;
+                            background: transparent !important;
                         }
                     }
                     .brown-header {
                         background-color: #8B4513 !important;
                         color: white !important;
                         font-weight: bold;
-                        padding: 4px 8px;
-                        font-size: 12px;
+                        padding: 3px 6px;
+                        font-size: 11px;
                     }
                     .report-table {
                         width: 100%;
                         border-collapse: collapse;
-                        font-size: 10px;
+                        font-size: 9.5px;
+                        table-layout: fixed;
                     }
                     .report-table th, .report-table td {
-                        border: 1px solid #d1d5db;
-                        padding: 2px 4px;
+                        border: 1px solid #94a3b8;
+                        padding: 3px 4px;
+                        line-height: 1.3;
+                        vertical-align: middle;
+                        box-sizing: border-box;
                     }
                     .report-table th {
-                        background-color: #f3f4f6;
+                        background-color: #f1f5f9;
                         text-align: center;
-                        font-weight: bold;
+                        font-weight: 700;
+                        color: #0f172a;
                     }
                     .editable-cell {
                         width: 100%;
                         background: transparent;
-                        outline: none;
+                        border: none !important;
+                        outline: none !important;
+                        font-family: inherit;
+                        font-size: 9.5px;
+                        line-height: 1.3;
+                        color: inherit;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        box-sizing: border-box;
+                        vertical-align: middle;
                     }
                     .editable-cell:focus {
                         background: #fef08a;
@@ -968,63 +1100,63 @@ export default function BeritaAcaraPage() {
                 `}</style>
 
                 {/* Page 1 */}
-                <div id="berita-acara-page-1" className="print-page mb-4">
+                <div id="berita-acara-page-1" className="print-page mb-2">
                     {/* Header */}
-                    <div className="flex items-center justify-between border-b-2 border-amber-900 pb-4 mb-4">
+                    <div className="flex items-center justify-between border-b-2 border-amber-900 pb-2 mb-3">
                         <div className="w-1/4">
-                            <img src="/logokasir.jpg" alt="Logo" style={{ height: '70px', objectFit: 'contain' }} onError={(e) => e.target.style.display='none'} />
+                            <img src="/logokasir.jpg" alt="Logo" style={{ height: '55px', objectFit: 'contain' }} onError={(e) => e.target.style.display='none'} />
                         </div>
                         <div className="w-3/4 text-center">
-                            <h1 className="text-xl font-bold uppercase tracking-wider mb-1">BERITA ACARA</h1>
-                            <h2 className="text-sm font-bold uppercase">LAPORAN PENJUALAN DAN PENGELUARAN</h2>
-                            <h3 className="text-sm font-bold text-amber-900 italic">RUMAH ETNIK PAPUA - WISATA BUDAYA PAPUA</h3>
+                            <h1 className="text-lg font-bold uppercase tracking-wider mb-0.5">BERITA ACARA</h1>
+                            <h2 className="text-xs font-bold uppercase">LAPORAN PENJUALAN DAN PENGELUARAN</h2>
+                            <h3 className="text-xs font-bold text-amber-900 italic">RUMAH ETNIK PAPUA - WISATA BUDAYA PAPUA</h3>
                         </div>
                     </div>
 
                     {/* Section I */}
-                    <div className="mb-4">
+                    <div className="mb-3">
                         <div className="brown-header">I. IDENTITAS LAPORAN</div>
-                        <div className="grid grid-cols-2 gap-4 mt-2 px-2 text-sm font-medium">
+                        <div className="grid grid-cols-2 gap-4 mt-1.5 px-2 text-xs font-medium">
                             <div>
-                                <div className="flex mb-1">
-                                    <span className="w-24">Date</span>
+                                <div className="flex items-center mb-1">
+                                    <span className="w-16 shrink-0">Date</span>
                                     <span className="mr-2">:</span>
-                                    <span className="border-b border-black flex-1">{tanggal.split("-").reverse().join("/")}</span>
+                                    <div className="flex-1 border-b border-black pb-0.5 font-semibold text-gray-900">{tanggal.split("-").reverse().join("/")}</div>
                                 </div>
-                                <div className="flex">
-                                    <span className="w-24">Periode</span>
+                                <div className="flex items-center">
+                                    <span className="w-16 shrink-0">Periode</span>
                                     <span className="mr-2">:</span>
-                                    <span className="border-b border-black flex-1">{periode}</span>
+                                    <div className="flex-1 border-b border-black pb-0.5 font-semibold text-gray-900">{periode}</div>
                                 </div>
                             </div>
                             <div>
-                                <div className="flex mb-1">
-                                    <span className="w-24">Kasir</span>
+                                <div className="flex items-center mb-1">
+                                    <span className="w-16 shrink-0">Kasir</span>
                                     <span className="mr-2">:</span>
-                                    <span className="flex-1">{kasir}</span>
+                                    <div className="flex-1 pb-0.5 font-semibold text-gray-900">{kasir}</div>
                                 </div>
-                                <div className="flex">
-                                    <span className="w-24">Lokasi</span>
+                                <div className="flex items-center">
+                                    <span className="w-16 shrink-0">Lokasi</span>
                                     <span className="mr-2">:</span>
-                                    <span className="flex-1">{lokasi}</span>
+                                    <div className="flex-1 pb-0.5 font-semibold text-gray-900">{lokasi}</div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Section II & III - Gabungan dalam satu tabel dinamis */}
-                    <div className="flex flex-col gap-6 mb-6">
+                    {/* Section II & III - Berdampingan (Side by Side) */}
+                    <div className="grid grid-cols-2 gap-3 mb-3">
                         {/* Section II - Tunai */}
-                        <div className="w-full">
+                        <div>
                             <div className="brown-header">II. LAPORAN PENJUALAN (TUNAI)</div>
                             <table className="report-table">
                                 <thead>
                                     <tr>
-                                        <th style={{ width: '5%' }}>No</th>
-                                        <th style={{ width: '35%' }}>Sumber Pendapatan</th>
-                                        <th style={{ width: '20%' }}>Pendapatan (Rp)</th>
-                                        <th style={{ width: '20%' }}>Modal (Rp)</th>
-                                        <th style={{ width: '20%' }}>Keuntungan (Rp)</th>
+                                        <th style={{ width: '6%' }}>No</th>
+                                        <th style={{ width: '38%' }}>Sumber Pendapatan</th>
+                                        <th style={{ width: '18%' }}>Pendapatan</th>
+                                        <th style={{ width: '18%' }}>Modal</th>
+                                        <th style={{ width: '20%' }}>Keuntungan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1065,14 +1197,14 @@ export default function BeritaAcaraPage() {
                                                         readOnly={!!viewingArchive}
                                                     />
                                                 </td>
-                                                <td className="text-right font-medium text-green-700 bg-slate-50/50 pr-2">
+                                                <td className="text-right font-medium text-green-700 bg-slate-50/50 pr-1">
                                                     {isRowEmpty ? '' : keuntungan.toLocaleString('id-ID')}
                                                 </td>
                                             </tr>
                                         );
                                     })}
                                     <tr className="bg-[#f5e6d3] font-bold">
-                                        <td colSpan={2} className="text-right">TOTAL PENJUALAN</td>
+                                        <td colSpan={2} className="text-right">TOTAL (TUNAI)</td>
                                         <td className="text-right">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
                                         <td className="text-right text-red-700">Rp {totalHppTunai.toLocaleString('id-ID')}</td>
                                         <td className="text-right text-green-700">Rp {totalProfitTunai.toLocaleString('id-ID')}</td>
@@ -1082,16 +1214,16 @@ export default function BeritaAcaraPage() {
                         </div>
 
                         {/* Section III - QR */}
-                        <div className="w-full">
+                        <div>
                             <div className="brown-header">III. LAPORAN PENJUALAN (QR / TRANSFER)</div>
                             <table className="report-table">
                                 <thead>
                                     <tr>
-                                        <th style={{ width: '5%' }}>No</th>
-                                        <th style={{ width: '35%' }}>Sumber Pendapatan (QR)</th>
-                                        <th style={{ width: '20%' }}>Pendapatan (Rp)</th>
-                                        <th style={{ width: '20%' }}>Modal (Rp)</th>
-                                        <th style={{ width: '20%' }}>Keuntungan (Rp)</th>
+                                        <th style={{ width: '6%' }}>No</th>
+                                        <th style={{ width: '38%' }}>Sumber Pendapatan</th>
+                                        <th style={{ width: '18%' }}>Pendapatan</th>
+                                        <th style={{ width: '18%' }}>Modal</th>
+                                        <th style={{ width: '20%' }}>Keuntungan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1131,14 +1263,14 @@ export default function BeritaAcaraPage() {
                                                         readOnly={!!viewingArchive}
                                                     />
                                                 </td>
-                                                <td className="text-right font-medium text-green-700 bg-slate-50/50 pr-2">
+                                                <td className="text-right font-medium text-green-700 bg-slate-50/50 pr-1">
                                                     {isRowEmpty ? '' : keuntungan.toLocaleString('id-ID')}
                                                 </td>
                                             </tr>
                                         );
                                     })}
                                     <tr className="bg-[#f5e6d3] font-bold">
-                                        <td colSpan={2} className="text-right">TOTAL PENJUALAN (QR)</td>
+                                        <td colSpan={2} className="text-right">TOTAL (QR)</td>
                                         <td className="text-right">Rp {totalSalesQR.toLocaleString('id-ID')}</td>
                                         <td className="text-right text-red-700">Rp {totalHppQR.toLocaleString('id-ID')}</td>
                                         <td className="text-right text-green-700">Rp {totalProfitQR.toLocaleString('id-ID')}</td>
@@ -1148,64 +1280,86 @@ export default function BeritaAcaraPage() {
                         </div>
                     </div>
 
-                    {/* Section IV (Rekapitulasi) */}
-                    <div className="mb-4">
-                        <div className="brown-header">IV. REKAPITULASI</div>
-                        <div className="border border-[#d1d5db] p-4 flex flex-col md:flex-row justify-between gap-8 text-sm font-bold">
-                            <div className="w-full md:w-1/3">
-                                <div className="text-center bg-slate-100 p-1 mb-2">Pemasukan</div>
-                                <div className="flex justify-between mb-2">
-                                    <span>Penjualan Tunai</span>
-                                    <span className="border-b border-black w-32 text-right text-gray-700 font-medium">Rp {totalSalesTunai.toLocaleString('id-ID')}</span>
-                                </div>
-                                <div className="flex justify-between mb-2">
-                                    <span>Penjualan QR</span>
-                                    <span className="border-b border-black w-32 text-right text-gray-700 font-medium">Rp {totalSalesQR.toLocaleString('id-ID')}</span>
-                                </div>
-                                <div className="flex justify-between text-amber-900 mt-4">
-                                    <span>TOTAL</span>
-                                    <span>Rp {totalAllSales.toLocaleString('id-ID')}</span>
-                                </div>
-                            </div>
-                            
-                            <div className="w-full md:w-1/3 border-t md:border-t-0 md:border-l border-slate-300 pt-4 md:pt-0 md:pl-8">
-                                <div className="text-center bg-blue-50 text-blue-900 p-1 mb-2">Laba Penjualan</div>
-                                <div className="flex justify-between mb-2">
-                                    <span>Total Pendapatan</span>
-                                    <span className="border-b border-black w-32 text-right text-gray-700 font-medium">Rp {totalAllSales.toLocaleString('id-ID')}</span>
-                                </div>
-                                <div className="flex justify-between mb-2">
-                                    <span>Total HPP (Modal)</span>
-                                    <span className="border-b border-black w-32 text-right text-red-700 font-medium">Rp {(totalHppTunai + totalHppQR).toLocaleString('id-ID')}</span>
-                                </div>
-                                <div className="flex justify-between text-green-700 mt-4">
-                                    <span>KEUNTUNGAN</span>
-                                    <span className="border-b border-black w-32 text-right">Rp {((totalSalesTunai + totalSalesQR) - (totalHppTunai + totalHppQR)).toLocaleString('id-ID')}</span>
-                                </div>
-                            </div>
+                    {/* Section IV & V - Berdampingan (Side by Side) */}
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                        {/* Section IV (Rekapitulasi) */}
+                        <div>
+                            <div className="brown-header">IV. REKAPITULASI</div>
+                            <div className="border border-[#d1d5db] p-2 space-y-2 text-xs">
+                                {/* 1. Pemasukan */}
+                                <table className="report-table w-full">
+                                    <thead>
+                                        <tr>
+                                            <th colSpan={2} className="bg-slate-100 text-slate-800 text-left px-2 py-0.5 font-bold text-[10px]">1. PEMASUKAN</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td className="w-3/5 text-gray-700">Penjualan Tunai</td>
+                                            <td className="w-2/5 text-right font-medium">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
+                                        </tr>
+                                        <tr>
+                                            <td className="text-gray-700">Penjualan QR</td>
+                                            <td className="text-right font-medium">Rp {totalSalesQR.toLocaleString('id-ID')}</td>
+                                        </tr>
+                                        <tr className="bg-amber-50/60 font-bold text-amber-900">
+                                            <td>TOTAL PEMASUKAN</td>
+                                            <td className="text-right">Rp {totalAllSales.toLocaleString('id-ID')}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
 
-                            <div className="w-full md:w-1/3 border-t md:border-t-0 md:border-l border-slate-300 pt-4 md:pt-0 md:pl-8">
-                                <div className="text-center bg-slate-100 p-1 mb-2">Setoran Fisik (Tunai)</div>
-                                <div className="flex justify-between mb-2">
-                                    <span>Penjualan Tunai</span>
-                                    <span className="border-b border-black w-32 text-right text-gray-700 font-medium">Rp {totalSalesTunai.toLocaleString('id-ID')}</span>
-                                </div>
-                                <div className="flex justify-between mb-2">
-                                    <span>Pengeluaran</span>
-                                    <span className="border-b border-black w-32 text-right text-red-700 font-medium">Rp {totalPengeluaran.toLocaleString('id-ID')}</span>
-                                </div>
-                                <div className="flex justify-between mt-4 text-slate-800">
-                                    <span>NETTO (Uang Kasir)</span>
-                                    <span className="border-b border-black w-32 text-right">Rp {netto.toLocaleString('id-ID')}</span>
-                                </div>
+                                {/* 2. Laba Penjualan */}
+                                <table className="report-table w-full">
+                                    <thead>
+                                        <tr>
+                                            <th colSpan={2} className="bg-slate-100 text-slate-800 text-left px-2 py-0.5 font-bold text-[10px]">2. LABA PENJUALAN</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td className="w-3/5 text-gray-700">Total Pendapatan</td>
+                                            <td className="w-2/5 text-right font-medium">Rp {totalAllSales.toLocaleString('id-ID')}</td>
+                                        </tr>
+                                        <tr>
+                                            <td className="text-gray-700">Total HPP (Modal)</td>
+                                            <td className="text-right font-medium text-red-600">Rp {(totalHppTunai + totalHppQR).toLocaleString('id-ID')}</td>
+                                        </tr>
+                                        <tr className="bg-green-50/60 font-bold text-green-700">
+                                            <td>KEUNTUNGAN</td>
+                                            <td className="text-right">Rp {((totalSalesTunai + totalSalesQR) - (totalHppTunai + totalHppQR)).toLocaleString('id-ID')}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                {/* 3. Setoran Fisik (Tunai) */}
+                                <table className="report-table w-full">
+                                    <thead>
+                                        <tr>
+                                            <th colSpan={2} className="bg-slate-100 text-slate-800 text-left px-2 py-0.5 font-bold text-[10px]">3. SETORAN FISIK (TUNAI)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td className="w-3/5 text-gray-700">Penjualan Tunai</td>
+                                            <td className="w-2/5 text-right font-medium">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
+                                        </tr>
+                                        <tr>
+                                            <td className="text-gray-700">Pengeluaran</td>
+                                            <td className="text-right font-medium text-red-600">Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
+                                        </tr>
+                                        <tr className="bg-slate-100 font-bold text-slate-900">
+                                            <td>NETTO (UANG KASIR)</td>
+                                            <td className="text-right text-emerald-700">Rp {netto.toLocaleString('id-ID')}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Section V (Pengeluaran) */}
-                    <div className="flex gap-4 mb-8">
-                        <div className="w-1/2">
-                            <div className="brown-header">IV. LAPORAN PENGELUARAN</div>
+                        {/* Section V (Pengeluaran) */}
+                        <div>
+                            <div className="brown-header">V. LAPORAN PENGELUARAN</div>
                             <table className="report-table">
                                 <thead>
                                     <tr>
@@ -1239,41 +1393,30 @@ export default function BeritaAcaraPage() {
                                     ))}
                                     <tr className="bg-[#f5e6d3] font-bold">
                                         <td colSpan={2} className="text-right">TOTAL PENGELUARAN</td>
-                                        <td className="text-right">Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
+                                        <td className="text-right text-red-700">Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
-                        <div className="w-1/2 pt-6 pl-4">
-                            <h4 className="font-bold text-sm mb-2">KATEGORI PENGELUARAN :</h4>
-                            <div className="text-xs space-y-1 font-medium">
-                                {categoryOptions.map((cat, idx) => {
-                                    const hasNum = /^\d+\)/.test(cat);
-                                    return (
-                                        <p key={cat}>{hasNum ? cat : `${idx + 1}) ${cat}`}</p>
-                                    );
-                                })}
-                            </div>
-                        </div>
                     </div>
 
                     {/* Signatures */}
-                    <div className="flex justify-between text-sm mt-12 mb-12 px-8 font-medium">
+                    <div className="flex justify-between text-xs mt-4 mb-4 px-8 font-medium">
                         <div className="text-center">
-                            <p className="mb-16">Dibuat oleh,<br/>Kasir / Administrasi</p>
+                            <p className="mb-10">Dibuat oleh,<br/>Kasir / Administrasi</p>
                             <p>( ................................................. )</p>
                         </div>
                         <div className="text-center">
-                            <p className="mb-16">Sorong, ......./......../.............<br/>Mengetahui,<br/>Staff Keuangan</p>
+                            <p className="mb-10">Sorong, ......./......../.............<br/>Mengetahui,<br/>Staff Keuangan</p>
                             <p>( ................................................. )</p>
                         </div>
                     </div>
 
                     {/* Catatan */}
-                    <div className="text-sm font-bold flex gap-2">
-                        <span>CATATAN :</span>
+                    <div className="text-xs font-bold flex gap-2 items-start border-t border-gray-200 pt-2">
+                        <span className="shrink-0 pt-0.5">CATATAN :</span>
                         <textarea 
-                            className="flex-1 outline-none min-h-[60px] resize-none"
+                            className="flex-1 outline-none min-h-[36px] resize-none border border-gray-200 rounded p-1 text-xs print:border-none print:p-0"
                             value={catatan}
                             onChange={(e) => setCatatan(e.target.value)}
                         />
@@ -1408,31 +1551,40 @@ export default function BeritaAcaraPage() {
                         </div>
 
                         <div className="mt-4">
-                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Daftar Kategori Saat Ini</h4>
-                            <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-                                {categoryOptions.map((cat, idx) => {
-                                    const isDefault = DEFAULT_CATEGORY_OPTIONS.includes(cat);
-                                    return (
+                            <div className="flex justify-between items-center mb-2">
+                                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                    Daftar Kategori Saat Ini ({categoryOptions.length})
+                                </h4>
+                                <button
+                                    onClick={handleResetCategories}
+                                    className="text-xs text-amber-700 hover:text-amber-900 underline font-medium"
+                                >
+                                    Reset Bawaan
+                                </button>
+                            </div>
+                            {categoryOptions.length === 0 ? (
+                                <p className="text-center text-xs text-gray-400 py-6 italic border border-dashed rounded-lg">
+                                    Belum ada kategori pengeluaran. Silakan tambah kategori baru di atas.
+                                </p>
+                            ) : (
+                                <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                                    {categoryOptions.map((cat, idx) => (
                                         <div key={cat} className="flex justify-between items-center p-2.5 text-sm hover:bg-gray-50 transition-colors">
                                             <span className="font-medium text-gray-800 flex items-center gap-2">
                                                 <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono">{idx + 1}</span>
                                                 {cat}
                                             </span>
-                                            {isDefault ? (
-                                                <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-semibold">Bawaan</span>
-                                            ) : (
-                                                <button 
-                                                    onClick={() => handleDeleteCategory(cat)}
-                                                    className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded transition-colors"
-                                                    title="Hapus Kategori Custom"
-                                                >
-                                                    <Trash2 size={15} />
-                                                </button>
-                                            )}
+                                            <button 
+                                                onClick={() => handleDeleteCategory(cat)}
+                                                className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
+                                                title="Hapus Kategori"
+                                            >
+                                                <Trash2 size={14} /> Hapus
+                                            </button>
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <div className="mt-6 pt-4 border-t flex justify-end">
