@@ -255,205 +255,242 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
     };
 
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col gap-4 border-b border-slate-200 pb-4">
-                <div className="flex flex-wrap justify-between items-center gap-4">
+        <div className="space-y-6 animate-fade-in p-2 md:p-0">
+            {/* Header Bar */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <TruckIcon className="text-amber-600" />
+                        Riwayat Pembelian & Aktivitas Supplier
+                    </h1>
+                    <p className="text-slate-500 text-sm mt-1">Lacak transaksi pengadaan barang, sisa utang supplier, dan riwayat retur produk</p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                    <button onClick={handlePrint} className="text-xs font-semibold flex items-center gap-1.5 bg-white border border-slate-200 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 shadow-sm transition-all">
+                        <Printer size={15} /> Print
+                    </button>
+                    <button onClick={handleExportExcel} className="text-xs font-semibold flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3.5 py-2 rounded-xl text-emerald-700 hover:bg-emerald-100 shadow-sm transition-all">
+                        <FileSpreadsheet size={15} /> Export Excel
+                    </button>
+                    <button onClick={handleExport} className="text-xs font-semibold flex items-center gap-1.5 bg-white border border-slate-200 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 shadow-sm transition-all">
+                        <Download size={15} /> Export CSV
+                    </button>
+                </div>
+            </div>
+
+            {/* Metric Summary Stat Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                            <TruckIcon className="text-primary" />
-                            Riwayat Supplier
-                        </h1>
-                        <p className="text-slate-500 text-sm mt-1">Lacak riwayat pembelian dan aktivitas supplier</p>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Pembelian</p>
+                        <h3 className="text-lg font-extrabold text-slate-900 mt-1">{formatIDR(totals.totalPurchases)}</h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{filteredPurchases.length} Transaksi Pembelian</p>
                     </div>
-                    <div className="flex gap-2">
-                        <button onClick={handlePrint} className="text-sm flex items-center gap-2 bg-white border border-slate-300 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
-                            <Printer size={16} /> Print
-                        </button>
-                        <button onClick={handleExportExcel} className="text-sm flex items-center gap-2 bg-green-50 border border-green-200 px-3 py-2 rounded-lg text-green-700 hover:bg-green-100">
-                            <FileSpreadsheet size={16} /> Excel
-                        </button>
-                        <button onClick={handleExport} className="text-sm flex items-center gap-2 bg-white border border-slate-300 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
-                            <Download size={16} /> CSV
-                        </button>
+                    <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                        <TruckIcon size={22} />
                     </div>
                 </div>
 
-                {/* Summary Cards */}
-                {selectedSupplierId && (
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="bg-primary/10 border border-primary/20 rounded-xl p-4">
-                            <p className="text-xs text-primary mb-1">Total Pembelian</p>
-                            <p className="text-lg font-bold text-primary">{formatIDR(totals.totalPurchases)}</p>
-                        </div>
-                        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                            <p className="text-xs text-green-600 mb-1">Total Dibayar</p>
-                            <p className="text-lg font-bold text-green-700">{formatIDR(totals.totalPaid)}</p>
-                        </div>
-                        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                            <p className="text-xs text-red-600 mb-1">Total Utang</p>
-                            <p className="text-lg font-bold text-red-700">{formatIDR(totals.totalDebt)}</p>
-                        </div>
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Terbayar</p>
+                        <h3 className="text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(totals.totalPaid)}</h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Sudah Dilunasi</p>
                     </div>
-                )}
+                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                        <TruckIcon size={22} />
+                    </div>
+                </div>
 
-                {/* Filters */}
-                <div className="flex flex-wrap items-center gap-4">
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Sisa Utang Supplier</p>
+                        <h3 className="text-lg font-extrabold text-rose-600 mt-1">{formatIDR(totals.totalDebt)}</h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Belum Lunas</p>
+                    </div>
+                    <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                        <TruckIcon size={22} />
+                    </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Supplier Terpilih</p>
+                        <h3 className="text-sm font-extrabold text-amber-700 mt-1 truncate max-w-[140px]">
+                            {selectedSupplier?.name || 'Semua Supplier'}
+                        </h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{suppliers.length} Supplier Master Data</p>
+                    </div>
+                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                        <TruckIcon size={22} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
                     {/* Supplier Selector */}
-                    <label htmlFor="supplierFilter" className="sr-only">Filter Supplier</label>
-                    <select
-                        id="supplierFilter"
-                        name="supplierFilter"
-                        className="px-4 py-2 border border-slate-300 rounded-lg text-sm min-w-[200px]"
-                        value={selectedSupplierId}
-                        onChange={e => setSelectedSupplierId(e.target.value)}
-                    >
-                        <option value="">-- Semua Supplier --</option>
-                        {suppliers.sort((a, b) => a.name.localeCompare(b.name)).map(s => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                    </select>
+                    <div className="relative min-w-[200px]">
+                        <label htmlFor="supplierFilter" className="sr-only">Filter Supplier</label>
+                        <select
+                            id="supplierFilter"
+                            name="supplierFilter"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 font-semibold text-slate-800 outline-none focus:bg-white focus:border-amber-500"
+                            value={selectedSupplierId}
+                            onChange={e => setSelectedSupplierId(e.target.value)}
+                        >
+                            <option value="">-- Semua Supplier ({suppliers.length}) --</option>
+                            {suppliers.sort((a, b) => a.name.localeCompare(b.name)).map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                        </select>
+                    </div>
 
                     {/* Date Filters */}
-                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 w-fit">
-                        <Filter size={16} className="text-slate-400" />
-                        <span className="text-sm font-medium text-slate-600">Filter Tanggal:</span>
-                        <div className="relative flex items-center bg-white border border-slate-300 rounded px-2 py-1">
-                            <label htmlFor="startDate" className="sr-only">Tanggal Mulai</label>
-                            <span className="text-sm text-slate-700 pr-6">
-                                {startDate ? new Date(startDate).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'dd/mm/yyyy'}
+                    <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+                        <Filter size={14} className="text-slate-400" />
+                        <span className="font-semibold text-slate-600">Tanggal:</span>
+                        <div className="relative flex items-center bg-white border border-slate-200 rounded-lg px-2 py-1">
+                            <span className="font-medium text-slate-700 pr-5">
+                                {startDate ? new Date(startDate).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Mulai'}
                             </span>
                             <input
                                 id="startDate"
                                 name="startDate"
                                 type="date"
-                                className="absolute inset-0 opacity-0 w-full h-full"
+                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                                 value={startDate}
                                 onChange={e => setStartDate(e.target.value)}
                             />
-                            <Calendar size={14} className="absolute right-2 text-slate-400 pointer-events-none" />
+                            <Calendar size={13} className="absolute right-2 text-slate-400 pointer-events-none" />
                         </div>
                         <span className="text-slate-400">-</span>
-                        <div className="relative flex items-center bg-white border border-slate-300 rounded px-2 py-1">
-                            <label htmlFor="endDate" className="sr-only">Tanggal Akhir</label>
-                            <span className="text-sm text-slate-700 pr-6">
-                                {endDate ? new Date(endDate).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'dd/mm/yyyy'}
+                        <div className="relative flex items-center bg-white border border-slate-200 rounded-lg px-2 py-1">
+                            <span className="font-medium text-slate-700 pr-5">
+                                {endDate ? new Date(endDate).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sampai'}
                             </span>
                             <input
                                 id="endDate"
                                 name="endDate"
                                 type="date"
-                                className="absolute inset-0 opacity-0 w-full h-full"
+                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                                 value={endDate}
                                 onChange={e => setEndDate(e.target.value)}
                             />
-                            <Calendar size={14} className="absolute right-2 text-slate-400 pointer-events-none" />
+                            <Calendar size={13} className="absolute right-2 text-slate-400 pointer-events-none" />
                         </div>
-                        <button
-                            onClick={() => { setStartDate(''); setEndDate(''); }}
-                            className="p-1 text-slate-400 hover:text-slate-600 bg-slate-200 rounded ml-2"
-                            title="Reset Filter"
-                        >
-                            <RotateCcw size={14} />
-                        </button>
-                    </div>
-
-                    {/* Search Input */}
-                    <div className="relative w-full max-w-md">
-                        <label htmlFor="searchPurchase" className="sr-only">Cari Pembelian</label>
-                        <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                            id="searchPurchase"
-                            name="searchPurchase"
-                            type="text"
-                            placeholder="Cari ID, faktur, supplier, deskripsi..."
-                            className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm text-slate-700"
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                        />
-                        {searchQuery && (
+                        {(startDate || endDate) && (
                             <button
-                                onClick={() => setSearchQuery('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full p-1"
-                                title="Hapus pencarian"
+                                onClick={() => { setStartDate(''); setEndDate(''); }}
+                                className="p-1 text-slate-400 hover:text-slate-600 bg-slate-200 rounded-lg ml-1"
+                                title="Reset Filter Tanggal"
                             >
-                                <X size={14} />
+                                <RotateCcw size={13} />
                             </button>
                         )}
                     </div>
                 </div>
+
+                {/* Search Input */}
+                <div className="relative w-full lg:w-80">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                        id="searchPurchase"
+                        name="searchPurchase"
+                        type="text"
+                        placeholder="Cari ID, no faktur, supplier, deskripsi..."
+                        className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-slate-800 text-xs font-medium"
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                    />
+                    {searchQuery && (
+                        <button
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                            title="Hapus pencarian"
+                        >
+                            <X size={14} />
+                        </button>
+                    )}
+                </div>
             </div>
 
-            {/* Table */}
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200">
-                <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700">
-                    Daftar Pembelian ({filteredPurchases.length})
+            {/* Main Purchase Table */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Daftar Pembelian Supplier ({filteredPurchases.length})</h3>
+                    {selectedSupplier && (
+                        <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                            Supplier: {selectedSupplier.name}
+                        </span>
+                    )}
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
+                    <table className="w-full text-left text-xs border-collapse">
+                        <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-100">
                             <tr>
-                                <th className="p-4 font-medium">Tanggal</th>
-                                <th className="p-4 font-medium">ID Pembelian</th>
-                                <th className="p-4 font-medium">Faktur</th>
-                                <th className="p-4 font-medium">Supplier</th>
-                                <th className="p-4 font-medium">Deskripsi</th>
-                                <th className="p-4 font-medium">Total</th>
-                                <th className="p-4 font-medium">Dibayar</th>
-                                <th className="p-4 font-medium">Sisa/Utang</th>
-                                <th className="p-4 font-medium">Status</th>
-                                <th className="p-4 font-medium">Metode</th>
-                                <th className="p-4 font-medium">Aksi</th>
+                                <th className="p-3.5">Waktu Pembelian</th>
+                                <th className="p-3.5">No. Faktur / ID</th>
+                                <th className="p-3.5">Supplier</th>
+                                <th className="p-3.5">Keterangan Barang</th>
+                                <th className="p-3.5">Total Belanja</th>
+                                <th className="p-3.5">Jumlah Terbayar</th>
+                                <th className="p-3.5">Sisa Utang</th>
+                                <th className="p-3.5">Status Pembayaran</th>
+                                <th className="p-3.5">Metode</th>
+                                <th className="p-3.5 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredPurchases.length === 0 && (
                                 <tr>
-                                    <td colSpan={11} className="p-8 text-center text-slate-400">Tidak ada pembelian.</td>
+                                    <td colSpan={10} className="p-12 text-center text-slate-400 italic">Tidak ada riwayat pembelian supplier ditemukan.</td>
                                 </tr>
                             )}
                             {visiblePurchases.map(p => (
-                                <tr key={p.id} onClick={() => setDetailPurchase(p)} className="hover:bg-slate-50 cursor-pointer group">
-                                    <td className="p-4 text-slate-600">
-                                        <div className="flex flex-col">
-                                            <span>{new Date(p.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                            <span className="text-xs text-slate-400">{new Date(p.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
-                                        </div>
+                                <tr key={p.id} onClick={() => setDetailPurchase(p)} className="hover:bg-slate-50 cursor-pointer transition-colors">
+                                    <td className="p-3.5 whitespace-nowrap text-slate-700">
+                                        <div className="font-semibold">{new Date(p.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                                        <div className="text-[10px] text-slate-400">{new Date(p.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
                                     </td>
-                                    <td className="p-4 font-mono text-xs text-slate-400">#{p.id.substring(0, 6)}</td>
-                                    <td className="p-4 font-mono text-sm text-slate-700">{p.invoiceNumber || '-'}</td>
-                                    <td className="p-4 font-medium text-slate-800">{p.supplierName}</td>
-                                    <td className="p-4 text-slate-600">{p.description}</td>
-                                    <td className="p-4 font-semibold text-slate-700">{formatIDR(p.totalAmount)}</td>
-                                    <td className="p-4 text-green-600">{formatIDR(p.amountPaid)}</td>
-                                    <td className="p-4 text-red-600 font-medium">{formatIDR(p.totalAmount - p.amountPaid)}</td>
-                                    <td className="p-4">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold ${p.type === PurchaseType.RETURN
-                                            ? 'bg-purple-100 text-purple-600'
-                                            : p.paymentStatus === PaymentStatus.PAID
-                                                ? 'bg-green-100 text-green-600'
-                                                : p.paymentStatus === PaymentStatus.PARTIAL
-                                                    ? 'bg-orange-100 text-orange-600'
-                                                    : 'bg-red-100 text-red-600'
-                                            }`}>
+                                    <td className="p-3.5 whitespace-nowrap">
+                                        <div className="font-mono font-bold text-slate-900">{p.invoiceNumber || `#${p.id.substring(0, 8)}`}</div>
+                                        <div className="text-[10px] text-slate-400 font-mono">#{p.id.substring(0, 8)}</div>
+                                    </td>
+                                    <td className="p-3.5 font-bold text-slate-800 whitespace-nowrap">{p.supplierName}</td>
+                                    <td className="p-3.5 text-slate-600 max-w-[200px] truncate">{p.description}</td>
+                                    <td className="p-3.5 font-extrabold text-slate-900 whitespace-nowrap">{formatIDR(p.totalAmount)}</td>
+                                    <td className="p-3.5 font-bold text-emerald-600 whitespace-nowrap">{formatIDR(p.amountPaid)}</td>
+                                    <td className="p-3.5 font-bold text-rose-600 whitespace-nowrap">{formatIDR(p.totalAmount - p.amountPaid)}</td>
+                                    <td className="p-3.5 whitespace-nowrap">
+                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                                            p.type === PurchaseType.RETURN
+                                                ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                                                : p.paymentStatus === PaymentStatus.PAID
+                                                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                                    : p.paymentStatus === PaymentStatus.PARTIAL
+                                                        ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                                                        : 'bg-rose-100 text-rose-700 border border-rose-200'
+                                        }`}>
                                             {p.type === PurchaseType.RETURN
-                                                ? 'RETUR'
-                                                : (p.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : p.paymentStatus) + (p.isReturned ? ' (Ada Retur)' : '')}
+                                                ? 'RETUR SUPPLIER'
+                                                : (p.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : p.paymentStatus) + (p.isReturned ? ' (RETUR)' : '')}
                                         </span>
                                     </td>
-                                    <td className="p-4 text-slate-600">{p.paymentMethod}</td>
-                                    <td className="p-4 text-right">
-                                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button onClick={(e) => { e.stopPropagation(); setDetailPurchase(p); }} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded hover:bg-slate-200 flex items-center gap-1" title="Detail">
-                                                <Eye size={12} />
-                                            </button>
-                                        </div>
+                                    <td className="p-3.5 font-semibold text-slate-600 uppercase whitespace-nowrap">{p.paymentMethod}</td>
+                                    <td className="p-3.5 text-center whitespace-nowrap">
+                                        <button onClick={(e) => { e.stopPropagation(); setDetailPurchase(p); }} className="px-2.5 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-lg text-[11px] font-semibold flex items-center gap-1 mx-auto" title="Detail">
+                                            <Eye size={13} /> Detail
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
                             {visiblePurchases.length < filteredPurchases.length && (
                                 <tr>
-                                    <td colSpan={11} className="p-4 text-center text-slate-400">
-                                        <div ref={loadMoreRef}>Loading more...</div>
+                                    <td colSpan={10} className="p-4 text-center text-slate-400 text-xs">
+                                        <div ref={loadMoreRef}>Memuat lebih banyak pembelian...</div>
                                     </td>
                                 </tr>
                             )}
@@ -462,198 +499,143 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
                 </div>
             </div>
 
-            {/* Detail Modal */}
+            {/* Detail Purchase Modal */}
             {detailPurchase && createPortal(
-                <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-black/40 backdrop-blur-md z-[99999] flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden">
+                <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-black/50 backdrop-blur-sm z-[99999] flex items-center justify-center p-4 overflow-y-auto">
+                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-fade-in border border-slate-100">
                         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                            <h3 className="font-bold text-slate-800">
-                                Detail Pembelian {detailPurchase.invoiceNumber ? `(${detailPurchase.invoiceNumber})` : `#${detailPurchase.id.substring(0, 8)}`}
+                            <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
+                                <TruckIcon size={16} className="text-amber-600" />
+                                Detail Pembelian Supplier {detailPurchase.invoiceNumber ? `(${detailPurchase.invoiceNumber})` : `#${detailPurchase.id.substring(0, 8)}`}
                             </h3>
-                            <button onClick={() => setDetailPurchase(null)}><X size={20} className="text-slate-400" /></button>
+                            <button onClick={() => setDetailPurchase(null)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+                                <X size={18} />
+                            </button>
                         </div>
-                        <div className="p-6 max-h-[70vh] overflow-y-auto">
-                            <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+                        <div className="p-5 max-h-[75vh] overflow-y-auto space-y-4 text-xs">
+                            <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
                                 <div>
-                                    <span className="text-slate-500 block text-xs">Waktu Pembelian</span>
-                                    <span className="font-medium text-slate-900">
-                                        {formatDate(detailPurchase.date)}
-                                    </span>
+                                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Waktu Pembelian</span>
+                                    <span className="font-bold text-slate-800">{formatDate(detailPurchase.date)}</span>
                                 </div>
                                 <div>
-                                    <span className="text-slate-500 block text-xs">Supplier</span>
-                                    <span className="font-medium text-slate-900">{detailPurchase.supplierName}</span>
+                                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Supplier</span>
+                                    <span className="font-bold text-slate-800">{detailPurchase.supplierName}</span>
                                 </div>
                                 <div>
-                                    <span className="text-slate-500 block text-xs">Metode Awal</span>
-                                    <span className="font-medium text-slate-900">{detailPurchase.paymentMethod}</span>
+                                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Metode Pembayaran</span>
+                                    <span className="font-bold text-slate-800">{detailPurchase.paymentMethod}</span>
                                     {(() => {
                                         if (detailPurchase.bankId) {
                                             const bank = banks.find(b => b.id === detailPurchase.bankId);
-                                            if (bank) return <span className="block text-xs text-primary">via {bank.bankName} {bank.accountNumber}</span>;
+                                            if (bank) return <span className="block text-[11px] text-amber-700 font-semibold">via {bank.bankName} {bank.accountNumber}</span>;
                                         }
-                                        if (detailPurchase.bankName) return <span className="block text-xs text-primary">via {detailPurchase.bankName}</span>;
+                                        if (detailPurchase.bankName) return <span className="block text-[11px] text-amber-700 font-semibold">via {detailPurchase.bankName}</span>;
                                         return null;
                                     })()}
                                 </div>
                                 <div>
-                                    <span className="text-slate-500 block text-xs">Status</span>
-                                    <span className={`font-bold ${detailPurchase.paymentStatus === 'LUNAS' ? 'text-green-600' : 'text-red-600'}`}>
+                                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Status Pembayaran</span>
+                                    <span className={`font-extrabold ${detailPurchase.paymentStatus === 'LUNAS' ? 'text-emerald-600' : 'text-rose-600'}`}>
                                         {detailPurchase.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : detailPurchase.paymentStatus}
                                     </span>
                                 </div>
                             </div>
 
-                            <h4 className="font-bold text-sm text-slate-800 mb-2">Keterangan Barang</h4>
-                            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg mb-6 text-sm text-slate-700">
-                                {detailPurchase.description}
+                            <div>
+                                <h4 className="font-bold text-slate-800 mb-1.5">Keterangan Barang</h4>
+                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700">
+                                    {detailPurchase.description}
+                                </div>
                             </div>
 
                             {detailPurchase.items && detailPurchase.items.length > 0 ? (
-                                <div className="mb-6">
-                                    <h4 className="font-bold text-sm text-slate-800 mb-2">Rincian Barang Stok</h4>
-                                    <div className="border rounded-lg overflow-hidden">
+                                <div>
+                                    <h4 className="font-bold text-slate-800 mb-1.5">Rincian Barang Stok</h4>
+                                    <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
                                         {detailPurchase.items.map((item, i) => (
-                                            <div key={i} className="flex justify-between p-3 border-b last:border-0 text-sm">
+                                            <div key={i} className="flex justify-between p-3 text-xs">
                                                 <div>
-                                                    <span className="block font-medium text-slate-700">{item.name}</span>
-                                                    <span className="text-xs text-slate-500">{item.qty} {item.unit || 'Pcs'} x {formatIDR(item.finalPrice)}</span>
+                                                    <span className="block font-bold text-slate-800">{item.name}</span>
+                                                    <span className="text-[10px] text-slate-500">{item.qty} {item.unit || 'Pcs'} x {formatIDR(item.finalPrice)}</span>
                                                 </div>
-                                                <span className="font-medium text-slate-800">{formatIDR(item.finalPrice * item.qty)}</span>
+                                                <span className="font-bold text-slate-900">{formatIDR(item.finalPrice * item.qty)}</span>
                                             </div>
                                         ))}
-                                        <div className="bg-slate-50 p-3 flex justify-between font-bold text-slate-900">
-                                            <span>Total</span>
+                                        <div className="bg-slate-50 p-3 flex justify-between font-extrabold text-slate-900">
+                                            <span>Total Pembelian</span>
                                             <span>{formatIDR(detailPurchase.totalAmount)}</span>
                                         </div>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="flex justify-between font-bold text-slate-900 mb-6 border-b border-slate-200 pb-2">
+                                <div className="flex justify-between font-extrabold text-slate-900 p-3 bg-slate-50 rounded-xl border border-slate-200">
                                     <span>Total Pembelian</span>
                                     <span>{formatIDR(detailPurchase.totalAmount)}</span>
                                 </div>
                             )}
 
-                            {/* Return History (If this is a Purchase) */}
+                            {/* Return History */}
                             {purchases.filter(p => p.type === PurchaseType.RETURN && (p.originalPurchaseId === detailPurchase.id || p.description.includes(detailPurchase.id))).length > 0 && (
-                                <div className="mt-6">
-                                    <h4 className="font-bold text-sm text-slate-800 mb-2">Riwayat Retur ke Supplier</h4>
-                                    <div className="bg-orange-50 rounded-lg p-3 space-y-2 text-sm border border-orange-100">
+                                <div>
+                                    <h4 className="font-bold text-slate-800 mb-1.5">Riwayat Retur ke Supplier</h4>
+                                    <div className="bg-amber-50/60 rounded-xl p-3 space-y-2 border border-amber-200">
                                         {purchases
                                             .filter(p => p.type === PurchaseType.RETURN && (p.originalPurchaseId === detailPurchase.id || p.description.includes(detailPurchase.id)))
                                             .map((ret, i) => (
-                                                <div key={i} className="flex justify-between border-b border-orange-200 last:border-0 pb-2">
+                                                <div key={i} className="flex justify-between border-b border-amber-200/60 last:border-0 pb-2">
                                                     <div>
-                                                        <div className="flex gap-1 text-xs text-slate-500">
+                                                        <div className="flex gap-1 text-[10px] text-slate-500 font-semibold">
                                                             <span>{new Date(ret.date).toLocaleDateString('id-ID')}</span>
-                                                            <span className="font-mono bg-slate-200 px-1 rounded text-[10px]">{new Date(ret.date).toLocaleTimeString('id-ID')}</span>
                                                         </div>
-                                                        <span className="text-slate-700 block font-medium">Retur #{ret.id.substring(0, 6)}</span>
-                                                        <div className="text-xs text-slate-500 mt-1 italic">
-                                                            {ret.description}
-                                                        </div>
-                                                        {ret.returnNote && (
-                                                            <div className="text-xs text-slate-600 mt-1 italic bg-white/50 p-1 rounded border border-orange-200">
-                                                                Catatan: {ret.returnNote}
-                                                            </div>
-                                                        )}
+                                                        <span className="text-slate-800 font-bold">Retur #{ret.id.substring(0, 6)}</span>
+                                                        <div className="text-[11px] text-slate-600 italic mt-0.5">{ret.description}</div>
                                                     </div>
-                                                    <span className="font-medium text-red-600">{formatIDR(ret.totalAmount)}</span>
+                                                    <span className="font-extrabold text-rose-600">{formatIDR(ret.totalAmount)}</span>
                                                 </div>
                                             ))}
                                     </div>
                                 </div>
                             )}
 
-                            {/* Original Purchase Info (If this is a Return) */}
-                            {detailPurchase.type === PurchaseType.RETURN && (
-                                <div className="mt-6">
-                                    <h4 className="font-bold text-sm text-slate-800 mb-2">Info Pembelian Induk</h4>
-                                    <div className="bg-primary/5 rounded-lg p-3 text-sm border border-primary/10">
-                                        {(() => {
-                                            // 1. Coba cari via originalPurchaseId (Prioritas)
-                                            let originalTx = detailPurchase.originalPurchaseId
-                                                ? purchases.find(p => p.id === detailPurchase.originalPurchaseId)
-                                                : null;
-
-                                            // 2. Fallback: Cari via deskripsi (Regex #ID)
-                                            if (!originalTx) {
-                                                const originalIdMatch = detailPurchase.description.match(/#([a-zA-Z0-9-]+)/);
-                                                const originalId = originalIdMatch ? originalIdMatch[1] : null;
-                                                if (originalId) {
-                                                    originalTx = purchases.find(p => p.id === originalId || p.id.startsWith(originalId));
-                                                }
-                                            }
-
-                                            if (originalTx) {
-                                                return (
-                                                    <div className="flex justify-between items-center cursor-pointer hover:bg-primary/10 p-2 rounded transition-colors" onClick={() => setDetailPurchase(originalTx)}>
-                                                        <div>
-                                                            <div className="flex gap-1 text-xs text-slate-500">
-                                                                <span>{new Date(originalTx.date).toLocaleDateString('id-ID')}</span>
-                                                            </div>
-                                                            <span className="text-slate-700 font-bold block">#{originalTx.id.substring(0, 8)}</span>
-                                                            <span className="text-xs text-slate-600">Total: {formatIDR(originalTx.totalAmount)}</span>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <span className="text-xs bg-white border border-primary/20 px-2 py-1 rounded text-primary flex items-center gap-1">
-                                                                <Eye size={10} /> Lihat
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            }
-                                            return <span className="text-slate-500 italic">Info pembelian induk tidak ditemukan di deskripsi.</span>;
-                                        })()}
-                                    </div>
-                                </div>
-                            )}
-
                             {/* Payment History */}
-                            <h4 className="font-bold text-sm text-slate-800 mb-2 mt-6">Riwayat Pembayaran</h4>
-                            <div className="bg-slate-50 rounded-lg p-3 space-y-2 text-sm">
-                                {detailPurchase.paymentHistory?.map((ph, i) => (
-                                    <div key={i} className="flex justify-between border-b border-slate-200 last:border-0 pb-1">
-                                        <div>
-                                            <div className="flex gap-1 text-xs text-slate-500">
-                                                <span>{new Date(ph.date).toLocaleDateString('id-ID')}</span>
-                                                <span className="font-mono bg-slate-200 px-1 rounded text-[10px]">{new Date(ph.date).toLocaleTimeString('id-ID')}</span>
+                            <div>
+                                <h4 className="font-bold text-slate-800 mb-1.5">Riwayat Pelunasan Pembayaran</h4>
+                                <div className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-200">
+                                    {detailPurchase.paymentHistory?.map((ph, i) => (
+                                        <div key={i} className="flex justify-between border-b border-slate-200 last:border-0 pb-1.5">
+                                            <div>
+                                                <div className="flex gap-1 text-[10px] text-slate-500">
+                                                    <span>{new Date(ph.date).toLocaleDateString('id-ID')}</span>
+                                                    <span className="font-mono text-[9px] bg-slate-200 px-1 rounded">{new Date(ph.date).toLocaleTimeString('id-ID')}</span>
+                                                </div>
+                                                <span className="text-slate-800 font-medium">{ph.note || 'Pembayaran'} ({ph.method})</span>
                                             </div>
-                                            <span className="text-slate-700 block">{ph.note || 'Pembayaran'} ({ph.method})</span>
-                                            {(() => {
-                                                if (ph.bankId) {
-                                                    const bank = banks.find(b => b.id === ph.bankId);
-                                                    if (bank) return <span className="text-[10px] text-primary italic">via {bank.bankName} {bank.accountNumber}</span>;
-                                                }
-                                                if (ph.bankName) return <span className="text-[10px] text-primary italic">via {ph.bankName}</span>;
-                                                return null;
-                                            })()}
+                                            <span className="font-bold text-emerald-600">{formatIDR(ph.amount)}</span>
                                         </div>
-                                        <span className="font-medium text-green-600">{formatIDR(ph.amount)}</span>
+                                    ))}
+                                    {!detailPurchase.paymentHistory && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-slate-600">Pembayaran Awal</span>
+                                            <span className="font-bold text-emerald-600">{formatIDR(detailPurchase.amountPaid)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between pt-2 font-bold border-t border-slate-200 text-slate-900">
+                                        <span>Total Terbayar</span>
+                                        <span className="text-emerald-600">{formatIDR(detailPurchase.amountPaid)}</span>
                                     </div>
-                                ))}
-                                {!detailPurchase.paymentHistory && (
-                                    <div className="flex justify-between">
-                                        <span>Pembayaran Awal</span>
-                                        <span>{formatIDR(detailPurchase.amountPaid)}</span>
+                                    <div className="flex justify-between text-rose-600 font-extrabold">
+                                        <span>Sisa Utang</span>
+                                        <span>{formatIDR(detailPurchase.totalAmount - detailPurchase.amountPaid)}</span>
                                     </div>
-                                )}
-                                <div className="flex justify-between pt-2 font-bold border-t border-slate-200">
-                                    <span>Total Dibayar</span>
-                                    <span>{formatIDR(detailPurchase.amountPaid)}</span>
-                                </div>
-                                <div className="flex justify-between text-red-600 font-bold">
-                                    <span>Sisa Utang</span>
-                                    <span>{formatIDR(detailPurchase.totalAmount - detailPurchase.amountPaid)}</span>
                                 </div>
                             </div>
                         </div>
                         <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
-                            <button onClick={() => printPurchaseDetail(detailPurchase)} className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50">
-                                <Printer size={16} /> Cetak Detail
+                            <button onClick={() => printPurchaseDetail(detailPurchase)} className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-slate-50 shadow-sm">
+                                <Printer size={15} /> Cetak Detail
                             </button>
-                            <button onClick={() => setDetailPurchase(null)} className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold">Tutup</button>
+                            <button onClick={() => setDetailPurchase(null)} className="bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-bold">Tutup</button>
                         </div>
                     </div>
                 </div>,

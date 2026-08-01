@@ -499,198 +499,278 @@ export const Products: React.FC = () => {
   }, [loadMoreRef.current, filteredProducts]);
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="space-y-6 animate-fade-in p-2 md:p-0">
+      {/* Header Controls */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Package className="text-primary" />
-            Daftar Produk
-          </h2>
-          <p className="text-slate-500 text-sm mt-1">Kelola inventaris, harga modal (HPP) dan harga jual.</p>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Package className="text-amber-600" />
+            Daftar Produk & Inventaris
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">Kelola stok barang, harga modal (HPP), harga jual eceran & grosir</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => setIsCategoryModalOpen(true)} className="bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 text-sm font-medium">
-            <Tag size={16} /> Kategori
+
+        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+          <button onClick={() => setIsCategoryModalOpen(true)} className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 transition-all flex text-xs font-medium shadow-sm">
+            <Tag size={15} /> Kategori
           </button>
 
           {/* Hide Import CSV for Cashier and Warehouse */}
           {['CASHIER', 'GUDANG'].indexOf((JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role) === -1 && (
-            <label className="bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 cursor-pointer text-sm font-medium">
-              <Upload size={16} /> Import CSV
+            <label className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 transition-all flex text-xs font-medium shadow-sm cursor-pointer">
+              <Upload size={15} /> Import CSV
               <input id="csvProductImport" name="csvProductImport" type="file" accept=".csv" className="hidden" onChange={handleImport} />
             </label>
           )}
-          <button onClick={handleExportExcel} className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-green-100 text-sm font-medium">
-            <FileSpreadsheet size={16} /> Excel
+          <button onClick={handlePrint} className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 transition-all flex text-xs font-medium shadow-sm">
+            <Printer size={15} /> Print
           </button>
-          <button onClick={handleExport} className="bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 text-sm font-medium">
-            <Download size={16} /> CSV
+          <button onClick={handleExportExcel} className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3.5 py-2 rounded-xl text-emerald-700 hover:bg-emerald-100 transition-all flex text-xs font-medium shadow-sm">
+            <FileSpreadsheet size={15} /> Excel
           </button>
-          <button onClick={handlePrint} className="bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 text-sm font-medium">
-            <Printer size={16} /> Print
+          <button onClick={handleExport} className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 transition-all flex text-xs font-medium shadow-sm">
+            <Download size={15} /> CSV
           </button>
           {/* Hide Add Button for Warehouse */}
           {(JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role !== UserRole.WAREHOUSE && (
-            <button onClick={() => { resetProductForm(); setIsProductModalOpen(true); }} className="bg-primary text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-primary-hover shadow-lg shadow-primary/20 text-sm font-medium">
-              <Plus size={18} /> Tambah
+            <button onClick={() => { resetProductForm(); setIsProductModalOpen(true); }} className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md">
+              <Plus size={16} /> Tambah Produk
             </button>
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => scroll('left')}
-          className="p-1.5 rounded-full bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 shadow-sm"
-        >
-          <ChevronLeft size={16} />
-        </button>
+      {/* Metric Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Jenis Produk</p>
+            <h3 className="text-lg font-extrabold text-slate-900 mt-1">{products.length} <span className="text-xs font-normal text-slate-400">item</span></h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">{categories.length} Kategori Terdaftar</p>
+          </div>
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+            <Package size={22} />
+          </div>
+        </div>
 
-        <div
-          ref={scrollContainerRef}
-          className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar flex-1 scroll-smooth"
-        >
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Stok Produk</p>
+            <h3 className="text-lg font-extrabold text-emerald-600 mt-1">
+              {products.reduce((acc, p) => acc + (p.stock || 0), 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-slate-400">unit</span>
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">Semua Stok Fisik</p>
+          </div>
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+            <Tag size={22} />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Aset Modal (HPP)</p>
+            <h3 className="text-lg font-extrabold text-amber-700 mt-1">
+              {formatIDR(products.reduce((acc, p) => acc + ((p.hpp || 0) * (p.stock || 0)), 0))}
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">Nilai Total Modal Stok</p>
+          </div>
+          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+            <FileSpreadsheet size={22} />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Stok Menipis (&lt; 10)</p>
+            <h3 className="text-lg font-extrabold text-rose-600 mt-1">
+              {products.filter(p => (p.stock || 0) < 10).length} <span className="text-xs font-normal text-slate-400">produk</span>
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">Perlu Restok Segera</p>
+          </div>
+          <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+            <Trash2 size={22} />
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Category & Search Bar Container */}
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        {/* Category Carousel Chips */}
+        <div className="flex items-center gap-1.5 flex-1 overflow-hidden">
           <button
-            onClick={() => setFilterCategory('ALL')}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filterCategory === 'ALL' ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+            onClick={() => scroll('left')}
+            className="p-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors shrink-0"
           >
-            Semua
+            <ChevronLeft size={16} />
           </button>
-          {categories.map(c => (
+
+          <div
+            ref={scrollContainerRef}
+            className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 scroll-smooth py-1"
+          >
             <button
-              key={c.id}
-              onClick={() => setFilterCategory(c.id)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filterCategory === c.id ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+              onClick={() => setFilterCategory('ALL')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                filterCategory === 'ALL'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
+              }`}
             >
-              {c.name}
+              Semua ({products.length})
             </button>
-          ))}
-        </div>
+            {categories.map(c => {
+              const count = products.filter(p => p.categoryId === c.id).length;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setFilterCategory(c.id)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                    filterCategory === c.id
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {c.name} ({count})
+                </button>
+              );
+            })}
+          </div>
 
-        <button
-          onClick={() => scroll('right')}
-          className="p-1.5 rounded-full bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 shadow-sm"
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
-
-      {/* Search Input */}
-      <div className="relative max-w-md">
-        <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <label htmlFor="productSearchMain" className="sr-only">Cari produk...</label>
-        <input
-          id="productSearchMain"
-          name="productSearchMain"
-          type="text"
-          placeholder="Cari nama produk, SKU, atau kategori..."
-          className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary outline-none transition-all text-sm text-slate-700"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-        />
-        {searchQuery && (
           <button
-            onClick={() => setSearchQuery('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full p-1"
-            title="Hapus pencarian"
+            onClick={() => scroll('right')}
+            className="p-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors shrink-0"
           >
-            <X size={14} />
+            <ChevronRight size={16} />
           </button>
-        )}
+        </div>
+
+        {/* Search Input */}
+        <div className="relative min-w-[240px]">
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            id="productSearchMain"
+            name="productSearchMain"
+            type="text"
+            placeholder="Cari nama produk, SKU, atau kategori..."
+            className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-800"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+              title="Hapus pencarian"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Result Counter */}
-      {searchQuery && (
-        <div className="text-sm text-slate-600">
-          <span className="font-medium">{filteredProducts.length}</span> produk ditemukan untuk "{searchQuery}"
+      {/* Table Container */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 text-xs flex justify-between items-center">
+          <span>Daftar Produk ({filteredProducts.length})</span>
+          <span className="text-emerald-700 font-bold">Total Stok Tampil: {filteredProducts.reduce((acc, p) => acc + (p.stock || 0), 0)} unit</span>
         </div>
-      )}
-
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden overflow-x-auto">
-        <table className="w-full text-left">
-          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 text-xs uppercase tracking-wider">
-            <tr>
-              <th className="p-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('name')}>
-                Produk <SortIcon column="name" />
-              </th>
-              <th className="p-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('sku')}>
-                SKU <SortIcon column="sku" />
-              </th>
-              <th className="p-4 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('stock')}>
-                Stok <SortIcon column="stock" />
-              </th>
-              {/* Hide HPP for Cashier, Warehouse */}
-              {/* Hide HPP removed temporarily so all roles can see it */}
-{true && (
-                <th className="p-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('hpp')}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
+              <tr>
+                <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('name')}>
+                  Produk <SortIcon column="name" />
+                </th>
+                <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('sku')}>
+                  SKU / Barcode <SortIcon column="sku" />
+                </th>
+                <th className="p-3.5 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('stock')}>
+                  Stok <SortIcon column="stock" />
+                </th>
+                <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('hpp')}>
                   HPP (Modal) <SortIcon column="hpp" />
                 </th>
+                <th className="p-3.5 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('unit')}>
+                  Satuan <SortIcon column="unit" />
+                </th>
+                <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('price')}>
+                  Harga Jual <SortIcon column="price" />
+                </th>
+                <th className="p-3.5 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredProducts.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-slate-400">Tidak ada produk yang ditemukan.</td>
+                </tr>
               )}
-              <th className="p-4 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('unit')}>
-                Satuan <SortIcon column="unit" />
-              </th>
-              <th className="p-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('price')}>
-                Harga Jual <SortIcon column="price" />
-              </th>
-              <th className="p-4 text-right">Aksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 text-sm">
-            {visibleProducts.map(p => (
-              <tr key={p.id} className="hover:bg-slate-50 group">
-                <td className="p-4 flex items-center gap-3">
-                  {p.image && !p.image.includes('picsum.photos') ? (
-                    <img src={p.image} alt="" loading="lazy" className="w-10 h-10 rounded-lg object-cover bg-slate-200 border border-slate-100" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center">
-                      <ImageIcon size={16} className="text-slate-400" />
-                    </div>
-                  )}
-                  <div>
-                    <span className="font-semibold text-slate-800 block">{p.name}</span>
-                    <div className="flex gap-1 mt-0.5">
-                      <span className="text-xs text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded">{p.categoryName}</span>
-                    </div>
-                  </div>
-                </td>
-                <td className="p-4 text-slate-500 font-mono text-xs">{p.sku}</td>
-                <td className="p-4 text-center">
-                  <span className={`px-2 py-1 rounded-md font-bold text-xs ${p.stock < 10 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                    {p.stock}
-                  </span>
-                </td>
-                {/* Hide HPP for Cashier, Warehouse */}
-                {/* Hide HPP removed temporarily so all roles can see it */}
-{true && (
-                  <td className="p-4 text-slate-500 font-medium">{formatIDR(p.hpp || 0)}</td>
-                )}
-                <td className="p-4 text-center text-slate-500 text-xs">{p.unit || 'Pcs'}</td>
-                <td className="p-4 text-slate-600">
-                  <div className="flex flex-col gap-0.5 text-xs">
-                    <span className="text-primary font-bold">{formatIDR(p.price)}</span>
-                  </div>
-                </td>
-                <td className="p-4 text-right">
-                  {/* Actions - Block for Warehouse */}
-                  {(JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role !== UserRole.WAREHOUSE && (
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => handleEditProduct(p)} className="p-2 text-primary hover:bg-primary/10 rounded"><Edit2 size={16} /></button>
-                      <button onClick={() => handleDeleteProduct(p.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={16} /></button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {/* Sentinel for Infinite Scroll */}
-            {visibleProducts.length < filteredProducts.length && (
-              <tr>
-                <td colSpan={6} className="p-4 text-center text-slate-400">
-                  <div ref={loadMoreRef}>Loading more...</div>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              {visibleProducts.map(p => {
+                const marginPercent = p.price > 0 && p.hpp ? Math.round(((p.price - p.hpp) / p.price) * 100) : 0;
+                return (
+                  <tr key={p.id} className="hover:bg-slate-50 cursor-pointer transition-colors group">
+                    <td className="p-3.5 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        {p.image && !p.image.includes('picsum.photos') ? (
+                          <img src={p.image} alt="" loading="lazy" className="w-10 h-10 rounded-xl object-cover bg-slate-100 border border-slate-200 shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0 text-amber-600 font-bold">
+                            <Package size={18} />
+                          </div>
+                        )}
+                        <div>
+                          <span className="font-bold text-slate-800 text-xs block">{p.name}</span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] font-semibold text-slate-500 px-1.5 py-0.5 bg-slate-100 rounded-md border border-slate-200">{p.categoryName}</span>
+                            {marginPercent > 0 && (
+                              <span className="text-[10px] font-extrabold text-emerald-700 px-1.5 py-0.5 bg-emerald-50 rounded-md border border-emerald-200">
+                                Margin: +{marginPercent}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-3.5 text-slate-600 font-mono text-xs font-bold whitespace-nowrap">{p.sku}</td>
+                    <td className="p-3.5 text-center whitespace-nowrap">
+                      <span className={`px-2.5 py-1 rounded-lg font-extrabold text-xs border ${
+                        p.stock < 10 ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      }`}>
+                        {p.stock}
+                      </span>
+                    </td>
+                    <td className="p-3.5 text-slate-700 font-semibold whitespace-nowrap">{formatIDR(p.hpp || 0)}</td>
+                    <td className="p-3.5 text-center text-slate-600 font-medium whitespace-nowrap">{p.unit || 'Pcs'}</td>
+                    <td className="p-3.5 whitespace-nowrap">
+                      <span className="text-amber-700 font-extrabold text-xs">{formatIDR(p.price)}</span>
+                    </td>
+                    <td className="p-3.5 text-center whitespace-nowrap">
+                      {/* Actions - Block for Warehouse */}
+                      {(JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role !== UserRole.WAREHOUSE && (
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => handleEditProduct(p)} className="p-1.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors" title="Edit Produk">
+                            <Edit2 size={15} />
+                          </button>
+                          <button onClick={() => handleDeleteProduct(p.id)} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Hapus Produk">
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {/* Sentinel for Infinite Scroll */}
+              {visibleProducts.length < filteredProducts.length && (
+                <tr>
+                  <td colSpan={7} className="p-4 text-center text-slate-400">
+                    <div ref={loadMoreRef}>Memuat produk berikutnya...</div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* PRODUCT MODAL */}

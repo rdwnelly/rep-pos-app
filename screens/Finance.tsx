@@ -7,7 +7,7 @@ import { formatIDR, formatDate, exportToCSV, generateId, exportToExcel } from '.
 import { generatePrintInvoice, generatePrintGoodsNote, generatePrintSuratJalan, generatePrintTransactionDetail, generatePrintPurchaseDetail, generatePrintPurchaseNote } from '../utils/printHelpers';
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
-import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet, Bluetooth } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet, Bluetooth, Receipt, UserCheck, Truck, DollarSign, PieChart, BookOpen } from 'lucide-react';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 
 interface FinanceProps {
@@ -1928,63 +1928,132 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         });
     };
 
+    const netCashFlow = useMemo(() => {
+        const inAmt = filteredCashFlows.filter(cf => cf.type === CashFlowType.IN).reduce((s, cf) => s + cf.amount, 0);
+        const outAmt = filteredCashFlows.filter(cf => cf.type === CashFlowType.OUT).reduce((s, cf) => s + cf.amount, 0);
+        return inAmt - outAmt;
+    }, [filteredCashFlows]);
+
     return (
         <div className="space-y-6 animate-fade-in min-h-[101vh]">
-            <div className="flex flex-col gap-4 border-b border-slate-200 pb-4">
-                {/* Top Controls */}
-                <div className="flex flex-wrap justify-between items-center gap-4">
-                    <div className="flex gap-4 overflow-x-auto no-scrollbar">
+            {/* Modern Top Header & Action Controls */}
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap justify-between items-center gap-4 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 px-1 bg-slate-100/80 rounded-xl">
                         {[
-                            { id: 'history', label: 'Riwayat Transaksi' },
-                            { id: 'debt_customer', label: 'Piutang Pelanggan' },
-                            { id: 'purchase_history', label: 'Riwayat Pembelian' },
-                            { id: 'debt_supplier', label: 'Utang Supplier' },
-                            { id: 'cashflow', label: 'Arus Kas' },
-                            ...(currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN ? [{ id: 'profit_loss', label: 'Laba Rugi' }] : []),
-                            ...(currentUser?.role === UserRole.OWNER || currentUser?.role === UserRole.SUPERADMIN ? [{ id: 'manual_cash_report', label: 'Kas Manual' }] : [])
-                        ].map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id as any)}
-                                className={`px-4 py-2 font-medium text-sm transition-all relative whitespace-nowrap rounded-lg ${activeTab === tab.id ? 'bg-primary shadow text-white' : 'text-slate-500 hover:bg-slate-100'
+                            { id: 'history', label: 'Riwayat Transaksi', icon: Receipt },
+                            { id: 'debt_customer', label: 'Piutang Pelanggan', icon: UserCheck, count: receivables.length },
+                            { id: 'purchase_history', label: 'Riwayat Pembelian', icon: ShoppingBag },
+                            { id: 'debt_supplier', label: 'Utang Supplier', icon: Truck, count: payables.length },
+                            { id: 'cashflow', label: 'Arus Kas', icon: DollarSign },
+                            ...(currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN ? [{ id: 'profit_loss', label: 'Laba Rugi', icon: PieChart }] : []),
+                            ...(currentUser?.role === UserRole.OWNER || currentUser?.role === UserRole.SUPERADMIN ? [{ id: 'manual_cash_report', label: 'Kas Manual', icon: BookOpen }] : [])
+                        ].map(tab => {
+                            const IconComponent = tab.icon;
+                            const isActive = activeTab === tab.id;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id as any)}
+                                    className={`flex items-center gap-2 px-3.5 py-2 font-medium text-xs rounded-lg transition-all whitespace-nowrap ${
+                                        isActive 
+                                            ? 'bg-amber-600 text-white shadow-md font-bold' 
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                                     }`}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
+                                >
+                                    {IconComponent && <IconComponent size={15} />}
+                                    <span>{tab.label}</span>
+                                    {tab.count !== undefined && tab.count > 0 && (
+                                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${isActive ? 'bg-amber-700 text-amber-100' : 'bg-slate-200 text-slate-700'}`}>
+                                            {tab.count}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
-                    <div className="flex gap-2">
-                        <button onClick={handleExportExcel} className="text-sm flex items-center gap-2 bg-green-50 border border-green-200 px-3 py-2 rounded-lg text-green-700 hover:bg-green-100">
-                            <FileSpreadsheet size={16} /> Excel
+
+                    <div className="flex items-center gap-2">
+                        <button onClick={handleCleanPrint} className="text-xs flex items-center gap-1.5 bg-white border border-slate-300 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 font-medium transition-colors shadow-sm">
+                            <Printer size={15} /> Print
                         </button>
-                        <button onClick={handleExport} className="text-sm flex items-center gap-2 bg-white border border-slate-300 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
-                            <Download size={16} /> CSV
+                        <button onClick={handleExportExcel} className="text-xs flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl text-emerald-700 hover:bg-emerald-100 font-medium transition-colors shadow-sm">
+                            <FileSpreadsheet size={15} /> Excel
                         </button>
-                        <button onClick={handleCleanPrint} className="text-sm flex items-center gap-2 bg-white border border-slate-300 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
-                            <Printer size={16} /> Print
+                        <button onClick={handleExport} className="text-xs flex items-center gap-1.5 bg-white border border-slate-300 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 font-medium transition-colors shadow-sm">
+                            <Download size={15} /> CSV
                         </button>
                         {activeTab === 'purchase_history' && (
-                            <button onClick={() => setIsPurchaseModalOpen(true)} className="text-sm flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg shadow hover:bg-primary/90">
-                                <Plus size={16} /> Catat Pembelian
+                            <button onClick={() => setIsPurchaseModalOpen(true)} className="text-xs flex items-center gap-1.5 bg-amber-600 text-white px-3.5 py-2 rounded-xl shadow-md hover:bg-amber-700 font-bold transition-colors">
+                                <Plus size={15} /> Catat Pembelian
                             </button>
                         )}
                     </div>
                 </div>
 
+                {/* Dashboard Summary Metric Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Penjualan</p>
+                            <h3 className="text-lg font-extrabold text-slate-900 mt-1">{formatIDR(filteredTransactions.reduce((s, t) => s + t.totalAmount, 0))}</h3>
+                            <p className="text-[11px] text-slate-400 mt-0.5">{filteredTransactions.length} Transaksi</p>
+                        </div>
+                        <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                            <Receipt size={22} />
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Piutang Pelanggan</p>
+                            <h3 className="text-lg font-extrabold text-rose-600 mt-1">{formatIDR(receivables.reduce((s, t) => s + (t.totalAmount - t.amountPaid), 0))}</h3>
+                            <p className="text-[11px] text-slate-400 mt-0.5">{receivables.length} Tagihan Belum Lunas</p>
+                        </div>
+                        <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                            <UserCheck size={22} />
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Utang Supplier</p>
+                            <h3 className="text-lg font-extrabold text-orange-600 mt-1">{formatIDR(payables.reduce((s, p) => s + (p.totalAmount - p.amountPaid), 0))}</h3>
+                            <p className="text-[11px] text-slate-400 mt-0.5">{payables.length} Utang Pembelian</p>
+                        </div>
+                        <div className="p-3 bg-orange-50 text-orange-600 rounded-xl shrink-0">
+                            <Truck size={22} />
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Arus Kas (Net)</p>
+                            <h3 className={`text-lg font-extrabold mt-1 ${netCashFlow >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatIDR(netCashFlow)}</h3>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Pemasukan - Pengeluaran</p>
+                        </div>
+                        <div className={`p-3 rounded-xl shrink-0 ${netCashFlow >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                            <DollarSign size={22} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Filter Bar Controls Card */}
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-3">
                 {/* Date Filters */}
-                <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 w-fit">
+                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                     <Filter size={16} className="text-slate-400" />
-                    <span className="text-sm font-medium text-slate-600">Filter Tanggal:</span>
+                    <span className="text-xs font-semibold text-slate-600">Tanggal:</span>
                     <div className="relative flex items-center bg-white border border-slate-300 rounded px-2 py-1">
-                        <label htmlFor="startDate" className="sr-only">Tanggal Mulai</label>
-                        <span className="text-sm text-slate-700 pr-6">
+                        <span className="text-xs text-slate-700 pr-6 font-medium">
                             {startDate ? new Date(startDate).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'dd/mm/yyyy'}
                         </span>
                         <input
                             id="startDate"
                             name="startDate"
                             type="date"
-                            className="absolute inset-0 opacity-0 w-full h-full"
+                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                             value={startDate}
                             onChange={e => setStartDate(e.target.value)}
                         />
@@ -1992,41 +2061,39 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                     </div>
                     <span className="text-slate-400">-</span>
                     <div className="relative flex items-center bg-white border border-slate-300 rounded px-2 py-1">
-                        <label htmlFor="endDate" className="sr-only">Tanggal Akhir</label>
-                        <span className="text-sm text-slate-700 pr-6">
+                        <span className="text-xs text-slate-700 pr-6 font-medium">
                             {endDate ? new Date(endDate).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'dd/mm/yyyy'}
                         </span>
                         <input
                             id="endDate"
                             name="endDate"
                             type="date"
-                            className="absolute inset-0 opacity-0 w-full h-full"
+                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                             value={endDate}
                             onChange={e => setEndDate(e.target.value)}
                         />
                         <Calendar size={14} className="absolute right-2 text-slate-400 pointer-events-none" />
                     </div>
-                    <button
-                        onClick={() => { setStartDate(''); setEndDate(''); }}
-                        className="p-1 text-slate-400 hover:text-slate-600 bg-slate-200 rounded ml-2"
-                        title="Reset Filter"
-                    >
-                        <RotateCcw size={14} />
-                    </button>
+                    {(startDate || endDate) && (
+                        <button
+                            onClick={() => { setStartDate(''); setEndDate(''); }}
+                            className="p-1 text-slate-400 hover:text-slate-600 bg-slate-200 rounded ml-1"
+                            title="Reset Filter"
+                        >
+                            <RotateCcw size={14} />
+                        </button>
+                    )}
                 </div>
-
-                {/* Status Filter for Transaction & Purchase History */}
-
 
                 {/* Category Filter for Cashflow */}
                 {activeTab === 'cashflow' && (
-                    <div className="flex flex-wrap items-center gap-3 w-full">
+                    <div className="flex flex-wrap items-center gap-3 flex-1">
                         <div className="relative w-[180px] flex-shrink-0">
                             <label htmlFor="categoryFilter" className="sr-only">Filter Kategori</label>
                             <select
                                 id="categoryFilter"
                                 name="categoryFilter"
-                                className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm text-slate-700 pr-10 appearance-none cursor-pointer"
+                                className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-700 pr-8 appearance-none cursor-pointer font-medium"
                                 value={categoryFilter}
                                 onChange={e => setCategoryFilter(e.target.value)}
                             >
@@ -2047,7 +2114,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                             <select
                                 id="paymentMethodFilter"
                                 name="paymentMethodFilter"
-                                className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm text-slate-700 pr-10 appearance-none cursor-pointer"
+                                className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-700 pr-8 appearance-none cursor-pointer font-medium"
                                 value={paymentMethodFilter}
                                 onChange={e => setPaymentMethodFilter(e.target.value)}
                             >
@@ -2068,7 +2135,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 <select
                                     id="userFilter"
                                     name="userFilter"
-                                    className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm text-slate-700 pr-10 appearance-none cursor-pointer"
+                                    className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-700 pr-8 appearance-none cursor-pointer font-medium"
                                     value={userFilter}
                                     onChange={e => setUserFilter(e.target.value)}
                                 >
@@ -2086,22 +2153,20 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                         )}
 
                         <div className="relative flex-1 min-w-[200px]">
-                            <label htmlFor="searchCashflow" className="sr-only">Cari Arus Kas</label>
-                            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input
                                 id="searchCashflow"
                                 name="searchCashflow"
                                 type="text"
                                 placeholder="Cari kategori atau keterangan..."
-                                className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm text-slate-700"
+                                className="w-full pl-9 pr-8 py-2 bg-white border border-slate-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-700"
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                             />
                             {searchQuery && (
                                 <button
                                     onClick={() => setSearchQuery('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full p-1"
-                                    title="Hapus pencarian"
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                                 >
                                     <X size={14} />
                                 </button>
@@ -2110,24 +2175,23 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                     </div>
                 )}
 
-                {/* Search Input */}
+                {/* Search Input for generic tabs */}
                 {activeTab !== 'profit_loss' && activeTab !== 'cashflow' && (
-                    <div className="flex items-center gap-3 w-full">
+                    <div className="flex flex-wrap items-center gap-3 flex-1">
                         {/* Category Dropdown for Manual Cash Report */}
                         {activeTab === 'manual_cash_report' && (
-                            <div className="relative min-w-[200px]">
-                                <label htmlFor="categoryFilterManual" className="sr-only">Filter Kategori Manual</label>
+                            <div className="relative min-w-[180px]">
                                 <select
                                     id="categoryFilterManual"
                                     name="categoryFilterManual"
-                                    className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm text-slate-700 pr-10 appearance-none cursor-pointer"
+                                    className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-700 pr-8 appearance-none cursor-pointer font-medium"
                                     value={categoryFilter}
                                     onChange={e => setCategoryFilter(e.target.value)}
                                 >
                                     <option value="">Semua Kategori</option>
                                     {Array.from(new Set(
                                         cashFlows
-                                            .filter(cf => !cf.referenceId) // Only manual categories
+                                            .filter(cf => !cf.referenceId)
                                             .map(cf => cf.category)
                                     )).sort().map(cat => (
                                         <option key={cat} value={cat}>{cat}</option>
@@ -2141,9 +2205,8 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                             </div>
                         )}
 
-                        <div className="relative w-full max-w-md">
-                            <label htmlFor="searchGeneric" className="sr-only">Cari Data</label>
-                            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <div className="relative flex-1 min-w-[220px]">
+                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input
                                 id="searchGeneric"
                                 name="searchGeneric"
@@ -2154,27 +2217,26 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                             activeTab === 'debt_supplier' ? 'Cari supplier atau keterangan...' :
                                                 'Cari kategori atau keterangan...'
                                 }
-                                className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm text-slate-700"
+                                className="w-full pl-9 pr-8 py-2 bg-white border border-slate-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-700"
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                             />
                             {searchQuery && (
                                 <button
                                     onClick={() => setSearchQuery('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full p-1"
-                                    title="Hapus pencarian"
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                                 >
                                     <X size={14} />
                                 </button>
                             )}
                         </div>
+
                         {(currentUser?.role === UserRole.OWNER || currentUser?.role === UserRole.SUPERADMIN || currentUser?.role === UserRole.ADMIN) && (
-                            <div className="relative min-w-[200px]">
-                                <label htmlFor="userFilterGeneric" className="sr-only">Filter User</label>
+                            <div className="relative min-w-[160px]">
                                 <select
                                     id="userFilterGeneric"
                                     name="userFilterGeneric"
-                                    className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm text-slate-700 pr-10 appearance-none cursor-pointer"
+                                    className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-700 pr-8 appearance-none cursor-pointer font-medium"
                                     value={userFilter}
                                     onChange={e => setUserFilter(e.target.value)}
                                 >
@@ -2191,14 +2253,12 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                             </div>
                         )}
 
-                        {/* Status Filter for Transaction & Purchase History (Moved here) */}
                         {(activeTab === 'history' || activeTab === 'purchase_history') && (
-                            <div className="relative min-w-[180px] w-auto">
-                                <label htmlFor="statusFilter" className="sr-only">Filter Status</label>
+                            <div className="relative min-w-[150px]">
                                 <select
                                     id="statusFilter"
                                     name="statusFilter"
-                                    className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm text-slate-700 pr-10 appearance-none cursor-pointer"
+                                    className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-700 pr-8 appearance-none cursor-pointer font-medium"
                                     value={statusFilter}
                                     onChange={e => setStatusFilter(e.target.value)}
                                 >
@@ -2387,46 +2447,70 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             }
 
             {/* --- TAB: HISTORY --- */}
+            {/* --- TAB: SALES TRANSACTION HISTORY --- */}
             {
                 activeTab === 'history' && (
                     <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200">
-                        <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 flex justify-between">
-                            <span>Riwayat Transaksi Penjualan</span>
-                            <span className="text-primary">Total: {formatIDR(filteredTransactions.reduce((s, t) => s + t.totalAmount, 0))}</span>
+                        <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 text-xs flex justify-between items-center">
+                            <span className="flex items-center gap-2 font-bold text-slate-800 text-sm">
+                                <Receipt className="text-amber-600" size={18} />
+                                Riwayat Transaksi Penjualan ({filteredTransactions.length})
+                            </span>
+                            <span className="text-amber-700 font-extrabold text-sm">
+                                Total: {formatIDR(filteredTransactions.reduce((s, t) => s + t.totalAmount, 0))}
+                            </span>
                         </div>
                         {searchQuery && (
-                            <div className="px-4 py-2 bg-primary/10 border-b border-primary/20 text-sm text-primary">
-                                <span className="font-medium">{filteredTransactions.length}</span> hasil ditemukan untuk "{searchQuery}"
+                            <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-900 font-medium">
+                                <span>{filteredTransactions.length}</span> hasil transaksi ditemukan untuk "{searchQuery}"
                             </div>
                         )}
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
+                            <table className="w-full text-left text-xs">
+                                <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
                                     <tr>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('id')}>ID <SortIcon column="id" /></th>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('date')}>Waktu <SortIcon column="date" /></th>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('invoiceNumber')}>Faktur <SortIcon column="invoiceNumber" /></th>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('customerName')}>Pelanggan <SortIcon column="customerName" /></th>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('paymentNote')}>Keterangan <SortIcon column="paymentNote" /></th>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('totalAmount')}>Total <SortIcon column="totalAmount" /></th>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('discountAmount')}>Diskon <SortIcon column="discountAmount" /></th>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('paymentStatus')}>Status <SortIcon column="paymentStatus" /></th>
-                                        <th className="p-4 font-medium text-right">Aksi</th>
+                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('date')}>Tanggal & Ref <SortIcon column="date" /></th>
+                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('invoiceNumber')}>No Faktur <SortIcon column="invoiceNumber" /></th>
+                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('customerName')}>Pelanggan <SortIcon column="customerName" /></th>
+                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentMethod')}>Metode <SortIcon column="paymentMethod" /></th>
+                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentNote')}>Keterangan <SortIcon column="paymentNote" /></th>
+                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('totalAmount')}>Total <SortIcon column="totalAmount" /></th>
+                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('discountAmount')}>Diskon <SortIcon column="discountAmount" /></th>
+                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentStatus')}>Status <SortIcon column="paymentStatus" /></th>
+                                        <th className="p-3.5 text-center whitespace-nowrap">Aksi Cetak & Opsi</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
+                                    {filteredTransactions.length === 0 && (
+                                        <tr>
+                                            <td colSpan={9} className="p-8 text-center text-slate-400">Tidak ada riwayat transaksi penjualan ditemukan.</td>
+                                        </tr>
+                                    )}
                                     {visibleTransactions.map(t => (
-                                        <tr key={t.id} onClick={() => setDetailTransaction(t)} className="hover:bg-slate-50 cursor-pointer group">
-                                            <td className="p-4 font-mono text-xs text-slate-400">#{t.id.substring(0, 6)}</td>
-                                            <td className="p-4 text-slate-600">
-                                                <div className="flex flex-col">
-                                                    <span>{new Date(t.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                                    <span className="text-xs text-slate-400">{new Date(t.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+                                        <tr key={t.id} onClick={() => setDetailTransaction(t)} className="hover:bg-slate-50 cursor-pointer transition-colors group">
+                                            <td className="p-3.5 whitespace-nowrap">
+                                                <div className="font-semibold text-slate-800">
+                                                    {new Date(t.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                </div>
+                                                <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
+                                                    <span>{new Date(t.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                    <span>•</span>
+                                                    <span>#{t.id.substring(0, 8)}</span>
                                                 </div>
                                             </td>
-                                            <td className="p-4 font-mono text-sm text-slate-700">{t.invoiceNumber || '-'}</td>
-                                            <td className="p-4 font-medium text-slate-800">{t.customerName}</td>
-                                            <td className="p-4 text-slate-600">
+                                            <td className="p-3.5 font-mono text-xs font-bold text-slate-800 whitespace-nowrap">
+                                                {t.invoiceNumber || '-'}
+                                            </td>
+                                            <td className="p-3.5 whitespace-nowrap">
+                                                <div className="font-semibold text-slate-800">{t.customerName}</div>
+                                                {t.customerPhone && <div className="text-[10px] text-slate-400 font-mono">{t.customerPhone}</div>}
+                                            </td>
+                                            <td className="p-3.5 text-slate-700 font-medium whitespace-nowrap">
+                                                <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-bold">
+                                                    {t.paymentMethod} {t.bankName ? `(${t.bankName})` : ''}
+                                                </span>
+                                            </td>
+                                            <td className="p-3.5 text-slate-600 max-w-[200px] truncate">
                                                 {t.type === TransactionType.RETURN && t.originalTransactionId
                                                     ? (() => {
                                                         const original = transactions.find(orig => orig.id === t.originalTransactionId);
@@ -2437,40 +2521,45 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                     : (t.paymentNote || '-')
                                                 }
                                             </td>
-                                            <td className="p-4 text-slate-800">{formatIDR(t.totalAmount)}</td>
-                                            <td className="p-4 text-red-600 text-xs font-semibold">{t.discountAmount ? `-${formatIDR(t.discountAmount)}` : '-'}</td>
-                                            <td className="p-4">
-                                                <span className={`px-2 py-1 rounded text-xs font-bold ${t.type === TransactionType.RETURN
-                                                    ? 'bg-purple-100 text-purple-600'
-                                                    : t.paymentStatus === 'LUNAS'
-                                                        ? 'bg-green-100 text-green-600'
-                                                        : t.paymentStatus === 'BELUM_LUNAS'
-                                                            ? 'bg-red-100 text-red-600'
-                                                            : 'bg-orange-100 text-orange-600'
-                                                    }`}>
+                                            <td className="p-3.5 font-extrabold text-slate-900 whitespace-nowrap">
+                                                {formatIDR(t.totalAmount)}
+                                            </td>
+                                            <td className="p-3.5 text-rose-600 font-bold whitespace-nowrap">
+                                                {t.discountAmount ? `-${formatIDR(t.discountAmount)}` : '-'}
+                                            </td>
+                                            <td className="p-3.5 whitespace-nowrap">
+                                                <span className={`px-2.5 py-0.5 rounded text-[10px] font-extrabold border ${
+                                                    t.type === TransactionType.RETURN
+                                                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                        : t.paymentStatus === 'LUNAS'
+                                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                            : t.paymentStatus === 'BELUM_LUNAS'
+                                                                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                                                : 'bg-amber-50 text-amber-800 border-amber-200'
+                                                }`}>
                                                     {t.type === TransactionType.RETURN ? 'RETUR' : t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus}
                                                     {t.isReturned && t.type !== TransactionType.RETURN ? ' (Ada Retur)' : ''}
                                                 </span>
                                             </td>
-                                            <td className="p-4 text-right">
-                                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={(e) => { e.stopPropagation(); printInvoice(t); }} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 flex items-center gap-1" title="Cetak Nota">
+                                            <td className="p-3.5 text-center whitespace-nowrap">
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    <button onClick={(e) => { e.stopPropagation(); printInvoice(t); }} className="px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-semibold border border-amber-200 transition-colors flex items-center gap-1" title="Cetak Nota">
                                                         <Printer size={12} /> Nota
                                                     </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); printBluetoothInvoice(t); }} className="text-xs bg-green-50 text-green-600 px-2 py-1 rounded hover:bg-green-100 flex items-center gap-1" title="Cetak Struk Bluetooth">
+                                                    <button onClick={(e) => { e.stopPropagation(); printBluetoothInvoice(t); }} className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold border border-emerald-200 transition-colors flex items-center gap-1" title="Cetak Struk Bluetooth">
                                                         <Bluetooth size={12} /> BT
                                                     </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); printGoodsNote(t); }} className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded hover:bg-indigo-100 flex items-center gap-1" title="Cetak Nota Barang (Tanpa Bayar)">
-                                                        <ShoppingBag size={12} /> Barang
-                                                    </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); printSuratJalan(t); }} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded hover:bg-slate-200 flex items-center gap-1" title="Cetak Surat Jalan">
+                                                    <button onClick={(e) => { e.stopPropagation(); printSuratJalan(t); }} className="px-2 py-1 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-lg text-[11px] font-semibold border border-slate-200 transition-colors flex items-center gap-1" title="Cetak Surat Jalan">
                                                         <FileText size={12} /> SJ
                                                     </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded hover:bg-slate-200 flex items-center gap-1" title="Detail">
-                                                        <Eye size={12} />
+                                                    <button onClick={(e) => { e.stopPropagation(); printGoodsNote(t); }} className="px-2 py-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-[11px] font-semibold border border-indigo-200 transition-colors flex items-center gap-1" title="Cetak Nota Barang">
+                                                        <ShoppingBag size={12} /> Barang
                                                     </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }} className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100 flex items-center gap-1" title="Hapus Transaksi">
-                                                        <Trash2 size={12} />
+                                                    <button onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }} className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition-colors" title="Detail Transaksi">
+                                                        <Eye size={14} />
+                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }} className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition-colors" title="Hapus Transaksi">
+                                                        <Trash2 size={14} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -2478,8 +2567,8 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                     ))}
                                     {visibleTransactions.length < filteredTransactions.length && (
                                         <tr>
-                                            <td colSpan={6} className="p-4 text-center text-slate-400">
-                                                <div ref={loadMoreRef}>Loading more...</div>
+                                            <td colSpan={9} className="p-4 text-center text-slate-400">
+                                                <div ref={loadMoreRef}>Memuat transaksi berikutnya...</div>
                                             </td>
                                         </tr>
                                     )}

@@ -217,6 +217,11 @@ export const StorageService = {
     notifyListeners('stock_adjustments');
     notifyListeners('products'); // Stock changed
   },
+  deleteStockAdjustment: async (adjustment: any) => {
+    await ApiService.deleteStockAdjustment(adjustment);
+    notifyListeners('stock_adjustments');
+    notifyListeners('products'); // Stock changed
+  },
 
   // Users
   getUsers: async (): Promise<User[]> => {

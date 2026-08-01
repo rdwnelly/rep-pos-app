@@ -114,6 +114,7 @@ export interface Transaction {
   bankName?: string; // New: Snapshot of bank name
   customerId?: string; // Optional link to registered customer
   customerName: string; // Required for debt (snapshotted or manual)
+  customerPhone?: string; // Snapshot of customer phone number
   customerAddress?: string; // New: Snapshot of customer address
   cashierId: string;
   cashierName: string;

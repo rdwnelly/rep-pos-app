@@ -344,6 +344,17 @@ export const FirestoreService = {
     
     await batch.commit();
   },
+  deleteStockAdjustment: async (adjustment: StockAdjustment) => {
+    const batch = writeBatch(db);
+    const ref = doc(collectionRef("stock_adjustments"), adjustment.id);
+    batch.delete(ref);
+
+    const productRef = doc(collectionRef("products"), adjustment.productId);
+    const delta = adjustment.type === "INCREASE" ? -adjustment.qty : adjustment.qty;
+    batch.update(productRef, { stock: increment(delta) });
+
+    await batch.commit();
+  },
 
   getUsers: async (): Promise<User[]> => getCollection<User>("users"),
   saveUser: async (user: User) => saveEntity<User>("users", user),

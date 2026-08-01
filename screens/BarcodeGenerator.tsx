@@ -127,91 +127,232 @@ export const BarcodeGenerator: React.FC = () => {
         printWindow.document.close();
     };
 
+    const handleSelectAllFiltered = () => {
+        const newQueue = [...selectedProducts];
+        filteredProducts.forEach(p => {
+            if (!newQueue.some(item => item.product.id === p.id)) {
+                newQueue.push({ product: p, count: 1 });
+            }
+        });
+        setSelectedProducts(newQueue);
+    };
+
+    const handleClearQueue = () => {
+        if (selectedProducts.length === 0) return;
+        if (confirm('Kosongkan semua antrian cetak barcode?')) {
+            setSelectedProducts([]);
+        }
+    };
+
+    const totalLabelsCount = React.useMemo(() => {
+        return selectedProducts.reduce((acc, curr) => acc + curr.count, 0);
+    }, [selectedProducts]);
+
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div>
-                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                    <Barcode className="text-primary" />
-                    Cetak Barcode
-                </h2>
-                <p className="text-slate-500 text-sm mt-1">Pilih produk untuk dicetak barcodenya.</p>
+        <div className="space-y-6 animate-fade-in p-2 md:p-0">
+            {/* Header Bar */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <Barcode className="text-amber-600" />
+                        Cetak Label & Barcode Produk
+                    </h1>
+                    <p className="text-slate-500 text-sm mt-1">Pilih produk dari katalog, atur kuantitas cetak label, dan cetak secara massal</p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                    {selectedProducts.length > 0 && (
+                        <button
+                            onClick={handleClearQueue}
+                            className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-700 px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-rose-100 transition-all"
+                        >
+                            <X size={15} /> Kosongkan Antrian
+                        </button>
+                    )}
+                    <button
+                        onClick={handlePrint}
+                        disabled={selectedProducts.length === 0}
+                        className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md"
+                    >
+                        <Printer size={16} /> Cetak {totalLabelsCount > 0 ? `${totalLabelsCount} Label` : ''}
+                    </button>
+                </div>
             </div>
 
+            {/* Metric Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Produk Katalog</p>
+                        <h3 className="text-lg font-extrabold text-slate-900 mt-1">{products.length} <span className="text-xs font-normal text-slate-400">item</span></h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{filteredProducts.length} Tampil Hasil Filter</p>
+                    </div>
+                    <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                        <Barcode size={22} />
+                    </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Produk Antrian Cetak</p>
+                        <h3 className="text-lg font-extrabold text-amber-600 mt-1">{selectedProducts.length} <span className="text-xs font-normal text-slate-400">jenis</span></h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Produk Dipilih</p>
+                    </div>
+                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                        <Printer size={22} />
+                    </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Stiker Label</p>
+                        <h3 className="text-lg font-extrabold text-emerald-600 mt-1">{totalLabelsCount} <span className="text-xs font-normal text-slate-400">lembar</span></h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Siap Dicetak</p>
+                    </div>
+                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                        <Barcode size={22} />
+                    </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Format Kertas</p>
+                        <h3 className="text-base font-extrabold text-purple-700 mt-1">A4 Sticker Grid</h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">CODE128 Auto Layout</p>
+                    </div>
+                    <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
+                        <Printer size={22} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Product Selection */}
-                <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                    <div className="relative mb-4">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <label htmlFor="productSearch" className="sr-only">Cari produk...</label>
-                        <input
-                            id="productSearch"
-                            name="productSearch"
-                            type="text"
-                            placeholder="Cari produk..."
-                            className="w-full pl-10 pr-10 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                        />
-                        {searchQuery && (
+                {/* Product Catalog Picker */}
+                <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col h-[620px]">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                        <div className="relative flex-1 w-full">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            <input
+                                id="productSearch"
+                                name="productSearch"
+                                type="text"
+                                placeholder="Cari nama produk atau kode SKU / Barcode..."
+                                className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-xs text-slate-800"
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                                    title="Hapus pencarian"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+
+                        {filteredProducts.length > 0 && (
                             <button
-                                onClick={() => setSearchQuery('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full p-1"
-                                title="Hapus pencarian"
+                                onClick={handleSelectAllFiltered}
+                                className="px-3.5 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-xl text-xs font-bold shrink-0 transition-colors"
                             >
-                                <X size={14} />
+                                + Pilih Semua ({filteredProducts.length})
                             </button>
                         )}
                     </div>
 
-                    <div className="h-[500px] overflow-y-auto pr-2 space-y-2">
-                        {filteredProducts.map(p => (
-                            <div key={p.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-lg hover:bg-slate-50">
-                                <div>
-                                    <div className="font-medium text-slate-800">{p.name}</div>
-                                    <div className="text-xs text-slate-500">SKU: {p.sku} | Stok: {p.stock} {p.unit || 'Pcs'}</div>
-                                </div>
-                                <button
-                                    onClick={() => handleAddProduct(p)}
-                                    className="px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-sm font-medium hover:bg-primary/20"
-                                >
-                                    Tambah
-                                </button>
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-2.5">
+                        {filteredProducts.length === 0 ? (
+                            <div className="text-center text-slate-400 py-16 text-xs">
+                                Tidak ada produk ditemukan.
                             </div>
-                        ))}
+                        ) : (
+                            filteredProducts.map(p => {
+                                const inQueue = selectedProducts.find(item => item.product.id === p.id);
+                                return (
+                                    <div key={p.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-xl hover:border-amber-200 hover:bg-slate-50/80 transition-all">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 font-bold shrink-0">
+                                                <Barcode size={18} />
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-slate-800 text-xs">{p.name}</div>
+                                                <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
+                                                    <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-bold">{p.sku}</span>
+                                                    <span>•</span>
+                                                    <span>Stok: {p.stock} {p.unit || 'Pcs'}</span>
+                                                    <span>•</span>
+                                                    <span className="font-bold text-amber-700">{formatIDR(p.price)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={() => handleAddProduct(p)}
+                                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                                                inQueue
+                                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                                    : 'bg-amber-600 text-white hover:bg-amber-700 shadow-sm'
+                                            }`}
+                                        >
+                                            {inQueue ? `+1 (${inQueue.count})` : 'Tambah'}
+                                        </button>
+                                    </div>
+                                );
+                            })
+                        )}
                     </div>
                 </div>
 
-                {/* Print Queue */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-[600px]">
-                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <Printer size={18} /> Antrian Cetak
-                    </h3>
+                {/* Print Queue Container */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col h-[620px]">
+                    <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                        <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                            <Printer size={16} className="text-amber-600" /> Antrian Cetak Label
+                        </h3>
+                        <span className="text-xs font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                            {totalLabelsCount} Label
+                        </span>
+                    </div>
 
-                    <div className="flex-1 overflow-y-auto space-y-3 pr-2 mb-4">
+                    <div className="flex-1 overflow-y-auto space-y-3 pr-1">
                         {selectedProducts.length === 0 ? (
-                            <div className="text-center text-slate-400 py-10 text-sm">
-                                Belum ada produk dipilih.
+                            <div className="text-center text-slate-400 py-20 text-xs">
+                                Belum ada produk dipilih.<br />Klik <strong>Tambah</strong> pada produk untuk masuk antrian.
                             </div>
                         ) : (
                             selectedProducts.map((item) => (
-                                <div key={item.product.id} className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className="font-medium text-sm text-slate-800 line-clamp-1">{item.product.name}</span>
-                                        <button onClick={() => handleRemoveProduct(item.product.id)} className="text-slate-400 hover:text-red-500">
-                                            <X size={16} />
+                                <div key={item.product.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <span className="font-bold text-xs text-slate-800 block line-clamp-1">{item.product.name}</span>
+                                            <span className="text-[10px] font-mono text-slate-500">{item.product.sku} | {formatIDR(item.product.price)}</span>
+                                        </div>
+                                        <button onClick={() => handleRemoveProduct(item.product.id)} className="p-1 text-slate-400 hover:text-rose-600 transition-colors">
+                                            <X size={15} />
                                         </button>
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-slate-500">{item.product.sku}</span>
-                                        <div className="flex items-center gap-2">
+
+                                    {/* Label Quantity Controls */}
+                                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
+                                        <span className="text-[11px] font-medium text-slate-500">Jumlah Cetak:</span>
+                                        <div className="flex items-center gap-1.5">
                                             <button
                                                 onClick={() => handleUpdateCount(item.product.id, item.count - 1)}
-                                                className="w-6 h-6 flex items-center justify-center bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-100"
+                                                className="w-6 h-6 flex items-center justify-center bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-bold shadow-sm"
                                             >-</button>
-                                            <span className="text-sm font-medium w-8 text-center">{item.count}</span>
+                                            <input
+                                                type="number"
+                                                className="w-10 text-center font-bold text-xs bg-white border border-slate-300 rounded-lg py-0.5 outline-none"
+                                                value={item.count}
+                                                onChange={(e) => handleUpdateCount(item.product.id, parseInt(e.target.value) || 1)}
+                                                min={1}
+                                            />
                                             <button
                                                 onClick={() => handleUpdateCount(item.product.id, item.count + 1)}
-                                                className="w-6 h-6 flex items-center justify-center bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-100"
+                                                className="w-6 h-6 flex items-center justify-center bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-bold shadow-sm"
                                             >+</button>
                                         </div>
                                     </div>
@@ -221,16 +362,16 @@ export const BarcodeGenerator: React.FC = () => {
                     </div>
 
                     <div className="pt-4 border-t border-slate-100">
-                        <div className="flex justify-between mb-4 text-sm font-medium text-slate-600">
-                            <span>Total Label:</span>
-                            <span>{selectedProducts.reduce((acc, curr) => acc + curr.count, 0)}</span>
+                        <div className="flex justify-between mb-3 text-xs font-bold text-slate-700">
+                            <span>Total Kuantitas Label:</span>
+                            <span className="text-amber-700 font-extrabold">{totalLabelsCount} Stiker</span>
                         </div>
                         <button
                             onClick={handlePrint}
                             disabled={selectedProducts.length === 0}
-                            className="w-full py-2.5 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="w-full py-2.5 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md transition-all text-xs"
                         >
-                            <Printer size={18} /> Cetak Barcode
+                            <Printer size={16} /> Cetak {totalLabelsCount} Label Barcode
                         </button>
                     </div>
                 </div>
