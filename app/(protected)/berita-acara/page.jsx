@@ -46,19 +46,42 @@ const FIXED_EXPENSE_CATEGORIES = BASE_SALES_CATEGORIES;
 
 const DEFAULT_CATEGORY_OPTIONS = BASE_SALES_CATEGORIES.map((cat, idx) => `${idx + 1}) ${cat}`);
 
+const DETAILED_EXPENSE_CONFIG = [
+    { title: "VI. URAIAN PENGELUARAN (Tiket Masuk)", rows: 10 },
+    { title: "VI. URAIAN PENGELUARAN (Sewa Kostum)", rows: 10 },
+    { title: "VI. URAIAN PENGELUARAN (Toko / Souvenir)", rows: 10 },
+    { title: "VI. URAIAN PENGELUARAN (Pembelanjaan Café)", rows: 21 },
+    { title: "VI. URAIAN PENGELUARAN (Biaya Kios)", rows: 10 },
+    { title: "VI. URAIAN PENGELUARAN (Paket Sopendo / Saswar / Edukasi)", rows: 5 },
+    { title: "VI. URAIAN PENGELUARAN (Jasa Fotografer)", rows: 5 },
+    { title: "VI. URAIAN PENGELUARAN (Sewa kostum keluar)", rows: 5 },
+    { title: "VI. URAIAN PENGELUARAN (REPARASI)", rows: 3 },
+    { title: "VI. URAIAN PENGELUARAN (Transportasi)", rows: 2 },
+    { title: "VI. URAIAN PENGELUARAN (Listrik)", rows: 2 },
+    { title: "VI. URAIAN PENGELUARAN (Makan Siang Karyawan)", rows: 4 },
+    { title: "VI. URAIAN PENGELUARAN (Perlengkapan)", rows: 1 },
+    { title: "VI. URAIAN PENGELUARAN (Panjar)", rows: 1 },
+    { title: "VI. URAIAN PENGELUARAN (Lain-lain)", rows: 5 }
+];
+
 // Helper to map category dropdown to the correct printable table
 const mapCategoryToSection = (cat) => {
     if (!cat) return "VI. URAIAN PENGELUARAN (Lain-lain)";
-    if (cat.includes("CAFÉ")) return "VI. URAIAN PENGELUARAN (Pembelanjaan Café)";
-    if (cat.includes("REPARASI")) return "VI. URAIAN PENGELUARAN (REPARASI)";
-    if (cat.includes("TRANSPORTASI")) return "VI. URAIAN PENGELUARAN (Transportasi)";
-    if (cat.includes("LISTRIK")) return "VI. URAIAN PENGELUARAN (Listrik)";
-    if (cat.includes("KIOS")) return "VI. URAIAN PENGELUARAN (Biaya Kios)";
+    if (cat.includes("Tiket")) return "VI. URAIAN PENGELUARAN (Tiket Masuk)";
+    if (cat.includes("Sewa Kostum") || cat.includes("Kostum")) return "VI. URAIAN PENGELUARAN (Sewa Kostum)";
+    if (cat.includes("Toko") || cat.includes("Souvenir") || cat.includes("Sovenir")) return "VI. URAIAN PENGELUARAN (Toko / Souvenir)";
+    if (cat.includes("CAFÉ") || cat.includes("Kafe") || cat.includes("Resto")) return "VI. URAIAN PENGELUARAN (Pembelanjaan Café)";
+    if (cat.includes("KIOS") || cat.includes("Kios")) return "VI. URAIAN PENGELUARAN (Biaya Kios)";
+    if (cat.includes("Sopendo") || cat.includes("Saswar") || cat.includes("Edukasi")) return "VI. URAIAN PENGELUARAN (Paket Sopendo / Saswar / Edukasi)";
+    if (cat.includes("Fotografer") || cat.includes("Foto")) return "VI. URAIAN PENGELUARAN (Jasa Fotografer)";
+    if (cat.includes("Sewa kostum keluar")) return "VI. URAIAN PENGELUARAN (Sewa kostum keluar)";
+    if (cat.includes("REPARASI") || cat.includes("Reparasi")) return "VI. URAIAN PENGELUARAN (REPARASI)";
+    if (cat.includes("TRANSPORTASI") || cat.includes("Transportasi")) return "VI. URAIAN PENGELUARAN (Transportasi)";
+    if (cat.includes("LISTRIK") || cat.includes("Listrik")) return "VI. URAIAN PENGELUARAN (Listrik)";
     if (cat.includes("Makan Siang")) return "VI. URAIAN PENGELUARAN (Makan Siang Karyawan)";
-    if (cat.includes("SOVENIR")) return "VI. URAIAN PENGELUARAN (Sovenir)";
-    if (cat.includes("PERLENGKAPAN")) return "VI. URAIAN PENGELUARAN (Perlengkapan)";
-    if (cat.includes("PANJAR")) return "VI. URAIAN PENGELUARAN (Panjar)";
-    if (cat.includes("LAIN-LAIN")) return "VI. URAIAN PENGELUARAN (Lain-lain)";
+    if (cat.includes("PERLENGKAPAN") || cat.includes("Perlengkapan")) return "VI. URAIAN PENGELUARAN (Perlengkapan)";
+    if (cat.includes("PANJAR") || cat.includes("Panjar")) return "VI. URAIAN PENGELUARAN (Panjar)";
+    if (cat.includes("LAIN-LAIN") || cat.includes("Lain-lain")) return "VI. URAIAN PENGELUARAN (Lain-lain)";
     const cleaned = cat.replace(/^\d+\)\s*/, '');
     return `VI. URAIAN PENGELUARAN (${cleaned})`;
 };
@@ -595,23 +618,36 @@ export default function BeritaAcaraPage() {
         setExpenseRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: val } : row));
     };
 
-    // Custom Categories State & Management
+    // Custom Categories State & Management - disamakan dengan kategori Sumber Pendapatan
     const [categoryOptions, setCategoryOptions] = useState(() => {
+        const defaultList = BASE_SALES_CATEGORIES.map((cat, idx) => `${idx + 1}) ${cat}`);
         if (typeof window !== 'undefined') {
             try {
                 const saved = localStorage.getItem('custom_expense_categories');
                 if (saved) {
                     const parsed = JSON.parse(saved);
-                    if (Array.isArray(parsed)) {
-                        return parsed;
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        const hasOldLegacy = parsed.some(c => c.includes("CAFÉ") || c.includes("REPARASI") || c.includes("LISTRIK PLN") || c.includes("PANJAR"));
+                        if (!hasOldLegacy) {
+                            return parsed;
+                        }
                     }
                 }
             } catch (e) {
                 console.error('Error loading custom expense categories:', e);
             }
         }
-        return DEFAULT_CATEGORY_OPTIONS;
+        return defaultList;
     });
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('custom_expense_categories');
+            if (!saved) {
+                setCategoryOptions(allSalesCategories.map((cat, idx) => `${idx + 1}) ${cat}`));
+            }
+        }
+    }, [allSalesCategories]);
 
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [newCatInput, setNewCatInput] = useState("");
@@ -651,8 +687,9 @@ export default function BeritaAcaraPage() {
     };
 
     const handleResetCategories = () => {
-        if (confirm("Kembalikan daftar kategori pengeluaran ke kategori bawaan awal?")) {
-            setCategoryOptions(DEFAULT_CATEGORY_OPTIONS);
+        if (confirm("Kembalikan daftar kategori pengeluaran ke kategori bawaan (Sumber Pendapatan)?")) {
+            const defaultList = allSalesCategories.map((cat, idx) => `${idx + 1}) ${cat}`);
+            setCategoryOptions(defaultList);
             try {
                 localStorage.removeItem('custom_expense_categories');
             } catch (e) {
@@ -729,62 +766,146 @@ export default function BeritaAcaraPage() {
     const netto = totalSalesTunai - totalPengeluaran;
 
     return (
-        <div className="min-h-screen print:min-h-0 print:h-auto print:overflow-visible bg-gray-100 p-2 md:p-4 lg:p-8 print:bg-white print:p-0">
-            <div className="flex flex-wrap gap-4 mb-6 print:hidden">
-                <button 
-                    onClick={() => { setActiveTab('input'); setViewingArchive(null); }} 
-                    className={`px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all ${activeTab === 'input' ? 'bg-primary text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
-                >
-                    <Plus size={18} /> Input Baru
-                </button>
-                <button 
-                    onClick={() => setActiveTab('archives')} 
-                    className={`px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all ${activeTab === 'archives' ? 'bg-primary text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
-                >
-                    <Archive size={18} /> Daftar Arsip
-                </button>
+        <div className="min-h-screen print:min-h-0 print:h-auto print:overflow-visible bg-slate-100 p-2 md:p-6 lg:p-8 print:bg-white print:p-0">
+            {/* Header Title & Navigation Bar (Hidden on Print) */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4 mb-6 print:hidden">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <FileText className="text-amber-600" />
+                        Berita Acara & Laporan Setoran Sesi
+                    </h1>
+                    <p className="text-slate-500 text-sm mt-1">Rekapitulasi resmi pendapatan penjualan, pengeluaran operasional, dan setoran kasir</p>
+                </div>
+
+                <div className="flex gap-2 py-1 px-1 bg-white border border-slate-200 rounded-xl shadow-sm">
+                    <button
+                        onClick={() => { setActiveTab('input'); setViewingArchive(null); }}
+                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-lg transition-all ${
+                            activeTab === 'input' && !viewingArchive
+                                ? 'bg-amber-600 text-white shadow-md'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                        }`}
+                    >
+                        <Plus size={15} /> Form Berita Acara
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('archives')}
+                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-lg transition-all ${
+                            activeTab === 'archives' || viewingArchive
+                                ? 'bg-amber-600 text-white shadow-md'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                        }`}
+                    >
+                        <Archive size={15} /> Daftar Arsip ({archives.length})
+                    </button>
+                </div>
             </div>
 
+            {/* Metric Summary Cards Banner (Hidden on Print) */}
+            {activeTab === 'input' && !viewingArchive && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 mb-6 print:hidden">
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Penjualan Tunai</p>
+                            <h3 className="text-lg font-extrabold text-slate-900 mt-1">Rp {totalSalesTunai.toLocaleString('id-ID')}</h3>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Penerimaan Tunai Kasir</p>
+                        </div>
+                        <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                            <FileText size={22} />
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Non-Tunai / QR</p>
+                            <h3 className="text-lg font-extrabold text-purple-700 mt-1">Rp {totalSalesQR.toLocaleString('id-ID')}</h3>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Transfer & QRIS Bank</p>
+                        </div>
+                        <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
+                            <Info size={22} />
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Pendapatan Kotor</p>
+                            <h3 className="text-lg font-extrabold text-emerald-600 mt-1">Rp {totalAllSales.toLocaleString('id-ID')}</h3>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Tunai + Non-Tunai</p>
+                        </div>
+                        <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                            <CheckCircle2 size={22} />
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pengeluaran Sesi</p>
+                            <h3 className="text-lg font-extrabold text-rose-600 mt-1">Rp {totalPengeluaran.toLocaleString('id-ID')}</h3>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Operasional Kasir</p>
+                        </div>
+                        <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                            <Trash2 size={22} />
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Setoran Bersih (Netto)</p>
+                            <h3 className="text-lg font-extrabold text-amber-700 mt-1">Rp {netto.toLocaleString('id-ID')}</h3>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Tunai Dikurangi Pengeluaran</p>
+                        </div>
+                        <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                            <Save size={22} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {activeTab === 'archives' && !viewingArchive && (
-                <div className="bg-white p-6 rounded-xl shadow-md print:hidden">
-                    <h2 className="text-xl font-bold mb-4 text-gray-800 border-b pb-3">Daftar Arsip Rekapan Berita Acara</h2>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 print:hidden">
+                    <h2 className="text-lg font-bold mb-4 text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2">
+                        <Archive size={18} className="text-amber-600" />
+                        Daftar Arsip Rekapan Berita Acara
+                    </h2>
                     {archives.length === 0 ? (
-                        <p className="text-gray-500 py-8 text-center italic">Belum ada arsip yang tersimpan.</p>
+                        <p className="text-slate-400 py-12 text-center text-xs italic">Belum ada arsip Berita Acara yang tersimpan.</p>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-gray-50 text-gray-600 text-sm">
-                                        <th className="p-3 border-b font-semibold">Tanggal Arsip</th>
-                                        <th className="p-3 border-b font-semibold">Judul</th>
-                                        <th className="p-3 border-b font-semibold">Total Pendapatan</th>
-                                        <th className="p-3 border-b font-semibold">Total Pengeluaran</th>
-                                        <th className="p-3 border-b font-semibold text-center">Aksi</th>
+                            <table className="w-full text-left text-xs border-collapse">
+                                <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-100">
+                                    <tr>
+                                        <th className="p-3.5">Tanggal Arsip</th>
+                                        <th className="p-3.5">Judul Berita Acara</th>
+                                        <th className="p-3.5">Total Pendapatan</th>
+                                        <th className="p-3.5">Total Pengeluaran</th>
+                                        <th className="p-3.5 text-center">Aksi Dokumen</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody className="divide-y divide-slate-100">
                                     {archives.map(arch => (
-                                        <tr key={arch.id} className="hover:bg-gray-50 transition-colors border-b last:border-b-0">
-                                            <td className="p-3 text-sm text-gray-800">{new Date(arch.date).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}</td>
-                                            <td className="p-3 font-medium text-gray-800">{arch.title}</td>
-                                            <td className="p-3 text-emerald-600 font-bold">Rp {arch.totalIncome?.toLocaleString('id-ID')}</td>
-                                            <td className="p-3 text-red-600 font-bold">Rp {arch.totalExpense?.toLocaleString('id-ID')}</td>
-                                            <td className="p-3 text-center">
-                                                <div className="flex justify-center gap-1.5 flex-wrap">
-                                                    <button onClick={() => setViewingArchive(arch)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors tooltip" title="Lihat Detail">
-                                                        <Eye size={16} />
+                                        <tr key={arch.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
+                                                {new Date(arch.date).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}
+                                            </td>
+                                            <td className="p-3.5 font-bold text-slate-800">{arch.title}</td>
+                                            <td className="p-3.5 text-emerald-600 font-extrabold whitespace-nowrap">Rp {arch.totalIncome?.toLocaleString('id-ID')}</td>
+                                            <td className="p-3.5 text-rose-600 font-extrabold whitespace-nowrap">Rp {arch.totalExpense?.toLocaleString('id-ID')}</td>
+                                            <td className="p-3.5 text-center whitespace-nowrap">
+                                                <div className="flex justify-center gap-1.5">
+                                                    <button onClick={() => setViewingArchive(arch)} className="px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-semibold border border-amber-200 flex items-center gap-1" title="Lihat Detail">
+                                                        <Eye size={13} /> Lihat
                                                     </button>
-                                                    <button onClick={() => handleArchiveDownloadPdf(arch)} disabled={isGeneratingPdf} className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 disabled:opacity-50 rounded-lg transition-colors tooltip" title="Download PDF">
-                                                        {isGeneratingPdf && viewingArchive?.id === arch.id ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                                                    <button onClick={() => handleArchiveDownloadPdf(arch)} disabled={isGeneratingPdf} className="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-[11px] font-semibold border border-blue-200 flex items-center gap-1" title="Download PDF">
+                                                        {isGeneratingPdf && viewingArchive?.id === arch.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} PDF
                                                     </button>
-                                                    <button onClick={() => handleArchivePrint(arch)} className="p-2 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg transition-colors tooltip" title="Cetak Dokumen">
-                                                        <Printer size={16} />
+                                                    <button onClick={() => handleArchivePrint(arch)} className="px-2 py-1 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-lg text-[11px] font-semibold border border-slate-200 flex items-center gap-1" title="Cetak Dokumen">
+                                                        <Printer size={13} /> Cetak
                                                     </button>
-                                                    <button onClick={() => handleArchiveShareWhatsApp(arch)} disabled={isGeneratingPdf} className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 disabled:opacity-50 rounded-lg transition-colors tooltip" title="Kirim WhatsApp">
-                                                        <WhatsAppIcon size={16} />
+                                                    <button onClick={() => handleArchiveShareWhatsApp(arch)} disabled={isGeneratingPdf} className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold border border-emerald-200 flex items-center gap-1" title="Kirim WA">
+                                                        <WhatsAppIcon size={13} /> WA
                                                     </button>
-                                                    <button onClick={() => handleDeleteArchive(arch.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors tooltip" title="Hapus Arsip">
-                                                        <Trash2 size={16} />
+                                                    <button onClick={() => handleDeleteArchive(arch.id)} className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg" title="Hapus Arsip">
+                                                        <Trash2 size={15} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -800,22 +921,22 @@ export default function BeritaAcaraPage() {
             {(activeTab === 'input' || viewingArchive) && (
                 <>
                 {viewingArchive && (
-                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden shadow-sm">
+                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden shadow-sm">
                         <div>
-                            <h3 className="font-bold text-amber-800 flex items-center gap-2"><Eye size={18} /> Sedang Melihat Arsip: {viewingArchive.title}</h3>
-                            <p className="text-sm text-amber-700 mt-1">Anda dalam mode Read-Only. Untuk mengubah data, silakan kembali ke tab Input Baru.</p>
+                            <h3 className="font-bold text-amber-900 flex items-center gap-2 text-sm"><Eye size={18} /> Sedang Melihat Arsip: {viewingArchive.title}</h3>
+                            <p className="text-xs text-amber-700 mt-1">Mode Read-Only. Untuk mengubah data, silakan kembali ke tab Form Berita Acara.</p>
                         </div>
                         <div className="flex flex-wrap gap-2 items-center shrink-0">
-                            <button onClick={handleDownloadPdf} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
+                            <button onClick={handleDownloadPdf} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
                                 {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Download PDF
                             </button>
-                            <button onClick={handleShareWhatsApp} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
+                            <button onClick={handleShareWhatsApp} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
                                 {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />} Kirim WhatsApp
                             </button>
-                            <button onClick={handlePrint} className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
+                            <button onClick={handlePrint} className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
                                 <Printer size={14}/> Cetak
                             </button>
-                            <button onClick={() => setViewingArchive(null)} className="p-2 bg-amber-200 hover:bg-amber-300 text-amber-800 rounded-lg transition-colors">
+                            <button onClick={() => setViewingArchive(null)} className="p-2 bg-amber-200 hover:bg-amber-300 text-amber-800 rounded-xl transition-colors">
                                 <X size={18}/>
                             </button>
                         </div>
@@ -823,84 +944,87 @@ export default function BeritaAcaraPage() {
                 )}
 
             {/* Control Panel (Hidden on Print) */}
-            <div className="bg-white p-6 rounded-xl shadow-md mb-8 print:hidden flex flex-wrap gap-4 items-end">
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 mb-6 print:hidden flex flex-wrap gap-4 items-end text-xs">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Tanggal Laporan</label>
                     <input
                         type="date"
                         value={tanggal}
                         onChange={(e) => setTanggal(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                        className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none font-semibold text-slate-800"
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Periode</label>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Periode Sesi</label>
                     <input
                         type="text"
                         value={periode}
                         onChange={(e) => setPeriode(e.target.value)}
-                        placeholder="Contoh: 1 - 7 Juli 2026"
-                        className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                        placeholder="Cth: 1 - 7 Juli 2026"
+                        className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-slate-800 font-medium min-w-[200px]"
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nama Kasir</label>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Nama Kasir</label>
                     <input
                         type="text"
                         value={kasir}
                         onChange={(e) => setKasir(e.target.value)}
-                        placeholder="Nama Kasir"
-                        className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                        placeholder="Nama Kasir Tugas"
+                        className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-slate-800 font-medium"
                     />
                 </div>
                 <div className="ml-auto flex flex-wrap gap-2 sm:gap-3 items-center">
                     {autoSaveStatus === "saving" && (
-                        <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg flex items-center gap-1.5 font-medium animate-pulse">
+                        <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl flex items-center gap-1.5 font-semibold animate-pulse">
                             <Loader2 size={14} className="animate-spin text-amber-600" /> Menyimpan Otomatis...
                         </span>
                     )}
                     {autoSaveStatus === "saved" && (
-                        <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg flex items-center gap-1.5 font-medium">
+                        <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl flex items-center gap-1.5 font-semibold">
                             <CheckCircle2 size={14} className="text-emerald-600" /> Otomatis Tersimpan ke Arsip
                         </span>
                     )}
                     <button
                         onClick={handleDownloadPdf}
                         disabled={isGeneratingPdf}
-                        className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-md flex items-center gap-2 text-sm"
+                        className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-4 py-2 rounded-xl font-bold transition-colors shadow-md flex items-center gap-1.5 text-xs"
                     >
-                        {isGeneratingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} 
+                        {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} 
                         Download PDF
                     </button>
                     <button
                         onClick={handleShareWhatsApp}
                         disabled={isGeneratingPdf}
-                        className="bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-md flex items-center gap-2 text-sm"
+                        className="bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white px-4 py-2 rounded-xl font-bold transition-colors shadow-md flex items-center gap-1.5 text-xs"
                     >
-                        {isGeneratingPdf ? <Loader2 size={16} className="animate-spin" /> : <WhatsAppIcon size={16} />} 
-                        Kirim WhatsApp
+                        {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />} 
+                        Kirim WA
                     </button>
                     <button
                         onClick={handlePrint}
-                        className="bg-amber-700 hover:bg-amber-800 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-md flex items-center gap-2 text-sm"
+                        className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl font-bold transition-colors shadow-md flex items-center gap-1.5 text-xs"
                     >
-                        <Printer size={16} /> Cetak
+                        <Printer size={14} /> Cetak
                     </button>
                 </div>
             </div>
 
             {/* Modern Expense Input Section (Hidden on Print) */}
-            <div className="bg-white p-6 rounded-xl shadow-md mb-8 print:hidden border-t-4 border-amber-600">
+            <div className="bg-white p-5 rounded-2xl shadow-sm mb-6 print:hidden border border-slate-200">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
                     <div>
-                        <h3 className="text-lg font-bold text-gray-800">Input Rincian Pengeluaran</h3>
-                        <p className="text-sm text-gray-500">Tabel ini akan otomatis mengisi tabel rincian (Halaman 2) dan laporan utama (Halaman 1) di format cetak.</p>
+                        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                            <FileText size={16} className="text-amber-600" />
+                            Input Rincian Pengeluaran Operasional
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">Tabel ini otomatis merekapitulasi uraian pengeluaran pada cetakan Berita Acara.</p>
                     </div>
                     <button
                         onClick={() => setShowCategoryModal(true)}
-                        className="flex items-center gap-2 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-3.5 py-2 rounded-lg transition-colors shadow-sm shrink-0"
+                        className="flex items-center gap-1.5 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-3.5 py-2 rounded-xl transition-colors shadow-sm shrink-0"
                     >
-                        <FolderPlus size={16} className="text-amber-700" /> Kelola / Tambah Kategori
+                        <FolderPlus size={15} className="text-amber-700" /> Kelola Kategori Pengeluaran
                     </button>
                 </div>
                 
@@ -1194,10 +1318,20 @@ export default function BeritaAcaraPage() {
                                         );
                                     })}
                                     <tr className="bg-[#f5e6d3] font-bold">
-                                        <td colSpan={2} className="text-right">TOTAL (TUNAI)</td>
+                                        <td colSpan={2} className="text-right">TOTAL PENJUALAN (TUNAI)</td>
                                         <td className="text-right">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
                                         <td className="text-right text-red-700">Rp {totalHppTunai.toLocaleString('id-ID')}</td>
                                         <td className="text-right text-green-700">Rp {totalProfitTunai.toLocaleString('id-ID')}</td>
+                                    </tr>
+                                    <tr className="bg-red-50/80 font-semibold text-red-700 text-xs">
+                                        <td colSpan={2} className="text-right">DIPOTONG PENGELUARAN (V)</td>
+                                        <td className="text-right font-bold text-red-700">- Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
+                                        <td colSpan={2} className="text-gray-500 font-normal italic text-[9px] text-center">Terpotong Otomatis</td>
+                                    </tr>
+                                    <tr className="bg-emerald-100 font-bold text-emerald-900">
+                                        <td colSpan={2} className="text-right">SETORAN TUNAI BERSIH (NETTO)</td>
+                                        <td className="text-right text-emerald-800 text-xs font-bold">Rp {netto.toLocaleString('id-ID')}</td>
+                                        <td colSpan={2} className="text-right text-[10px] text-emerald-700">Uang Kasir</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1285,15 +1419,15 @@ export default function BeritaAcaraPage() {
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td className="w-3/5 text-gray-700">Penjualan Tunai</td>
+                                            <td className="w-3/5 text-gray-700">Penjualan Tunai (II)</td>
                                             <td className="w-2/5 text-right font-medium">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
                                         </tr>
                                         <tr>
-                                            <td className="text-gray-700">Penjualan QR</td>
+                                            <td className="text-gray-700">Penjualan QR (III)</td>
                                             <td className="text-right font-medium">Rp {totalSalesQR.toLocaleString('id-ID')}</td>
                                         </tr>
                                         <tr className="bg-amber-50/60 font-bold text-amber-900">
-                                            <td>TOTAL PEMASUKAN</td>
+                                            <td>TOTAL PEMASUKAN (BRUTO)</td>
                                             <td className="text-right">Rp {totalAllSales.toLocaleString('id-ID')}</td>
                                         </tr>
                                     </tbody>
@@ -1315,9 +1449,13 @@ export default function BeritaAcaraPage() {
                                             <td className="text-gray-700">Total HPP (Modal)</td>
                                             <td className="text-right font-medium text-red-600">Rp {(totalHppTunai + totalHppQR).toLocaleString('id-ID')}</td>
                                         </tr>
+                                        <tr>
+                                            <td className="text-gray-700">Dipotong Pengeluaran (V)</td>
+                                            <td className="text-right font-medium text-red-600">- Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
+                                        </tr>
                                         <tr className="bg-green-50/60 font-bold text-green-700">
-                                            <td>KEUNTUNGAN</td>
-                                            <td className="text-right">Rp {((totalSalesTunai + totalSalesQR) - (totalHppTunai + totalHppQR)).toLocaleString('id-ID')}</td>
+                                            <td>KEUNTUNGAN BERSIH (NETTO)</td>
+                                            <td className="text-right">Rp {((totalSalesTunai + totalSalesQR) - (totalHppTunai + totalHppQR) - totalPengeluaran).toLocaleString('id-ID')}</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -1331,16 +1469,16 @@ export default function BeritaAcaraPage() {
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td className="w-3/5 text-gray-700">Penjualan Tunai</td>
+                                            <td className="w-3/5 text-gray-700">Penjualan Tunai (II)</td>
                                             <td className="w-2/5 text-right font-medium">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
                                         </tr>
                                         <tr>
-                                            <td className="text-gray-700">Pengeluaran</td>
-                                            <td className="text-right font-medium text-red-600">Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
+                                            <td className="text-gray-700">Dipotong Pengeluaran (V)</td>
+                                            <td className="text-right font-medium text-red-600">- Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
                                         </tr>
-                                        <tr className="bg-slate-100 font-bold text-slate-900">
-                                            <td>NETTO (UANG KASIR)</td>
-                                            <td className="text-right text-emerald-700">Rp {netto.toLocaleString('id-ID')}</td>
+                                        <tr className="bg-emerald-100 font-bold text-slate-900">
+                                            <td>NETTO (UANG FISIK KASIR)</td>
+                                            <td className="text-right text-emerald-800 font-extrabold text-[11px]">Rp {netto.toLocaleString('id-ID')}</td>
                                         </tr>
                                     </tbody>
                                 </table>

@@ -76,7 +76,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
       { id: 'products', label: 'Produk', icon: Package },
       { id: 'transactions', label: 'Riwayat & Utang', icon: Receipt },
       { id: 'people', label: 'Kontak', icon: Users },
-      { id: 'finance', label: 'Keuangan', icon: Wallet },
       { id: 'monthly_report', label: 'Laporan Bulanan', icon: Building2 },
       { id: 'customer_history', label: 'Riwayat Pelanggan', icon: UserCheck },
       { id: 'supplier_history', label: 'Riwayat Supplier', icon: Truck },

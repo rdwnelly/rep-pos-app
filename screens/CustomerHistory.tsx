@@ -281,216 +281,260 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
     };
 
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col gap-4 border-b border-slate-200 pb-4">
-                <div className="flex flex-wrap justify-between items-center gap-4">
+        <div className="space-y-6 animate-fade-in p-2 md:p-0">
+            {/* Header Controls */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <UserCheck className="text-amber-600" />
+                        Riwayat Transaksi Pelanggan
+                    </h1>
+                    <p className="text-slate-500 text-sm mt-1">Lacak seluruh riwayat pembelian, status pembayaran, dan piutang pelanggan</p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                    <button onClick={handlePrint} className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 transition-all flex text-xs font-medium shadow-sm">
+                        <Printer size={15} /> Print
+                    </button>
+                    <button onClick={handleExportExcel} className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3.5 py-2 rounded-xl text-emerald-700 hover:bg-emerald-100 transition-all flex text-xs font-medium shadow-sm">
+                        <FileSpreadsheet size={15} /> Excel
+                    </button>
+                    <button onClick={handleExport} className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 transition-all flex text-xs font-medium shadow-sm">
+                        <Download size={15} /> CSV
+                    </button>
+                </div>
+            </div>
+
+            {/* Metric Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                            <UserCheck className="text-primary" />
-                            Riwayat Pelanggan
-                        </h1>
-                        <p className="text-slate-500 text-sm mt-1">Lacak riwayat transaksi dan aktivitas pelanggan</p>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Penjualan</p>
+                        <h3 className="text-lg font-extrabold text-slate-900 mt-1">{formatIDR(totals.totalSales)}</h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{filteredTransactions.length} Transaksi</p>
                     </div>
-                    <div className="flex gap-2">
-                        <button onClick={handlePrint} className="text-sm flex items-center gap-2 bg-white border border-slate-300 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
-                            <Printer size={16} /> Print
-                        </button>
-                        <button onClick={handleExportExcel} className="text-sm flex items-center gap-2 bg-green-50 border border-green-200 px-3 py-2 rounded-lg text-green-700 hover:bg-green-100">
-                            <FileSpreadsheet size={16} /> Excel
-                        </button>
-                        <button onClick={handleExport} className="text-sm flex items-center gap-2 bg-white border border-slate-300 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
-                            <Download size={16} /> CSV
-                        </button>
+                    <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                        <FileText size={22} />
                     </div>
                 </div>
 
-                {/* Summary Cards */}
-                {selectedCustomerId && (
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="bg-primary/10 border border-primary/20 rounded-xl p-4">
-                            <p className="text-xs text-primary mb-1">Total Penjualan</p>
-                            <p className="text-lg font-bold text-primary">{formatIDR(totals.totalSales)}</p>
-                        </div>
-                        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                            <p className="text-xs text-green-600 mb-1">Total Dibayar</p>
-                            <p className="text-lg font-bold text-green-700">{formatIDR(totals.totalPaid)}</p>
-                        </div>
-                        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                            <p className="text-xs text-red-600 mb-1">Total Piutang</p>
-                            <p className="text-lg font-bold text-red-700">{formatIDR(totals.totalDebt)}</p>
-                        </div>
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Terbayar (Lunas)</p>
+                        <h3 className="text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(totals.totalPaid)}</h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Sudah Diterima</p>
                     </div>
-                )}
+                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                        <UserCheck size={22} />
+                    </div>
+                </div>
 
-                {/* Filters */}
-                <div className="flex flex-wrap items-center gap-4">
-                    {/* Customer Selector */}
-                    <label htmlFor="customerFilter" className="sr-only">Filter Pelanggan</label>
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Sisa Piutang Pelanggan</p>
+                        <h3 className="text-lg font-extrabold text-rose-600 mt-1">{formatIDR(totals.totalDebt)}</h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                            {filteredTransactions.filter(t => t.paymentStatus !== PaymentStatus.PAID).length} Transaksi Belum Lunas
+                        </p>
+                    </div>
+                    <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                        <X size={22} />
+                    </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pelanggan Terpilih</p>
+                        <h3 className="text-base font-extrabold text-amber-700 mt-1 truncate max-w-[150px]">
+                            {selectedCustomer ? selectedCustomer.name : 'Semua Pelanggan'}
+                        </h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{customers.length} Pelanggan Terdaftar</p>
+                    </div>
+                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                        <UserCheck size={22} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Filter Controls Card */}
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-3">
+                {/* Customer Selector Dropdown */}
+                <div className="relative min-w-[220px]">
                     <select
                         id="customerFilter"
                         name="customerFilter"
-                        className="px-4 py-2 border border-slate-300 rounded-lg text-sm min-w-[200px]"
+                        className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-xs font-semibold text-slate-800 pr-8 appearance-none cursor-pointer"
                         value={selectedCustomerId}
                         onChange={e => setSelectedCustomerId(e.target.value)}
                     >
                         <option value="">-- Semua Pelanggan --</option>
                         {customers.sort((a, b) => a.name.localeCompare(b.name)).map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
+                            <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>
                         ))}
                     </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                </div>
 
-                    {/* Date Filters */}
-                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 w-fit">
-                        <Filter size={16} className="text-slate-400" />
-                        <span className="text-sm font-medium text-slate-600">Filter Tanggal:</span>
-                        <div className="relative flex items-center bg-white border border-slate-300 rounded px-2 py-1">
-                            <label htmlFor="startDate" className="sr-only">Tanggal Mulai</label>
-                            <span className="text-sm text-slate-700 pr-6">
-                                {startDate ? new Date(startDate).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'dd/mm/yyyy'}
-                            </span>
-                            <input
-                                id="startDate"
-                                name="startDate"
-                                type="date"
-                                className="absolute inset-0 opacity-0 w-full h-full"
-                                value={startDate}
-                                onChange={e => setStartDate(e.target.value)}
-                            />
-                            <Calendar size={14} className="absolute right-2 text-slate-400 pointer-events-none" />
-                        </div>
-                        <span className="text-slate-400">-</span>
-                        <div className="relative flex items-center bg-white border border-slate-300 rounded px-2 py-1">
-                            <label htmlFor="endDate" className="sr-only">Tanggal Akhir</label>
-                            <span className="text-sm text-slate-700 pr-6">
-                                {endDate ? new Date(endDate).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'dd/mm/yyyy'}
-                            </span>
-                            <input
-                                id="endDate"
-                                name="endDate"
-                                type="date"
-                                className="absolute inset-0 opacity-0 w-full h-full"
-                                value={endDate}
-                                onChange={e => setEndDate(e.target.value)}
-                            />
-                            <Calendar size={14} className="absolute right-2 text-slate-400 pointer-events-none" />
-                        </div>
+                {/* Date Filters */}
+                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                    <Filter size={15} className="text-slate-400" />
+                    <span className="text-xs font-semibold text-slate-600">Tanggal:</span>
+                    <div className="relative flex items-center bg-white border border-slate-300 rounded px-2 py-1">
+                        <span className="text-xs text-slate-700 pr-6 font-medium">
+                            {startDate ? new Date(startDate).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'dd/mm/yyyy'}
+                        </span>
+                        <input
+                            id="startDate"
+                            name="startDate"
+                            type="date"
+                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                            value={startDate}
+                            onChange={e => setStartDate(e.target.value)}
+                        />
+                        <Calendar size={14} className="absolute right-2 text-slate-400 pointer-events-none" />
+                    </div>
+                    <span className="text-slate-400">-</span>
+                    <div className="relative flex items-center bg-white border border-slate-300 rounded px-2 py-1">
+                        <span className="text-xs text-slate-700 pr-6 font-medium">
+                            {endDate ? new Date(endDate).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'dd/mm/yyyy'}
+                        </span>
+                        <input
+                            id="endDate"
+                            name="endDate"
+                            type="date"
+                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                            value={endDate}
+                            onChange={e => setEndDate(e.target.value)}
+                        />
+                        <Calendar size={14} className="absolute right-2 text-slate-400 pointer-events-none" />
+                    </div>
+                    {(startDate || endDate) && (
                         <button
                             onClick={() => { setStartDate(''); setEndDate(''); }}
-                            className="p-1 text-slate-400 hover:text-slate-600 bg-slate-200 rounded ml-2"
-                            title="Reset Filter"
+                            className="p-1 text-slate-400 hover:text-slate-600 bg-slate-200 rounded ml-1"
+                            title="Reset Tanggal"
                         >
                             <RotateCcw size={14} />
                         </button>
-                    </div>
+                    )}
+                </div>
 
-                    {/* Search Input */}
-                    <div className="relative w-full max-w-md">
-                        <label htmlFor="searchTransaction" className="sr-only">Cari Transaksi</label>
-                        <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                            id="searchTransaction"
-                            name="searchTransaction"
-                            type="text"
-                            placeholder="Cari ID transaksi, pelanggan, kasir..."
-                            className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm text-slate-700"
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                        />
-                        {searchQuery && (
-                            <button
-                                onClick={() => setSearchQuery('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full p-1"
-                                title="Hapus pencarian"
-                            >
-                                <X size={14} />
-                            </button>
-                        )}
-                    </div>
+                {/* Search Input */}
+                <div className="relative flex-1 min-w-[200px]">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                        id="searchTransaction"
+                        name="searchTransaction"
+                        type="text"
+                        placeholder="Cari ID transaksi, no faktur, pelanggan, kasir..."
+                        className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-800"
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                    />
+                    {searchQuery && (
+                        <button
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                        >
+                            <X size={14} />
+                        </button>
+                    )}
                 </div>
             </div>
 
-            {/* Table */}
+            {/* Table Container */}
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200">
-                <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700">
-                    Daftar Transaksi ({filteredTransactions.length})
+                <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 text-xs flex justify-between items-center">
+                    <span>Daftar Transaksi Pelanggan ({filteredTransactions.length})</span>
+                    <span className="text-rose-700 font-bold">Total Piutang: {formatIDR(totals.totalDebt)}</span>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
+                    <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
                             <tr>
-                                <th className="p-4 font-medium">Tanggal</th>
-                                <th className="p-4 font-medium">ID Transaksi</th>
-                                <th className="p-4 font-medium">Faktur</th>
-                                <th className="p-4 font-medium">Pelanggan</th>
-                                <th className="p-4 font-medium">Total</th>
-                                <th className="p-4 font-medium">Dibayar</th>
-                                <th className="p-4 font-medium">Piutang</th>
-                                <th className="p-4 font-medium">Kembalian</th>
-                                <th className="p-4 font-medium">Status</th>
-                                <th className="p-4 font-medium">Metode</th>
-                                <th className="p-4 font-medium">Kasir</th>
-                                <th className="p-4 font-medium">Aksi</th>
+                                <th className="p-3.5">Tanggal & Ref</th>
+                                <th className="p-3.5">No Faktur</th>
+                                <th className="p-3.5">Pelanggan</th>
+                                <th className="p-3.5">Total Belanja</th>
+                                <th className="p-3.5">Dibayar</th>
+                                <th className="p-3.5">Sisa Piutang</th>
+                                <th className="p-3.5">Kembalian</th>
+                                <th className="p-3.5">Status</th>
+                                <th className="p-3.5">Metode</th>
+                                <th className="p-3.5">Kasir</th>
+                                <th className="p-3.5 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredTransactions.length === 0 && (
                                 <tr>
-                                    <td colSpan={12} className="p-8 text-center text-slate-400">Tidak ada transaksi.</td>
+                                    <td colSpan={11} className="p-8 text-center text-slate-400">Tidak ada riwayat transaksi pelanggan yang ditemukan.</td>
                                 </tr>
                             )}
-                            {visibleTransactions.map(t => (
-                                <tr key={t.id} onClick={() => setDetailTransaction(t)} className="hover:bg-slate-50 cursor-pointer group">
-                                    <td className="p-4 text-slate-600">
-                                        <div className="flex flex-col">
-                                            <span>{new Date(t.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                            <span className="text-xs text-slate-400">{new Date(t.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
-                                        </div>
-                                    </td>
-                                    <td className="p-4 font-mono text-xs text-slate-400">#{t.id.substring(0, 6)}</td>
-                                    <td className="p-4 font-mono text-sm text-slate-700">{t.invoiceNumber || '-'}</td>
-                                    <td className="p-4 font-medium text-slate-800">{t.customerName}</td>
-                                    <td className="p-4 font-semibold text-slate-700">{formatIDR(t.totalAmount)}</td>
-                                    <td className="p-4 text-green-600">{formatIDR(t.amountPaid)}</td>
-                                    <td className="p-4 text-red-600 font-medium">
-                                        {(() => {
-                                            const remaining = t.totalAmount - t.amountPaid;
-                                            return remaining > 0 ? formatIDR(remaining) : '-';
-                                        })()}
-                                    </td>
-                                    <td className="p-4 text-green-600 font-medium">
-                                        {(() => {
-                                            const remaining = t.totalAmount - t.amountPaid;
-                                            return remaining < 0 ? formatIDR(Math.abs(remaining)) : '-';
-                                        })()}
-                                    </td>
-                                    <td className="p-4">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold ${t.type === TransactionType.RETURN
-                                            ? 'bg-purple-100 text-purple-600'
-                                            : t.paymentStatus === PaymentStatus.PAID
-                                                ? 'bg-green-100 text-green-600'
-                                                : t.paymentStatus === PaymentStatus.PARTIAL
-                                                    ? 'bg-orange-100 text-orange-600'
-                                                    : 'bg-red-100 text-red-600'
+                            {visibleTransactions.map(t => {
+                                const remaining = t.totalAmount - t.amountPaid;
+                                const piutang = remaining > 0 ? remaining : 0;
+                                const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
+
+                                return (
+                                    <tr key={t.id} onClick={() => setDetailTransaction(t)} className="hover:bg-slate-50 cursor-pointer transition-colors group">
+                                        <td className="p-3.5 whitespace-nowrap">
+                                            <div className="font-semibold text-slate-800">{formatDate(t.date)}</div>
+                                            <div className="text-[10px] font-mono text-slate-400">#{t.id.substring(0, 8)}</div>
+                                        </td>
+                                        <td className="p-3.5 font-mono text-xs font-bold text-slate-800 whitespace-nowrap">
+                                            {t.invoiceNumber || '-'}
+                                        </td>
+                                        <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
+                                            {t.customerName}
+                                        </td>
+                                        <td className="p-3.5 font-extrabold text-slate-900 whitespace-nowrap">
+                                            {formatIDR(t.totalAmount)}
+                                        </td>
+                                        <td className="p-3.5 text-emerald-600 font-bold whitespace-nowrap">
+                                            {formatIDR(t.amountPaid)}
+                                        </td>
+                                        <td className="p-3.5 text-rose-600 font-bold whitespace-nowrap">
+                                            {piutang > 0 ? formatIDR(piutang) : '-'}
+                                        </td>
+                                        <td className="p-3.5 text-emerald-600 font-medium whitespace-nowrap">
+                                            {kembalian > 0 ? formatIDR(kembalian) : '-'}
+                                        </td>
+                                        <td className="p-3.5 whitespace-nowrap">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${
+                                                t.type === TransactionType.RETURN
+                                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                    : t.paymentStatus === PaymentStatus.PAID
+                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                        : t.paymentStatus === PaymentStatus.PARTIAL
+                                                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                                            : 'bg-rose-50 text-rose-700 border-rose-200'
                                             }`}>
-                                            {t.type === TransactionType.RETURN
-                                                ? 'RETUR'
-                                                : (t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus) + (t.isReturned ? ' (Ada Retur)' : '')}
-                                        </span>
-                                    </td>
-                                    <td className="p-4 text-slate-600">{t.paymentMethod}</td>
-                                    <td className="p-4 text-slate-600">{t.cashierName}</td>
-                                    <td className="p-4 text-right">
-                                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded hover:bg-slate-200 flex items-center gap-1" title="Detail">
-                                                <Eye size={12} />
+                                                {t.type === TransactionType.RETURN
+                                                    ? 'RETUR'
+                                                    : (t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus) + (t.isReturned ? ' (Ada Retur)' : '')}
+                                            </span>
+                                        </td>
+                                        <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{t.paymentMethod}</td>
+                                        <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{t.cashierName}</td>
+                                        <td className="p-3.5 text-center whitespace-nowrap">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }}
+                                                className="px-2.5 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-amber-200"
+                                            >
+                                                <Eye size={12} /> Detail
                                             </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                             {visibleTransactions.length < filteredTransactions.length && (
                                 <tr>
-                                    <td colSpan={12} className="p-4 text-center text-slate-400">
+                                    <td colSpan={11} className="p-4 text-center text-slate-400">
                                         <div ref={loadMoreRef}>Loading more...</div>
                                     </td>
                                 </tr>

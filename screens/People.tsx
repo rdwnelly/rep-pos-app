@@ -372,88 +372,154 @@ export const People: React.FC = () => {
     }, [loadMoreRef.current, filteredList]);
 
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div>
-                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                    <Users className="text-primary" />
-                    Daftar Kontak
-                </h2>
-                <p className="text-slate-500 text-sm mt-1">Kelola data pelanggan dan supplier.</p>
+        <div className="space-y-6 animate-fade-in p-2 md:p-0">
+            {/* Header Controls */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <Users className="text-amber-600" />
+                        Daftar Kontak (Pelanggan & Supplier)
+                    </h1>
+                    <p className="text-slate-500 text-sm mt-1">Kelola direktori kontak pelanggan dan supplier beserta akses cepat WhatsApp</p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                    {/* Hide Import CSV for Cashier and Admin */}
+                    {['CASHIER', 'ADMIN'].indexOf((JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role) === -1 && (
+                        <label className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 transition-all flex text-xs font-medium shadow-sm cursor-pointer">
+                            <Upload size={15} /> Import CSV
+                            <input id="csvImport" name="csvImport" type="file" accept=".csv" className="hidden" onChange={handleImport} />
+                        </label>
+                    )}
+                    <button onClick={handlePrint} className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 transition-all flex text-xs font-medium shadow-sm">
+                        <Printer size={15} /> Print
+                    </button>
+                    <button onClick={handleExportExcel} className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3.5 py-2 rounded-xl text-emerald-700 hover:bg-emerald-100 transition-all flex text-xs font-medium shadow-sm">
+                        <FileSpreadsheet size={15} /> Excel
+                    </button>
+                    <button onClick={handleExport} className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 transition-all flex text-xs font-medium shadow-sm">
+                        <Download size={15} /> CSV
+                    </button>
+                    <button onClick={() => handleOpenModal()} className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md">
+                        <Plus size={16} /> Tambah Kontak
+                    </button>
+                </div>
             </div>
 
-            <div className="flex flex-col md:flex-row justify-between gap-4">
-                <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit">
+            {/* Metric Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Pelanggan</p>
+                        <h3 className="text-lg font-extrabold text-slate-900 mt-1">{customers.length} <span className="text-xs font-normal text-slate-400">kontak</span></h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Pelanggan Terdaftar</p>
+                    </div>
+                    <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                        <User size={22} />
+                    </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Supplier</p>
+                        <h3 className="text-lg font-extrabold text-amber-600 mt-1">{suppliers.length} <span className="text-xs font-normal text-slate-400">supplier</span></h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Mitra Pemasok</p>
+                    </div>
+                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                        <Truck size={22} />
+                    </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Terhubung Telepon/WA</p>
+                        <h3 className="text-lg font-extrabold text-emerald-600 mt-1">
+                            {customers.filter(c => c.phone).length + suppliers.filter(s => s.phone).length} <span className="text-xs font-normal text-slate-400">nomor</span>
+                        </h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Akses Kontak Langsung</p>
+                    </div>
+                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                        <Phone size={22} />
+                    </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Kategori Terpilih</p>
+                        <h3 className="text-lg font-extrabold text-purple-700 mt-1 capitalize">{activeTab === 'customers' ? 'Pelanggan' : 'Supplier'}</h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{filteredList.length} Kontak Tampil</p>
+                    </div>
+                    <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
+                        <Users size={22} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Filter & Search Bar Container */}
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                {/* Tab Pill Navigation */}
+                <div className="flex gap-2 py-1 px-1 bg-slate-100/80 rounded-xl">
                     <button
                         onClick={() => setActiveTab('customers')}
-                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'customers' ? 'bg-white shadow text-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-lg transition-all ${
+                            activeTab === 'customers'
+                                ? 'bg-amber-600 text-white shadow-md'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                        }`}
                     >
-                        <User size={16} /> Pelanggan
+                        <User size={15} />
+                        Pelanggan ({customers.length})
                     </button>
                     <button
                         onClick={() => setActiveTab('suppliers')}
-                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'suppliers' ? 'bg-white shadow text-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-lg transition-all ${
+                            activeTab === 'suppliers'
+                                ? 'bg-amber-600 text-white shadow-md'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                        }`}
                     >
-                        <Truck size={16} /> Supplier
+                        <Truck size={15} />
+                        Supplier ({suppliers.length})
                     </button>
                 </div>
 
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+                    {/* Sort Selector */}
+                    <div className="relative">
+                        <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                        <select
+                            id="peopleSort"
+                            name="peopleSort"
+                            value={sortOrder}
+                            onChange={(e) => setSortOrder(e.target.value as any)}
+                            className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-xs font-semibold text-slate-700 appearance-none cursor-pointer"
+                        >
+                            <option value="name_asc">Urutkan: A-Z</option>
+                            <option value="name_desc">Urutkan: Z-A</option>
+                        </select>
+                    </div>
+
+                    {/* Search Input */}
                     <div className="relative flex-1 md:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <label htmlFor="peopleSearch" className="sr-only">Cari Kontak</label>
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                         <input
                             id="peopleSearch"
                             name="peopleSearch"
                             type="text"
-                            placeholder="Cari nama / HP / Email / Alamat..."
-                            className="pl-10 pr-10 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-primary bg-white w-full"
+                            placeholder="Cari nama, HP, email, alamat..."
+                            className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-800"
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                         />
                         {search && (
                             <button
                                 onClick={() => setSearch('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full p-1"
-                                title="Hapus pencarian"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
                             >
                                 <X size={14} />
                             </button>
                         )}
                     </div>
-
-                    <div className="relative">
-                        <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                        <label htmlFor="peopleSort" className="sr-only">Urutkan</label>
-                        <select
-                            id="peopleSort"
-                            name="peopleSort"
-                            value={sortOrder}
-                            onChange={(e) => setSortOrder(e.target.value as any)}
-                            className="pl-10 pr-8 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-primary bg-white text-slate-700 appearance-none cursor-pointer hover:bg-slate-50 h-[42px]"
-                        >
-                            <option value="name_asc">A-Z</option>
-                            <option value="name_desc">Z-A</option>
-                        </select>
-                    </div>
-                    {/* Hide Import CSV for Cashier and Admin */}
-                    {['CASHIER', 'ADMIN'].indexOf((JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role) === -1 && (
-                        <label className="bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-50 cursor-pointer">
-                            <Upload size={18} /> <span className="hidden md:inline">CSV</span>
-                            <input id="csvImport" name="csvImport" type="file" accept=".csv" className="hidden" onChange={handleImport} />
-                        </label>
-                    )}
-                    <button onClick={handleExportExcel} className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-xl flex items-center gap-2 hover:bg-green-100">
-                        <FileSpreadsheet size={18} /> <span className="hidden md:inline">Excel</span>
-                    </button>
-                    <button onClick={handleExport} className="bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-50">
-                        <Download size={18} /> <span className="hidden md:inline">CSV</span>
-                    </button>
-                    <button onClick={handlePrint} className="bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-50">
-                        <Printer size={18} /> <span className="hidden md:inline">Print</span>
-                    </button>
-                    <button onClick={() => handleOpenModal()} className="bg-primary text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2 shadow-lg hover:bg-primary/90">
-                        <Plus size={18} />
-                    </button>
                 </div>
             </div>
 
@@ -464,109 +530,138 @@ export const People: React.FC = () => {
                         Tidak ada data kontak ditemukan.
                     </div>
                 )}
-                {visibleList.map(item => (
-                    <div key={item.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-primary/50 transition-colors group">
-                        <div className="flex justify-between items-start mb-3">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-full overflow-hidden border border-slate-100 flex-shrink-0">
-                                    {item.image ? (
-                                        <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
-                                    ) : (
-                                        <div className={`w-full h-full flex items-center justify-center text-lg font-bold ${activeTab === 'customers' ? 'bg-primary/10 text-primary' : 'bg-orange-100 text-orange-600'}`}>
-                                            {item.name.substring(0, 1).toUpperCase()}
+                {visibleList.map(item => {
+                    const formattedWa = item.phone ? item.phone.replace(/^0/, '62').replace(/[^0-9]/g, '') : '';
+                    return (
+                        <div key={item.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-amber-500/50 transition-colors group flex flex-col justify-between">
+                            <div>
+                                <div className="flex justify-between items-start mb-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 rounded-full overflow-hidden border border-slate-100 flex-shrink-0">
+                                            {item.image ? (
+                                                <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
+                                            ) : (
+                                                <div className={`w-full h-full flex items-center justify-center text-lg font-bold ${activeTab === 'customers' ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'}`}>
+                                                    {item.name.substring(0, 1).toUpperCase()}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-800 text-sm">{item.name}</h4>
+                                            <span className="text-[10px] font-bold text-slate-500 px-2 py-0.5 bg-slate-100 rounded-full">
+                                                {activeTab === 'customers' ? 'Pelanggan' : 'Supplier'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <button onClick={() => handleOpenModal(item)} className="p-1.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors" title="Edit Kontak"><Edit2 size={15} /></button>
+                                        <button onClick={() => handleDelete(item.id)} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Hapus Kontak"><Trash2 size={15} /></button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2 text-xs text-slate-600 my-3">
+                                    <div className="flex items-center gap-2">
+                                        <Phone size={14} className="text-slate-400 shrink-0" />
+                                        <span className="font-medium text-slate-800">{item.phone || '-'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <MapPin size={14} className="text-slate-400 shrink-0" />
+                                        <span className="line-clamp-1">{item.address || '-'}</span>
+                                    </div>
+                                    {item.email && (
+                                        <div className="flex items-center gap-2">
+                                            <Mail size={14} className="text-slate-400 shrink-0" />
+                                            <span className="line-clamp-1">{item.email}</span>
                                         </div>
                                     )}
                                 </div>
-                                <div>
-                                    <h4 className="font-bold text-slate-800">{item.name}</h4>
-                                    <span className="text-xs text-slate-400 px-2 py-0.5 bg-slate-50 rounded-full">{activeTab === 'customers' ? 'Pelanggan' : 'Supplier'}</span>
-                                </div>
                             </div>
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => handleOpenModal(item)} className="p-2 text-primary hover:bg-primary/10 rounded-lg"><Edit2 size={16} /></button>
-                                <button onClick={() => handleDelete(item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
-                            </div>
-                        </div>
-                        <div className="space-y-2 text-sm text-slate-600">
-                            <div className="flex items-center gap-2">
-                                <Phone size={14} className="text-slate-400" />
-                                <span>{item.phone || '-'}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <MapPin size={14} className="text-slate-400" />
-                                <span className="line-clamp-1">{item.address || '-'}</span>
-                            </div>
-                            {item.email && (
-                                <div className="flex items-center gap-2">
-                                    <Mail size={14} className="text-slate-400" />
-                                    <span className="line-clamp-1">{item.email}</span>
+
+                            {/* Direct Call & WhatsApp Action Buttons */}
+                            {item.phone && (
+                                <div className="pt-3 border-t border-slate-100 flex gap-2">
+                                    <a
+                                        href={`https://wa.me/${formattedWa}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex-1 py-1.5 px-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-xl font-bold text-[11px] flex items-center justify-center gap-1.5 transition-colors"
+                                    >
+                                        <Phone size={12} /> WhatsApp
+                                    </a>
+                                    <a
+                                        href={`tel:${item.phone}`}
+                                        className="py-1.5 px-3 bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 rounded-xl font-bold text-[11px] flex items-center justify-center gap-1 transition-colors"
+                                    >
+                                        Telepon
+                                    </a>
                                 </div>
                             )}
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
                 {visibleList.length < filteredList.length && (
-                    <div className="col-span-full text-center py-4 text-slate-400">
-                        <div ref={loadMoreRef}>Loading more...</div>
+                    <div className="col-span-full text-center py-4 text-slate-400 text-xs">
+                        <div ref={loadMoreRef}>Memuat data kontak berikutnya...</div>
                     </div>
                 )}
             </div>
 
-            {/* Modal */}
+            {/* Modal Tambah/Edit Kontak */}
             {isModalOpen && createPortal(
-                <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-black/40 backdrop-blur-md z-[99999] flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold text-xl text-slate-800">
-                                {editingId ? 'Edit' : 'Tambah'} {activeTab === 'customers' ? 'Pelanggan' : 'Supplier'}
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-scale-up">
+                        <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
+                            <h3 className="font-bold text-sm">
+                                {editingId ? 'Edit Data' : 'Tambah'} {activeTab === 'customers' ? 'Pelanggan' : 'Supplier'}
                             </h3>
-                            <button onClick={() => setIsModalOpen(false)}><X size={20} className="text-slate-400" /></button>
+                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white p-1 rounded-lg">
+                                <X size={18} />
+                            </button>
                         </div>
-                        <div className="space-y-4">
-                            <div className="flex justify-center mb-4 relative">
-                                <label className="relative w-24 h-24 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-primary overflow-hidden group">
+                        <div className="p-5 space-y-4 text-xs">
+                            <div className="flex justify-center mb-2 relative">
+                                <label className="relative w-20 h-20 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-amber-500 overflow-hidden group">
                                     {formData.image ? (
                                         <img src={formData.image} className="w-full h-full object-cover" alt="Preview" />
                                     ) : (
-                                        <Upload className="text-slate-400 group-hover:text-primary" />
+                                        <Upload className="text-slate-400 group-hover:text-amber-600" size={20} />
                                     )}
                                     <input id="imageUpload" name="imageUpload" type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
-                                    <div className={`absolute inset-0 bg-black/30 flex items-center justify-center transition-opacity text-white text-xs ${formData.image ? 'opacity-0 group-hover:opacity-100' : 'opacity-0'}`}>
+                                    <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity text-white text-[10px] font-bold ${formData.image ? 'opacity-0 group-hover:opacity-100' : 'opacity-0'}`}>
                                         Ubah Foto
                                     </div>
                                 </label>
                                 {formData.image && (
                                     <button
                                         onClick={handleRemoveImage}
-                                        className="absolute -top-1 -right-1 md:right-auto md:left-2/3 bg-white text-red-600 p-1.5 rounded-full shadow-md border border-slate-200 hover:bg-red-50 z-10"
+                                        className="absolute top-0 right-1/3 bg-white text-rose-600 p-1 rounded-full shadow border border-slate-200 hover:bg-rose-50 z-10"
                                         title="Hapus Foto"
                                         type="button"
                                     >
-                                        <Trash2 size={14} />
+                                        <Trash2 size={12} />
                                     </button>
                                 )}
                             </div>
                             <div>
-                                <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-1">Nama Lengkap</label>
+                                <label htmlFor="name" className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Nama Lengkap</label>
                                 <input
                                     id="name"
                                     name="name"
                                     type="text"
                                     autoComplete="name"
-                                    className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    className="w-full border border-slate-300 p-2.5 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-slate-800"
                                     value={formData.name}
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                    placeholder="Contoh: Toko Berkah"
+                                    placeholder="Contoh: Toko Berkah / Bpk. Ahmad"
                                 />
                             </div>
                             <div>
-                                <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-1">No. Telepon / HP</label>
+                                <label htmlFor="phone" className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">No. Telepon / WhatsApp</label>
                                 <input
                                     id="phone"
                                     name="phone"
                                     type="text"
                                     autoComplete="tel"
-                                    className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    className="w-full border border-slate-300 p-2.5 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-slate-800 font-mono"
                                     value={formData.phone}
                                     onChange={e => {
                                         const val = e.target.value.replace(/[^0-9]/g, '');
@@ -576,34 +671,35 @@ export const People: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                                <label htmlFor="email" className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Email (Opsional)</label>
                                 <input
                                     id="email"
                                     name="email"
                                     type="email"
                                     autoComplete="email"
-                                    className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    className="w-full border border-slate-300 p-2.5 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-slate-800"
                                     value={formData.email}
                                     onChange={e => setFormData({ ...formData, email: e.target.value })}
                                     placeholder="nama@email.com"
                                 />
                             </div>
                             <div>
-                                <label htmlFor="address" className="block text-sm font-medium text-slate-700 mb-1">Alamat</label>
+                                <label htmlFor="address" className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Alamat (Opsional)</label>
                                 <textarea
                                     id="address"
                                     name="address"
                                     autoComplete="street-address"
-                                    className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                                    className="w-full border border-slate-300 p-2.5 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-slate-800"
                                     rows={2}
                                     value={formData.address}
                                     onChange={e => setFormData({ ...formData, address: e.target.value })}
+                                    placeholder="Jl. Utama No. 12..."
                                 />
                             </div>
 
-                            <div className="flex gap-3 pt-4">
-                                <button onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 text-slate-600 hover:bg-slate-50 rounded-lg font-medium">Batal</button>
-                                <button onClick={handleSave} className="flex-1 py-2.5 bg-primary text-white rounded-lg font-bold hover:bg-primary/90">Simpan</button>
+                            <div className="flex gap-3 pt-2 border-t border-slate-100">
+                                <button onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl font-bold transition-colors">Batal</button>
+                                <button onClick={handleSave} className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 transition-colors shadow-md">Simpan Kontak</button>
                             </div>
                         </div>
                     </div>

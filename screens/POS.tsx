@@ -62,6 +62,7 @@ export const POS: React.FC = () => {
   // Customer State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [customerName, setCustomerName] = useState('Pelanggan Umum'); // Still used for display or custom walk-in name
+  const [customerPhone, setCustomerPhone] = useState('');
   const [tableNumber, setTableNumber] = useState('');
 
   // Payment State
@@ -96,15 +97,17 @@ export const POS: React.FC = () => {
     searchInputRef.current?.focus();
   }, []);
 
-  // Update customer name when ID changes & Auto set Price Type
+  // Update customer name & phone when ID changes
   useEffect(() => {
     if (selectedCustomerId) {
       const c = customers.find(cust => cust.id === selectedCustomerId);
       if (c) {
         setCustomerName(c.name);
+        setCustomerPhone(c.phone || '');
       }
     } else {
       setCustomerName('Pelanggan Umum');
+      setCustomerPhone('');
     }
   }, [selectedCustomerId, customers]);
 
@@ -313,6 +316,7 @@ export const POS: React.FC = () => {
       bankName: selectedBank?.bankName || '',
       customerId: selectedCustomerId || '',
       customerName: customerName || 'Pelanggan Umum',
+      customerPhone: customerPhone || (selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.phone : ''),
       customerAddress: selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.address || '' : '',
       cashierId: currentUser.id || 'unknown',
       cashierName: currentUser.name || 'Kasir',
@@ -401,24 +405,25 @@ export const POS: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row flex-1 h-full w-full gap-0 animate-fade-in relative bg-white">
+    <div className="flex flex-col lg:flex-row flex-1 h-full w-full gap-0 animate-fade-in relative bg-slate-50">
       {flyingItems.map(item => (
         <FlyingItem key={item.id} item={item} cartRect={cartIconRef.current?.getBoundingClientRect()} />
       ))}
       
-      {/* Product Grid */}
-      <div className="flex-1 flex flex-col bg-white border-r border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex gap-4 bg-white z-10">
+      {/* Product Catalog Grid Container */}
+      <div className="flex-1 flex flex-col bg-slate-50 border-r border-slate-200 overflow-hidden">
+        {/* Search Bar Header */}
+        <div className="p-4 border-b border-slate-200 flex gap-3 bg-white shadow-sm z-10">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-            <label htmlFor="posSearch" className="sr-only">Cari Produk</label>
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <label htmlFor="posSearch" className="sr-only">Cari Produk POS</label>
             <input
               id="posSearch"
               name="posSearch"
               ref={searchInputRef}
               type="text"
-              placeholder="Scan Barcode atau Cari Nama..."
-              className="w-full pl-10 pr-20 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="Scan Barcode atau Cari Nama Produk / Kode SKU..."
+              className="w-full pl-10 pr-20 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-xs font-semibold text-slate-800 transition-all"
               value={search}
               onChange={e => setSearch(e.target.value)}
               onKeyDown={handleSearchKeyDown}
@@ -429,61 +434,84 @@ export const POS: React.FC = () => {
                   setSearch('');
                   searchInputRef.current?.focus();
                 }}
-                className="absolute right-10 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 hover:bg-slate-200 rounded"
+                className="absolute right-10 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 hover:bg-slate-200 rounded-lg"
                 title="Hapus pencarian"
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             )}
-            <ScanLine className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <ScanLine className="absolute right-3.5 top-1/2 -translate-y-1/2 text-amber-600" size={18} />
           </div>
         </div>
 
-
-
-        {/* Category Filter Horizontal Scroll */}
-        <div className="bg-white border-b border-slate-100 px-4 py-3 sticky top-0 z-10 overflow-x-auto hide-scrollbar">
+        {/* Category Filter Horizontal Carousel */}
+        <div className="bg-white border-b border-slate-200 px-4 py-2.5 sticky top-0 z-10 overflow-x-auto no-scrollbar">
           <div className="flex items-center gap-2 min-w-max">
             <button
               onClick={() => setSelectedCategory('')}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${selectedCategory === '' ? 'bg-primary text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                selectedCategory === ''
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
             >
-              Semua Menu
+              Semua Menu ({products.length})
             </button>
-            {categories.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${selectedCategory === cat.id ? 'bg-primary text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-              >
-                {cat.name}
-              </button>
-            ))}
+            {categories.map(cat => {
+              const catCount = products.filter(p => p.categoryId === cat.id).length;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                    selectedCategory === cat.id
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>{cat.name}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                    selectedCategory === cat.id ? 'bg-amber-700/50 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}>{catCount}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 content-start pb-20 lg:pb-2">
+        {/* Product Cards Grid */}
+        <div className="flex-1 overflow-y-auto p-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 content-start pb-20 lg:pb-3">
           {visibleProducts.map(product => (
             <button
               key={product.id}
               onClick={(e) => addToCart(product, e)}
-              className="group flex flex-col items-start text-left bg-white border border-slate-100 rounded-xl p-3 hover:shadow-md hover:border-primary/50 transition-all active:scale-95"
+              className="group flex flex-col justify-between items-start text-left bg-white border border-slate-200 rounded-2xl p-3 hover:shadow-md hover:border-amber-500/60 transition-all active:scale-95 relative overflow-hidden"
             >
-              <div className="w-full aspect-square bg-slate-100 rounded-lg mb-3 overflow-hidden relative">
+              <div className="w-full aspect-square bg-slate-50 rounded-xl mb-2.5 overflow-hidden relative border border-slate-100">
                 {product.image && !product.image.includes('picsum.photos') ? (
-                  <img src={product.image} alt={product.name} loading="lazy" className="w-full h-full object-cover mix-blend-multiply" />
+                  <img src={product.image} alt={product.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <ImageIcon size={32} className="text-slate-300" />
+                  <div className="w-full h-full flex items-center justify-center bg-amber-50/50 text-amber-600">
+                    <ImageIcon size={32} className="text-amber-400" />
                   </div>
                 )}
-                <span className="absolute bottom-1 right-1 text-[10px] bg-black/50 text-white px-1 rounded backdrop-blur-sm">{product.stock} {product.unit || 'Pcs'}</span>
-              </div>
-              <h4 className="font-semibold text-slate-800 line-clamp-2 text-sm h-10">{product.name}</h4>
-              <div className="mt-2 w-full">
-                <span className="block font-bold text-primary">
-                  {product.price === 0 ? '0' : formatIDR(product.price)}
+                <span className={`absolute bottom-1.5 right-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-md shadow-sm ${
+                  product.stock <= 5 ? 'bg-rose-600/90 text-white' : 'bg-slate-900/80 text-white'
+                }`}>
+                  {product.stock} {product.unit || 'Pcs'}
                 </span>
+              </div>
+
+              <div className="w-full">
+                <h4 className="font-bold text-slate-800 line-clamp-2 text-xs h-8 leading-snug">{product.name}</h4>
+                <div className="mt-1.5 flex items-center justify-between">
+                  <span className="font-extrabold text-amber-700 text-sm">
+                    {product.price === 0 ? 'Rp 0' : formatIDR(product.price)}
+                  </span>
+                  <span className="p-1 bg-amber-50 text-amber-700 rounded-lg group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                    <Plus size={13} />
+                  </span>
+                </div>
               </div>
             </button>
           ))}
@@ -815,17 +843,29 @@ export const POS: React.FC = () => {
                 </div>
 
                 <div className="space-y-5 flex-1 shrink-0">
-                  {/* Customer & Table */}
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* Customer & Phone & Table */}
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label htmlFor="customerNameInput" className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Pelanggan</label>
                       <input
                         id="customerNameInput"
                         type="text"
-                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-xs"
                         placeholder="Nama (Opsional)"
                         value={customerName === 'Pelanggan Umum' ? '' : customerName}
                         onChange={(e) => setCustomerName(e.target.value || 'Pelanggan Umum')}
+                        disabled={!!selectedCustomerId}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="customerPhoneInput" className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">No. HP / WA</label>
+                      <input
+                        id="customerPhoneInput"
+                        type="text"
+                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-xs"
+                        placeholder="0812..."
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(e.target.value)}
                         disabled={!!selectedCustomerId}
                       />
                     </div>
@@ -834,7 +874,7 @@ export const POS: React.FC = () => {
                       <input
                         id="tableNumberInput"
                         type="text"
-                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-xs"
                         placeholder="Cth: 04"
                         value={tableNumber}
                         onChange={(e) => setTableNumber(e.target.value)}

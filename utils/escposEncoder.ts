@@ -142,6 +142,7 @@ export const generateESCPOSReceipt = (tx: Transaction, settings: StoreSettings):
         .textLine(`No   : ${tx.invoiceNumber || tx.id.substring(0, 8)}`)
         .textLine(`Kasir: ${tx.cashierName}`)
         .textLine(`Plg  : ${tx.customerName && tx.customerName !== 'Pelanggan Umum' ? tx.customerName : 'Pelanggan Umum (walk-in)'}`)
+        .textLine(`HP   : ${tx.customerPhone || '-'}`)
         .textLine(`Meja : ${tx.tableNumber || '-'}`)
         .textLine(`Note : ${tx.paymentNote || '-'}`);
         
