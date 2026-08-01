@@ -42,44 +42,9 @@ const mapCategoryNameToSalesRow = (catName) => {
     return catName;
 };
 
-const FIXED_EXPENSE_CATEGORIES = [
-    "CAFÉ",
-    "KIOS",
-    "REPARASI",
-    "LISTRIK PLN",
-    "TRANSPORTASI",
-    "SOVENIR",
-    "LAIN-LAIN",
-    "PERLENGKAPAN",
-    "Makan Siang Karyawan (MSK)",
-    "PANJAR"
-];
+const FIXED_EXPENSE_CATEGORIES = BASE_SALES_CATEGORIES;
 
-const DETAILED_EXPENSE_CONFIG = [
-    { title: "VI. URAIAN PENGELUARAN (Pembelanjaan Café)", rows: 21 },
-    { title: "VI. URAIAN PENGELUARAN (REPARASI)", rows: 3 },
-    { title: "VI. URAIAN PENGELUARAN (Transportasi)", rows: 2 },
-    { title: "VI. URAIAN PENGELUARAN (Listrik)", rows: 2 },
-    { title: "VI. URAIAN PENGELUARAN (Biaya Kios)", rows: 10 },
-    { title: "VI. URAIAN PENGELUARAN (Makan Siang Karyawan)", rows: 4 },
-    { title: "VI. URAIAN PENGELUARAN (Sovenir)", rows: 1 },
-    { title: "VI. URAIAN PENGELUARAN (Perlengkapan)", rows: 1 },
-    { title: "VI. URAIAN PENGELUARAN (Panjar)", rows: 1 },
-    { title: "VI. URAIAN PENGELUARAN (Lain-lain)", rows: 1 }
-];
-
-const DEFAULT_CATEGORY_OPTIONS = [
-    "1) CAFÉ", 
-    "2) KIOS", 
-    "3) REPARASI", 
-    "4) LISTRIK PLN", 
-    "5) TRANSPORTASI",
-    "6) SOVENIR", 
-    "7) LAIN-LAIN", 
-    "8) PERLENGKAPAN", 
-    "9) Makan Siang Karyawan (MSK)", 
-    "10) PANJAR"
-];
+const DEFAULT_CATEGORY_OPTIONS = BASE_SALES_CATEGORIES.map((cat, idx) => `${idx + 1}) ${cat}`);
 
 // Helper to map category dropdown to the correct printable table
 const mapCategoryToSection = (cat) => {
@@ -132,13 +97,14 @@ export default function BeritaAcaraPage() {
         allSalesCategories.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" }))
     );
 
-    // Summary Expense Table (Page 1)
-    const [expenses, setExpenses] = useState(Array(10).fill(""));
-    const [expenseNames, setExpenseNames] = useState([...FIXED_EXPENSE_CATEGORIES]);
+    // Summary Expense Table (Page 1) - disamakan dengan kategori Sumber Pendapatan
+    const [expenseRows, setExpenseRows] = useState(() =>
+        allSalesCategories.map(name => ({ name, amount: "" }))
+    );
 
     // Modern Dynamic Expenses (Hidden on print)
     const [customExpenses, setCustomExpenses] = useState([
-        { id: Date.now(), category: '1) CAFÉ', keterangan: '', qty: '', harga: '', total: '' }
+        { id: Date.now(), category: '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
     ]);
 
     const [catatan, setCatatan] = useState("");
@@ -156,17 +122,13 @@ export default function BeritaAcaraPage() {
         const endDate = new Date(tanggal);
         endDate.setHours(23, 59, 59, 999);
 
-        const newExpenses = Array(10).fill(0);
         let hasData = false;
 
         const currentTransactions = JSON.parse(transactionsStr);
         const currentCashflows = JSON.parse(cashflowsStr);
 
         // === LOGIKA PENJUALAN DINAMIS BERBASIS KATEGORI ===
-        // Map: rowName -> { tunai, hppTunai, qr, hppQR }
         const salesMap = {};
-
-        // Inisialisasi dengan seluruh kategori penjualan (dasar + baru dari POS)
         allSalesCategories.forEach(name => {
             salesMap[name] = { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
         });
@@ -176,7 +138,6 @@ export default function BeritaAcaraPage() {
             if (tDate >= startDate && tDate <= endDate) {
                 hasData = true;
                 t.items.forEach(item => {
-                    // Gunakan categoryName langsung dari item transaksi
                     const originalCatName = item.categoryName || 'Lainnya';
                     const rowName = mapCategoryNameToSalesRow(originalCatName);
 
@@ -187,7 +148,6 @@ export default function BeritaAcaraPage() {
                         itemHpp = -itemHpp;
                     }
 
-                    // Jika kategori belum ada di map, tambahkan sebagai baris baru otomatis
                     if (!salesMap[rowName]) {
                         salesMap[rowName] = { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
                     }
@@ -203,7 +163,6 @@ export default function BeritaAcaraPage() {
             }
         });
 
-        // Konversi salesMap ke array rows
         const newSalesRows = Object.entries(salesMap).map(([name, vals]) => ({
             name,
             tunai: vals.tunai === 0 ? "" : String(vals.tunai),
@@ -212,54 +171,83 @@ export default function BeritaAcaraPage() {
             hppQR: vals.hppQR === 0 ? "" : String(vals.hppQR),
         }));
 
-        // === LOGIKA PENGELUARAN (tetap seperti semula) ===
+        // === LOGIKA PENGELUARAN (DISAMAKAN DENGAN KATEGORI SUMBER PENDAPATAN) ===
+        const expenseMap = {};
+        allSalesCategories.forEach(name => {
+            expenseMap[name] = 0;
+        });
+
         currentCashflows.forEach(cf => {
             const cfDate = new Date(cf.date);
             if (cfDate >= startDate && cfDate <= endDate && cf.type === CashFlowType.OUT) {
                 hasData = true;
-                const desc = cf.description?.toLowerCase() || '';
-                let targetIndex = 6; // Default to Lain-lain (index 6)
+                const desc = (cf.description || '').toLowerCase();
+                const cfCat = (cf.category || '').toLowerCase();
+                const searchStr = cfCat + " " + desc;
 
-                if (desc.includes("cafe") || desc.includes("kafe")) targetIndex = 0;
-                else if (desc.includes("kios")) targetIndex = 1;
-                else if (desc.includes("reparasi")) targetIndex = 2;
-                else if (desc.includes("listrik")) targetIndex = 3;
-                else if (desc.includes("transport")) targetIndex = 4;
-                else if (desc.includes("sovenir") || desc.includes("souvenir")) targetIndex = 5;
-                // 6 is Lain-lain
-                else if (desc.includes("lengkap")) targetIndex = 7;
-                else if (desc.includes("makan") || desc.includes("msk")) targetIndex = 8;
-                else if (desc.includes("panjar")) targetIndex = 9;
+                let matchedCategory = null;
+                if (searchStr.includes("tiket")) matchedCategory = "Tiket Masuk";
+                else if (searchStr.includes("sewa kostum") || searchStr.includes("kostum")) matchedCategory = "Sewa Kostum";
+                else if (searchStr.includes("toko") || searchStr.includes("souvenir") || searchStr.includes("sovenir")) matchedCategory = "Toko / Souvenir";
+                else if (searchStr.includes("kafe") || searchStr.includes("cafe") || searchStr.includes("resto")) matchedCategory = "Kafe & Resto";
+                else if (searchStr.includes("kios")) matchedCategory = "Kios";
+                else if (searchStr.includes("sopendo") || searchStr.includes("saswar") || searchStr.includes("edukasi")) matchedCategory = "Paket Sopendo / Saswar / Edukasi";
+                else if (searchStr.includes("fotografer") || searchStr.includes("foto")) matchedCategory = "Jasa Fotografer";
+                else if (searchStr.includes("sewa kostum keluar")) matchedCategory = "Sewa kostum keluar";
+                else {
+                    const found = allSalesCategories.find(c => searchStr.includes(c.toLowerCase()));
+                    matchedCategory = found || (allSalesCategories[0] || "Lainnya");
+                }
 
-                newExpenses[targetIndex] += cf.amount;
+                if (expenseMap[matchedCategory] !== undefined) {
+                    expenseMap[matchedCategory] += cf.amount;
+                } else {
+                    expenseMap[matchedCategory] = cf.amount;
+                }
             }
         });
 
-        // Add manual custom expenses
+        // Tambahkan pengeluaran custom manual
         customExpenses.forEach(item => {
             const val = Number(item.total) || 0;
             if (val > 0) {
                 hasData = true;
-                if (item.category.includes("CAFÉ")) newExpenses[0] += val;
-                else if (item.category.includes("KIOS")) newExpenses[1] += val;
-                else if (item.category.includes("REPARASI")) newExpenses[2] += val;
-                else if (item.category.includes("LISTRIK")) newExpenses[3] += val;
-                else if (item.category.includes("TRANSPORTASI")) newExpenses[4] += val;
-                else if (item.category.includes("SOVENIR")) newExpenses[5] += val;
-                else if (item.category.includes("LAIN-LAIN")) newExpenses[6] += val;
-                else if (item.category.includes("PERLENGKAPAN")) newExpenses[7] += val;
-                else if (item.category.includes("Makan Siang")) newExpenses[8] += val;
-                else if (item.category.includes("PANJAR")) newExpenses[9] += val;
-                else newExpenses[6] += val;
+                const itemCat = (item.category || '').toLowerCase();
+                let matchedCategory = null;
+
+                if (itemCat.includes("tiket")) matchedCategory = "Tiket Masuk";
+                else if (itemCat.includes("sewa kostum") || itemCat.includes("kostum")) matchedCategory = "Sewa Kostum";
+                else if (itemCat.includes("toko") || itemCat.includes("souvenir") || itemCat.includes("sovenir")) matchedCategory = "Toko / Souvenir";
+                else if (itemCat.includes("kafe") || itemCat.includes("cafe") || itemCat.includes("resto")) matchedCategory = "Kafe & Resto";
+                else if (itemCat.includes("kios")) matchedCategory = "Kios";
+                else if (itemCat.includes("sopendo") || itemCat.includes("saswar") || itemCat.includes("edukasi")) matchedCategory = "Paket Sopendo / Saswar / Edukasi";
+                else if (itemCat.includes("fotografer") || itemCat.includes("foto")) matchedCategory = "Jasa Fotografer";
+                else if (itemCat.includes("sewa kostum keluar")) matchedCategory = "Sewa kostum keluar";
+                else {
+                    const cleanCat = item.category.replace(/^\d+\)\s*/, '');
+                    const found = allSalesCategories.find(c => cleanCat.toLowerCase().includes(c.toLowerCase()));
+                    matchedCategory = found || cleanCat;
+                }
+
+                if (expenseMap[matchedCategory] !== undefined) {
+                    expenseMap[matchedCategory] += val;
+                } else {
+                    expenseMap[matchedCategory] = val;
+                }
             }
         });
 
+        const newExpenseRows = Object.entries(expenseMap).map(([name, val]) => ({
+            name,
+            amount: val === 0 ? "" : String(val)
+        }));
+
         if (hasData) {
             setSalesRows(newSalesRows);
-            setExpenses(newExpenses.map(v => v === 0 ? "" : String(v)));
+            setExpenseRows(newExpenseRows);
         } else {
             setSalesRows(allSalesCategories.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" })));
-            setExpenses(Array(10).fill(""));
+            setExpenseRows(allSalesCategories.map(name => ({ name, amount: "" })));
         }
     }, [tanggal, transactionsStr, cashflowsStr, categoriesStr, JSON.stringify(customExpenses)]);
 
@@ -272,7 +260,7 @@ export default function BeritaAcaraPage() {
 
         const totalTunai = salesRows.reduce((sum, row) => sum + (Number(row.tunai) || 0), 0);
         const totalQR = salesRows.reduce((sum, row) => sum + (Number(row.qr) || 0), 0);
-        const totalExp = expenses.reduce((sum, val) => sum + (Number(val) || 0), 0);
+        const totalExp = expenseRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
         const totalInc = totalTunai + totalQR;
 
         const hasData = totalInc > 0 || totalExp > 0 || kasir || periode || catatan || customExpenses.some(c => c.keterangan || c.total);
@@ -292,7 +280,8 @@ export default function BeritaAcaraPage() {
                     kasir,
                     lokasi,
                     salesRows,
-                    expenses,
+                    expenseRows,
+                    expenses: expenseRows.map(r => r.amount),
                     customExpenses,
                     catatan,
                     totalIncome: totalInc,
@@ -311,7 +300,7 @@ export default function BeritaAcaraPage() {
         }, 1000);
 
         return () => clearTimeout(timer);
-    }, [tanggal, periode, kasir, lokasi, JSON.stringify(salesRows), JSON.stringify(expenses), JSON.stringify(customExpenses), catatan, viewingArchive]);
+    }, [tanggal, periode, kasir, lokasi, JSON.stringify(salesRows), JSON.stringify(expenseRows), JSON.stringify(customExpenses), catatan, viewingArchive]);
 
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
@@ -566,7 +555,15 @@ export default function BeritaAcaraPage() {
             setSalesRows(prev => prev.filter((_, i) => i !== index));
         }
     };
-    const currentExpenses = viewingArchive ? viewingArchive.expenses : expenses;
+    const currentExpenseRows = viewingArchive
+        ? (viewingArchive.expenseRows
+            ? viewingArchive.expenseRows
+            : (viewingArchive.expenses
+                ? (viewingArchive.expenseNames
+                    ? viewingArchive.expenseNames.map((name, idx) => ({ name, amount: viewingArchive.expenses[idx] ?? "" }))
+                    : allSalesCategories.map((name, idx) => ({ name, amount: viewingArchive.expenses[idx] ?? "" })))
+                : allSalesCategories.map(name => ({ name, amount: "" }))))
+        : expenseRows;
     const currentCustomExpenses = viewingArchive ? viewingArchive.customExpenses : customExpenses;
     const currentCatatan = viewingArchive ? viewingArchive.catatan : catatan;
 
@@ -593,16 +590,9 @@ export default function BeritaAcaraPage() {
         setSalesRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: val } : row));
     };
 
-    const handleExpenseChange = (index, value) => {
-        const newData = [...expenses];
-        newData[index] = value;
-        setExpenses(newData);
-    };
-
-    const handleExpenseNameChange = (index, value) => {
-        const newData = [...expenseNames];
-        newData[index] = value;
-        setExpenseNames(newData);
+    const handleExpenseRowChange = (index, field, value) => {
+        const val = field === 'name' ? value : value.replace(/[^0-9-]/g, "");
+        setExpenseRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: val } : row));
     };
 
     // Custom Categories State & Management
@@ -735,7 +725,7 @@ export default function BeritaAcaraPage() {
     const totalHppQR = currentSalesRows.reduce((sum, row) => sum + (Number(row.hppQR) || 0), 0);
     const totalProfitQR = totalSalesQR - totalHppQR;
     const totalAllSales = totalSalesTunai + totalSalesQR;
-    const totalPengeluaran = currentExpenses.reduce((sum, val) => sum + (Number(val) || 0), 0);
+    const totalPengeluaran = currentExpenseRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
     const netto = totalSalesTunai - totalPengeluaran;
 
     return (
@@ -1364,29 +1354,31 @@ export default function BeritaAcaraPage() {
                                 <thead>
                                     <tr>
                                         <th style={{ width: '10%' }}>No</th>
-                                        <th style={{ width: '60%' }}>SUB. KATEGORI PENGELUARAN</th>
+                                        <th style={{ width: '60%' }}>KATEGORI PENGELUARAN</th>
                                         <th style={{ width: '30%' }}>Jumlah (Rp)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {expenses.map((val, idx) => (
+                                    {currentExpenseRows.map((row, idx) => (
                                         <tr key={`expense-${idx}`}>
                                             <td className="text-center">{idx + 1}</td>
                                             <td>
                                                 <input 
                                                     type="text" 
                                                     className="editable-cell" 
-                                                    value={expenseNames[idx]} 
-                                                    onChange={(e) => handleExpenseNameChange(idx, e.target.value)} 
+                                                    value={row.name} 
+                                                    onChange={(e) => handleExpenseRowChange(idx, 'name', e.target.value)} 
+                                                    readOnly={!!viewingArchive}
                                                 />
                                             </td>
                                             <td>
                                                 <input 
                                                     type="text" 
                                                     className="editable-cell text-right" 
-                                                    value={val} 
-                                                    onChange={(e) => handleExpenseChange(idx, e.target.value)} 
+                                                    value={row.amount} 
+                                                    onChange={(e) => handleExpenseRowChange(idx, 'amount', e.target.value)} 
                                                     placeholder="0"
+                                                    readOnly={!!viewingArchive}
                                                 />
                                             </td>
                                         </tr>
