@@ -84,6 +84,13 @@ export const POS: React.FC = () => {
   const [showOpenBillsModal, setShowOpenBillsModal] = useState(false);
   const [openBillSearch, setOpenBillSearch] = useState('');
 
+  // Create/Edit Open Bill Popup Modal State
+  const [showCreateOpenBillModal, setShowCreateOpenBillModal] = useState(false);
+  const [openBillTableInput, setOpenBillTableInput] = useState('');
+  const [openBillNameInput, setOpenBillNameInput] = useState('');
+  const [openBillPhoneInput, setOpenBillPhoneInput] = useState('');
+  const [openBillNoteInput, setOpenBillNoteInput] = useState('');
+
   // Reset Cart & Open Bill State
   const resetCartAndState = () => {
     setCart([]);
@@ -96,22 +103,41 @@ export const POS: React.FC = () => {
     setDiscountType('FIXED');
     setSelectedTravelAgentId('');
     setPaymentNote('');
+    setOpenBillTableInput('');
+    setOpenBillNameInput('');
+    setOpenBillPhoneInput('');
+    setOpenBillNoteInput('');
   };
 
-  // Save or Update Open Bill
-  const handleSaveOpenBill = async () => {
+  // Open Save Open Bill Pop-up Modal
+  const handleOpenSaveOpenBillModal = () => {
     if (cart.length === 0) {
       alert('Keranjang masih kosong! Silakan tambahkan pesanan terlebih dahulu.');
       return;
     }
 
-    const targetTable = tableNumber.trim();
-    const targetCustomer = customerName.trim();
+    setOpenBillTableInput(tableNumber || '');
+    setOpenBillNameInput(customerName === 'Pelanggan Umum' ? '' : customerName);
+    setOpenBillPhoneInput(customerPhone || '');
+    setOpenBillNoteInput(paymentNote || '');
+    setShowCreateOpenBillModal(true);
+  };
+
+  // Execute Save or Update Open Bill from Pop-up Modal
+  const executeSaveOpenBill = async () => {
+    const targetTable = openBillTableInput.trim();
+    const targetCustomer = openBillNameInput.trim() || (selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.name : '') || 'Pelanggan Umum';
 
     if (!targetTable && (!targetCustomer || targetCustomer === 'Pelanggan Umum')) {
-      alert('Mohon masukkan Nomor Meja atau Nama Pelanggan untuk mencatat Open Bill!');
+      alert('Mohon isi Nomor Meja atau Nama Pelanggan terlebih dahulu untuk mencatat Open Bill!');
       return;
     }
+
+    // Also update parent state if filled
+    if (targetTable) setTableNumber(targetTable);
+    if (targetCustomer) setCustomerName(targetCustomer);
+    if (openBillPhoneInput) setCustomerPhone(openBillPhoneInput);
+    if (openBillNoteInput) setPaymentNote(openBillNoteInput);
 
     const existingBill = activeOpenBillId ? openBills.find(b => b.id === activeOpenBillId) : null;
     const billId = activeOpenBillId || generateId();
@@ -122,9 +148,9 @@ export const POS: React.FC = () => {
       id: billId,
       billNumber: billNumber,
       tableNumber: targetTable || undefined,
-      customerName: targetCustomer || 'Pelanggan Umum',
+      customerName: targetCustomer,
       customerId: selectedCustomerId || undefined,
-      customerPhone: customerPhone || undefined,
+      customerPhone: openBillPhoneInput || undefined,
       items: [...cart],
       subtotal,
       discount,
@@ -134,7 +160,7 @@ export const POS: React.FC = () => {
       cashierId: currentUser.id || 'cashier',
       cashierName: currentUser.name || 'Kasir',
       travelAgentId: selectedTravelAgentId || undefined,
-      notes: paymentNote || undefined,
+      notes: openBillNoteInput || undefined,
       status: 'OPEN',
       createdAt: existingBill?.createdAt || nowIso,
       updatedAt: nowIso
@@ -144,6 +170,7 @@ export const POS: React.FC = () => {
     playBeep();
 
     alert(`✓ Open Bill #${billNumber} (${targetTable ? `Meja ${targetTable}` : targetCustomer}) berhasil disimpan!`);
+    setShowCreateOpenBillModal(false);
     resetCartAndState();
   };
 
@@ -918,7 +945,7 @@ export const POS: React.FC = () => {
             {/* Dual Action Buttons: Open Bill & Close Bill */}
             <div className="grid grid-cols-2 gap-2 mt-3">
               <button
-                onClick={handleSaveOpenBill}
+                onClick={handleOpenSaveOpenBillModal}
                 disabled={cart.length === 0}
                 className="py-3 px-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-2xl font-bold shadow-lg shadow-amber-500/20 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-1.5 text-xs sm:text-sm disabled:opacity-50 cursor-pointer"
                 title="Simpan pesanan ke Open Bill (Tagihan Terbuka)"
@@ -1527,6 +1554,136 @@ export const POS: React.FC = () => {
                     ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal Popup Input Open Bill Baru */}
+      {showCreateOpenBillModal && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col animate-scale-in">
+            {/* Header Modal */}
+            <div className="p-6 bg-gradient-to-r from-amber-500 to-amber-600 text-white flex justify-between items-center shrink-0">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Receipt size={22} />
+                  <h3 className="text-lg font-bold">
+                    {activeOpenBillId ? 'Perbarui Open Bill' : 'Catat Open Bill Baru'}
+                  </h3>
+                </div>
+                <p className="text-xs text-amber-100 mt-1">Masukkan Nomor Meja atau Nama Pelanggan</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateOpenBillModal(false)}
+                className="p-2 hover:bg-white/20 rounded-full transition-colors text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <div className="p-6 space-y-4 text-slate-800">
+              {/* Quick Select Meja Pills */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Pilih Cepat Meja</label>
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded-xl border border-slate-200">
+                  {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'VIP 1', 'VIP 2', 'Bungkus'].map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setOpenBillTableInput(m)}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                        openBillTableInput === m
+                          ? 'bg-amber-500 text-white shadow-sm scale-105'
+                          : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200'
+                      }`}
+                    >
+                      {m === 'Bungkus' ? 'Takeaway' : `Meja ${m}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Input Nomor Meja */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nomor Meja <span className="text-amber-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Cth: 04, Meja 12, atau VIP"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all"
+                  value={openBillTableInput}
+                  onChange={(e) => setOpenBillTableInput(e.target.value)}
+                />
+              </div>
+
+              {/* Input Nama Pelanggan */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nama Pelanggan / Pemesan <span className="text-amber-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Cth: Pak Budi / Rian"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all"
+                  value={openBillNameInput}
+                  onChange={(e) => setOpenBillNameInput(e.target.value)}
+                />
+              </div>
+
+              {/* Input No HP */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">No. HP / WA (Opsional)</label>
+                <input
+                  type="text"
+                  placeholder="0812..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500"
+                  value={openBillPhoneInput}
+                  onChange={(e) => setOpenBillPhoneInput(e.target.value)}
+                />
+              </div>
+
+              {/* Order Notes */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Catatan Meja / Pesanan (Opsional)</label>
+                <input
+                  type="text"
+                  placeholder="Cth: Tanpa pedas, Minta garpu ekstra..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500"
+                  value={openBillNoteInput}
+                  onChange={(e) => setOpenBillNoteInput(e.target.value)}
+                />
+              </div>
+
+              {/* Summary Preview */}
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 flex justify-between items-center text-xs">
+                <span className="font-semibold text-amber-900">Total Tagihan ({cart.reduce((s, i) => s + i.qty, 0)} item)</span>
+                <span className="font-black text-amber-700 text-sm">{formatIDR(totalAmount)}</span>
+              </div>
+            </div>
+
+            {/* Footer Action */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCreateOpenBillModal(false)}
+                className="w-1/3 py-3 text-slate-600 bg-slate-200 hover:bg-slate-300 rounded-xl font-bold text-xs transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={executeSaveOpenBill}
+                className="w-2/3 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-extrabold text-xs shadow-lg shadow-amber-500/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Receipt size={16} />
+                Simpan & Catat Open Bill
+              </button>
             </div>
           </div>
         </div>,
