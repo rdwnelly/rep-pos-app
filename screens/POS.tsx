@@ -1001,10 +1001,10 @@ export const POS: React.FC = () => {
                 }}
                 disabled={cart.length === 0}
                 className="py-3 px-2 bg-primary hover:bg-primary-hover active:bg-primary text-white rounded-2xl font-extrabold shadow-lg shadow-primary/30 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5 text-xs sm:text-sm"
-                title="Bayar dan selesaikan transaksi (Close Bill)"
+                title="Bayar dan selesaikan transaksi"
               >
                 <Printer size={17} />
-                <span>Close Bill</span>
+                <span>Bayar</span>
               </button>
             </div>
           </div>
