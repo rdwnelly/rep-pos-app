@@ -10,6 +10,10 @@ export const formatIDR = (amount: number): string => {
 };
 
 export const formatDate = (dateString: string): string => {
+  if (!dateString) return '-';
+  const str = typeof dateString === 'string' ? dateString.replace(' ', 'T') : dateString;
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return '-';
   return new Intl.DateTimeFormat('id-ID', {
     weekday: 'long',
     year: 'numeric',
@@ -17,18 +21,36 @@ export const formatDate = (dateString: string): string => {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: 'Asia/Jakarta'
-  }).format(new Date(dateString));
+    timeZone: 'Asia/Jayapura'
+  }).format(d);
 };
 
 export const formatDateDateOnly = (dateString: string): string => {
+  if (!dateString) return '-';
+  const str = typeof dateString === 'string' ? dateString.replace(' ', 'T') : dateString;
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return '-';
   return new Intl.DateTimeFormat('id-ID', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-    timeZone: 'Asia/Jakarta'
-  }).format(new Date(dateString));
+    timeZone: 'Asia/Jayapura'
+  }).format(d);
+};
+
+export const formatTimeOnly = (dateString: string): string => {
+  if (!dateString) return '-';
+  const str = typeof dateString === 'string' ? dateString.replace(' ', 'T') : dateString;
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return '-';
+  return new Intl.DateTimeFormat('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Jayapura'
+  }).format(d) + ' WIT';
 };
 
 

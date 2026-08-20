@@ -39,10 +39,10 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
         StorageService.getStoreSettings().then(setStoreSettings);
     }, []);
 
-    // Helper for Jakarta Date
-    const getJakartaDateStr = (dateStr: string) => {
+    // Helper for WIT Date
+    const getWITDateStr = (dateStr: string) => {
         const date = new Date(dateStr);
-        return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+        return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Jayapura' });
     };
 
     // Get selected supplier
@@ -50,9 +50,31 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
         return suppliers.find(s => s.id === selectedSupplierId) || null;
     }, [suppliers, selectedSupplierId]);
 
+    // Helper for exact timestamp parsing (hour, minute, second)
+    const getExactTimestamp = (item: any): number => {
+        if (item.date) {
+            const dateStr = typeof item.date === 'string' ? item.date.replace(' ', 'T') : item.date;
+            const time = new Date(dateStr).getTime();
+            if (!isNaN(time) && time > 0) {
+                const hasTime = typeof item.date === 'string' ? item.date.includes(':') : true;
+                if (hasTime || !item.createdAt) return time;
+            }
+        }
+        if (item.createdAt) {
+            const createdStr = typeof item.createdAt === 'string' ? item.createdAt.replace(' ', 'T') : item.createdAt;
+            const createdTime = new Date(createdStr).getTime();
+            if (!isNaN(createdTime) && createdTime > 0) return createdTime;
+        }
+        if (item.id) {
+            const num = Number(item.id);
+            if (!isNaN(num) && num > 1000000000000) return num;
+        }
+        return 0;
+    };
+
     // Filter Logic
     const filteredPurchases = useMemo(() => {
-        let items = purchases;
+        let items = [...purchases];
 
         // Filter by supplier
         if (selectedSupplierId) {
@@ -62,7 +84,7 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
         // Date Filter
         if (startDate || endDate) {
             items = items.filter(item => {
-                const itemDateStr = getJakartaDateStr(item.date);
+                const itemDateStr = getWITDateStr(item.date);
                 if (startDate && itemDateStr < startDate) return false;
                 if (endDate && itemDateStr > endDate) return false;
                 return true;
@@ -80,12 +102,16 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
             );
         }
 
-        // Sort
-        // Sort (Date Descending)
+        // Sort (Waktu/Jam Paling Terbaru di Atas - Descending)
         items.sort((a, b) => {
-            const aTime = new Date(a.date).getTime();
-            const bTime = new Date(b.date).getTime();
-            return bTime - aTime;
+            const aTime = getExactTimestamp(a);
+            const bTime = getExactTimestamp(b);
+            if (bTime !== aTime) {
+                return bTime - aTime;
+            }
+            const aInvoice = a.invoiceNumber || a.id || '';
+            const bInvoice = b.invoiceNumber || b.id || '';
+            return bInvoice.localeCompare(aInvoice);
         });
 
         return items;
@@ -465,15 +491,14 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
                                     <td className="p-3.5 font-bold text-emerald-600 whitespace-nowrap">{formatIDR(p.amountPaid)}</td>
                                     <td className="p-3.5 font-bold text-rose-600 whitespace-nowrap">{formatIDR(p.totalAmount - p.amountPaid)}</td>
                                     <td className="p-3.5 whitespace-nowrap">
-                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                                            p.type === PurchaseType.RETURN
-                                                ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                                                : p.paymentStatus === PaymentStatus.PAID
-                                                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                                                    : p.paymentStatus === PaymentStatus.PARTIAL
-                                                        ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                                                        : 'bg-rose-100 text-rose-700 border border-rose-200'
-                                        }`}>
+                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${p.type === PurchaseType.RETURN
+                                            ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                                            : p.paymentStatus === PaymentStatus.PAID
+                                                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                                : p.paymentStatus === PaymentStatus.PARTIAL
+                                                    ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                                                    : 'bg-rose-100 text-rose-700 border border-rose-200'
+                                            }`}>
                                             {p.type === PurchaseType.RETURN
                                                 ? 'RETUR SUPPLIER'
                                                 : (p.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : p.paymentStatus) + (p.isReturned ? ' (RETUR)' : '')}

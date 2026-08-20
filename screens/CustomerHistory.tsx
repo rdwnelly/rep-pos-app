@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Transaction, PaymentStatus, Customer, UserRole, User, PaymentMethod, StoreSettings, TransactionType } from '../types';
-import { formatIDR, formatDate, exportToCSV, exportToExcel } from '../utils';
+import { formatIDR, formatDate, formatDateDateOnly, formatTimeOnly, exportToCSV, exportToExcel } from '../utils';
 import { generatePrintTransactionDetail } from '../utils/printHelpers';
 import { Download, Search, Filter, RotateCcw, X, Eye, FileText, Printer, FileSpreadsheet, UserCheck, Calendar } from 'lucide-react';
 
@@ -39,10 +39,10 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
         StorageService.getStoreSettings().then(setStoreSettings);
     }, []);
 
-    // Helper for Jakarta Date
-    const getJakartaDateStr = (dateStr: string) => {
+    // Helper for WIT Date
+    const getWITDateStr = (dateStr: string) => {
         const date = new Date(dateStr);
-        return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+        return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Jayapura' });
     };
 
     // Get selected customer
@@ -50,9 +50,28 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
         return customers.find(c => c.id === selectedCustomerId) || null;
     }, [customers, selectedCustomerId]);
 
+    // Helper for exact timestamp parsing (hour, minute, second)
+    const getExactTimestamp = (item: any): number => {
+        if (item.createdAt) {
+            const createdStr = typeof item.createdAt === 'string' ? item.createdAt.replace(' ', 'T') : item.createdAt;
+            const createdTime = new Date(createdStr).getTime();
+            if (!isNaN(createdTime) && createdTime > 0) return createdTime;
+        }
+        if (item.date) {
+            const dateStr = typeof item.date === 'string' ? item.date.replace(' ', 'T') : item.date;
+            const time = new Date(dateStr).getTime();
+            if (!isNaN(time) && time > 0) return time;
+        }
+        if (item.id) {
+            const num = Number(item.id);
+            if (!isNaN(num) && num > 1000000000000) return num;
+        }
+        return 0;
+    };
+
     // Filter Logic
     const filteredTransactions = useMemo(() => {
-        let items = transactions;
+        let items = [...transactions];
 
         // Filter by customer
         if (selectedCustomerId) {
@@ -62,7 +81,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
         // Date Filter
         if (startDate || endDate) {
             items = items.filter(item => {
-                const itemDateStr = getJakartaDateStr(item.date);
+                const itemDateStr = getWITDateStr(item.date);
                 if (startDate && itemDateStr < startDate) return false;
                 if (endDate && itemDateStr > endDate) return false;
                 return true;
@@ -80,18 +99,16 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             );
         }
 
-        // Cashier Filter
-        // Removed strict cashierId filter so cashiers can view all transactions for reprints/returns
-        // if (currentUser && currentUser.role === UserRole.CASHIER) {
-        //     items = items.filter(t => t.cashierId === currentUser.id);
-        // }
-
-        // Sort
-        // Sort (Date Descending)
+        // Sort (Waktu/Jam Paling Terbaru di Atas - Descending)
         items.sort((a, b) => {
-            const aTime = new Date(a.date).getTime();
-            const bTime = new Date(b.date).getTime();
-            return bTime - aTime;
+            const aTime = getExactTimestamp(a);
+            const bTime = getExactTimestamp(b);
+            if (bTime !== aTime) {
+                return bTime - aTime;
+            }
+            const aInvoice = a.invoiceNumber || a.id || '';
+            const bInvoice = b.invoiceNumber || b.id || '';
+            return bInvoice.localeCompare(aInvoice);
         });
 
         return items;
@@ -135,7 +152,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
 
 
     const handleExport = () => {
-        const headers = ['ID Transaksi', 'No Faktur', 'Tanggal', 'Pelanggan', 'Total', 'Dibayar', 'Piutang', 'Kembalian', 'Status', 'Metode', 'Kasir'];
+        const headers = ['ID Transaksi', 'No Faktur', 'Tanggal', 'Waktu / Jam', 'Pelanggan', 'Total', 'Dibayar', 'Piutang', 'Kembalian', 'Status', 'Metode', 'Kasir'];
         const rows = filteredTransactions.map(t => {
             const remaining = t.totalAmount - t.amountPaid;
             const piutang = remaining > 0 ? remaining : 0;
@@ -143,7 +160,8 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             return [
                 t.id,
                 t.invoiceNumber || '-',
-                formatDate(t.date),
+                formatDateDateOnly(t.date),
+                formatTimeOnly(t.date),
                 t.customerName,
                 t.totalAmount,
                 t.amountPaid,
@@ -165,7 +183,8 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             return {
                 'ID Transaksi': t.id,
                 'No Faktur': t.invoiceNumber || '-',
-                'Tanggal': formatDate(t.date),
+                'Tanggal': formatDateDateOnly(t.date),
+                'Waktu / Jam': formatTimeOnly(t.date),
                 'Pelanggan': t.customerName,
                 'Total': t.totalAmount,
                 'Dibayar': t.amountPaid,
@@ -181,6 +200,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             { wch: 15 }, // ID
             { wch: 20 }, // Faktur
             { wch: 15 }, // Tanggal
+            { wch: 15 }, // Waktu Jam
             { wch: 20 }, // Pelanggan
             { wch: 15 }, // Total
             { wch: 15 }, // Dibayar
@@ -205,7 +225,8 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             return `
             <tr>
                 <td>${idx + 1}</td>
-                <td>${formatDate(t.date)}</td>
+                <td>${formatDateDateOnly(t.date)}</td>
+                <td>${formatTimeOnly(t.date)}</td>
                 <td>${t.id.substring(0, 8)}</td>
                 <td>${t.invoiceNumber || '-'}</td>
                 <td>${t.customerName}</td>
@@ -246,6 +267,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                             <tr>
                                 <th>No</th>
                                 <th>Tanggal</th>
+                                <th>Waktu / Jam</th>
                                 <th>ID</th>
                                 <th>Faktur</th>
                                 <th>Pelanggan</th>
@@ -456,8 +478,16 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                     <table className="w-full text-left text-xs">
                         <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
                             <tr>
-                                <th className="p-3.5">Tanggal & Ref</th>
-                                <th className="p-3.5">No Faktur</th>
+                                <th className="p-3.5">Tanggal</th>
+                                <th className="p-3.5 bg-amber-50/60 border-b-2 border-amber-500/50">
+                                    <div className="flex items-center gap-1.5 text-amber-900 font-extrabold">
+                                        Waktu / Jam
+                                        <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded-md font-mono tracking-tight shadow-xs">
+                                            ↓ Terbaru
+                                        </span>
+                                    </div>
+                                </th>
+                                <th className="p-3.5">No Faktur & Ref</th>
                                 <th className="p-3.5">Pelanggan</th>
                                 <th className="p-3.5">Total Belanja</th>
                                 <th className="p-3.5">Dibayar</th>
@@ -472,7 +502,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                         <tbody className="divide-y divide-slate-100">
                             {filteredTransactions.length === 0 && (
                                 <tr>
-                                    <td colSpan={11} className="p-8 text-center text-slate-400">Tidak ada riwayat transaksi pelanggan yang ditemukan.</td>
+                                    <td colSpan={12} className="p-8 text-center text-slate-400">Tidak ada riwayat transaksi pelanggan yang ditemukan.</td>
                                 </tr>
                             )}
                             {visibleTransactions.map(t => {
@@ -482,12 +512,17 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
 
                                 return (
                                     <tr key={t.id} onClick={() => setDetailTransaction(t)} className="hover:bg-slate-50 cursor-pointer transition-colors group">
-                                        <td className="p-3.5 whitespace-nowrap">
-                                            <div className="font-semibold text-slate-800">{formatDate(t.date)}</div>
-                                            <div className="text-[10px] font-mono text-slate-400">#{t.id.substring(0, 8)}</div>
+                                        <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
+                                            {formatDateDateOnly(t.date)}
                                         </td>
-                                        <td className="p-3.5 font-mono text-xs font-bold text-slate-800 whitespace-nowrap">
-                                            {t.invoiceNumber || '-'}
+                                        <td className="p-3.5 whitespace-nowrap bg-amber-50/20">
+                                            <span className="font-mono text-xs font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded border border-amber-200 inline-block shadow-2xs">
+                                                {formatTimeOnly(t.createdAt || t.date)}
+                                            </span>
+                                        </td>
+                                        <td className="p-3.5 whitespace-nowrap">
+                                            <div className="font-mono text-xs font-bold text-slate-800">{t.invoiceNumber || '-'}</div>
+                                            <div className="text-[10px] font-mono text-slate-400">#{t.id.substring(0, 8)}</div>
                                         </td>
                                         <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
                                             {t.customerName}
@@ -534,7 +569,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                             })}
                             {visibleTransactions.length < filteredTransactions.length && (
                                 <tr>
-                                    <td colSpan={11} className="p-4 text-center text-slate-400">
+                                    <td colSpan={12} className="p-4 text-center text-slate-400">
                                         <div ref={loadMoreRef}>Loading more...</div>
                                     </td>
                                 </tr>

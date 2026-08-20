@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Transaction, PaymentStatus, CashFlow, CashFlowType, Purchase, Supplier, PaymentMethod, CashFlow as CashFlowTypeInterface, StoreSettings, BankAccount, User, UserRole, TransactionType, PurchaseType } from '../types';
-import { formatIDR, formatDate, exportToCSV, generateId, exportToExcel } from '../utils';
-import { generatePrintInvoice, generatePrintGoodsNote, generatePrintSuratJalan, generatePrintTransactionDetail, generatePrintPurchaseDetail, generatePrintPurchaseNote } from '../utils/printHelpers';
+import { formatIDR, formatDate, formatDateDateOnly, formatTimeOnly, exportToCSV, generateId, exportToExcel } from '../utils';
+import { generatePrintInvoice, generatePrintTransactionDetail, generatePrintPurchaseDetail, generatePrintPurchaseNote } from '../utils/printHelpers';
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
 import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet, Bluetooth, Receipt, UserCheck, Truck, DollarSign, PieChart, BookOpen } from 'lucide-react';
@@ -677,8 +677,35 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         });
     };
 
+    const getExactTimestamp = (item: any): number => {
+        if (item.createdAt) {
+            const createdStr = typeof item.createdAt === 'string' ? item.createdAt.replace(' ', 'T') : item.createdAt;
+            const createdTime = new Date(createdStr).getTime();
+            if (!isNaN(createdTime) && createdTime > 0) return createdTime;
+        }
+        if (item.date) {
+            const dateStr = typeof item.date === 'string' ? item.date.replace(' ', 'T') : item.date;
+            const time = new Date(dateStr).getTime();
+            if (!isNaN(time) && time > 0) return time;
+        }
+        if (item.id) {
+            const num = Number(item.id);
+            if (!isNaN(num) && num > 1000000000000) return num;
+        }
+        return 0;
+    };
+
     const sortItems = (items: any[]) => {
-        if (!sortConfig) return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Default desc date
+        if (!sortConfig) {
+            return [...items].sort((a, b) => {
+                const aTime = getExactTimestamp(a);
+                const bTime = getExactTimestamp(b);
+                if (bTime !== aTime) return bTime - aTime;
+                const aRef = a.invoiceNumber || a.id || '';
+                const bRef = b.invoiceNumber || b.id || '';
+                return bRef.localeCompare(aRef);
+            });
+        }
 
         return [...items].sort((a, b) => {
             let aVal: any = a[sortConfig.key];
@@ -692,8 +719,8 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             }
 
             if (sortConfig.key === 'date') {
-                const aTime = new Date(a.date).getTime();
-                const bTime = new Date(b.date).getTime();
+                const aTime = getExactTimestamp(a);
+                const bTime = getExactTimestamp(b);
                 return sortConfig.direction === 'asc' ? aTime - bTime : bTime - aTime;
             } else if (typeof aVal === 'string' && typeof bVal === 'string') {
                 aVal = aVal.toLowerCase();
@@ -1777,44 +1804,6 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         }
     };
 
-    const printGoodsNote = (tx: Transaction) => {
-        const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
-        const w = window.open('', '', 'width=800,height=600');
-        if (!w) return;
-
-        // Ensure customer address is populated
-        let txToPrint = { ...tx };
-        if ((!txToPrint.customerAddress || txToPrint.customerAddress === '-') && txToPrint.customerId) {
-            const customer = customers.find(c => c.id === txToPrint.customerId);
-            if (customer && customer.address) {
-                txToPrint.customerAddress = customer.address;
-            }
-        }
-
-        const html = generatePrintGoodsNote(txToPrint, settings, formatIDR, formatDate);
-        w.document.write(html);
-        w.document.close();
-    };
-
-    const printSuratJalan = (tx: Transaction) => {
-        const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
-        const w = window.open('', '', 'width=800,height=600');
-        if (!w) return;
-
-        // Ensure customer address is populated
-        let txToPrint = { ...tx };
-        if ((!txToPrint.customerAddress || txToPrint.customerAddress === '-') && txToPrint.customerId) {
-            const customer = customers.find(c => c.id === txToPrint.customerId);
-            if (customer && customer.address) {
-                txToPrint.customerAddress = customer.address;
-            }
-        }
-
-        const html = generatePrintSuratJalan(txToPrint, settings, formatDate, formatIDR);
-        w.document.write(html);
-        w.document.close();
-    };
-
     const printTransactionDetail = (tx: Transaction) => {
         const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
         const w = window.open('', '', 'width=800,height=600');
@@ -1943,8 +1932,6 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                         {[
                             { id: 'history', label: 'Riwayat Transaksi', icon: Receipt },
                             { id: 'debt_customer', label: 'Piutang Pelanggan', icon: UserCheck, count: receivables.length },
-                            { id: 'purchase_history', label: 'Riwayat Pembelian', icon: ShoppingBag },
-                            { id: 'debt_supplier', label: 'Utang Supplier', icon: Truck, count: payables.length },
                             { id: 'cashflow', label: 'Arus Kas', icon: DollarSign },
                             ...(currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN ? [{ id: 'profit_loss', label: 'Laba Rugi', icon: PieChart }] : []),
                             ...(currentUser?.role === UserRole.OWNER || currentUser?.role === UserRole.SUPERADMIN ? [{ id: 'manual_cash_report', label: 'Kas Manual', icon: BookOpen }] : [])
@@ -1983,11 +1970,6 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                         <button onClick={handleExport} className="text-xs flex items-center gap-1.5 bg-white border border-slate-300 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 font-medium transition-colors shadow-sm">
                             <Download size={15} /> CSV
                         </button>
-                        {activeTab === 'purchase_history' && (
-                            <button onClick={() => setIsPurchaseModalOpen(true)} className="text-xs flex items-center gap-1.5 bg-amber-600 text-white px-3.5 py-2 rounded-xl shadow-md hover:bg-amber-700 font-bold transition-colors">
-                                <Plus size={15} /> Catat Pembelian
-                            </button>
-                        )}
                     </div>
                 </div>
 
@@ -2253,7 +2235,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                             </div>
                         )}
 
-                        {(activeTab === 'history' || activeTab === 'purchase_history') && (
+                        {activeTab === 'history' && (
                             <div className="relative min-w-[150px]">
                                 <select
                                     id="statusFilter"
@@ -2469,8 +2451,16 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                             <table className="w-full text-left text-xs">
                                 <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
                                     <tr>
-                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('date')}>Tanggal & Ref <SortIcon column="date" /></th>
-                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('invoiceNumber')}>No Faktur <SortIcon column="invoiceNumber" /></th>
+                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('date')}>Tanggal <SortIcon column="date" /></th>
+                                        <th className="p-3.5 bg-amber-50/60 border-b-2 border-amber-500/50 cursor-pointer" onClick={() => handleSort('date')}>
+                                            <div className="flex items-center gap-1.5 text-amber-900 font-extrabold">
+                                                Waktu / Jam
+                                                <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded-md font-mono tracking-tight shadow-xs">
+                                                    ↓ Terbaru
+                                                </span>
+                                            </div>
+                                        </th>
+                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('invoiceNumber')}>No Faktur & Ref <SortIcon column="invoiceNumber" /></th>
                                         <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('customerName')}>Pelanggan <SortIcon column="customerName" /></th>
                                         <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentMethod')}>Metode <SortIcon column="paymentMethod" /></th>
                                         <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentNote')}>Keterangan <SortIcon column="paymentNote" /></th>
@@ -2483,23 +2473,22 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 <tbody className="divide-y divide-slate-100">
                                     {filteredTransactions.length === 0 && (
                                         <tr>
-                                            <td colSpan={9} className="p-8 text-center text-slate-400">Tidak ada riwayat transaksi penjualan ditemukan.</td>
+                                            <td colSpan={10} className="p-8 text-center text-slate-400">Tidak ada riwayat transaksi penjualan ditemukan.</td>
                                         </tr>
                                     )}
                                     {visibleTransactions.map(t => (
                                         <tr key={t.id} onClick={() => setDetailTransaction(t)} className="hover:bg-slate-50 cursor-pointer transition-colors group">
-                                            <td className="p-3.5 whitespace-nowrap">
-                                                <div className="font-semibold text-slate-800">
-                                                    {new Date(t.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                </div>
-                                                <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
-                                                    <span>{new Date(t.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
-                                                    <span>•</span>
-                                                    <span>#{t.id.substring(0, 8)}</span>
-                                                </div>
+                                            <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
+                                                {formatDateDateOnly(t.date)}
                                             </td>
-                                            <td className="p-3.5 font-mono text-xs font-bold text-slate-800 whitespace-nowrap">
-                                                {t.invoiceNumber || '-'}
+                                            <td className="p-3.5 whitespace-nowrap bg-amber-50/20">
+                                                <span className="font-mono text-xs font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded border border-amber-200 inline-block shadow-2xs">
+                                                    {formatTimeOnly(t.createdAt || t.date)}
+                                                </span>
+                                            </td>
+                                            <td className="p-3.5 whitespace-nowrap">
+                                                <div className="font-mono text-xs font-bold text-slate-800">{t.invoiceNumber || '-'}</div>
+                                                <div className="text-[10px] font-mono text-slate-400">#{t.id.substring(0, 8)}</div>
                                             </td>
                                             <td className="p-3.5 whitespace-nowrap">
                                                 <div className="font-semibold text-slate-800">{t.customerName}</div>
@@ -2549,12 +2538,6 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                     <button onClick={(e) => { e.stopPropagation(); printBluetoothInvoice(t); }} className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold border border-emerald-200 transition-colors flex items-center gap-1" title="Cetak Struk Bluetooth">
                                                         <Bluetooth size={12} /> BT
                                                     </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); printSuratJalan(t); }} className="px-2 py-1 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-lg text-[11px] font-semibold border border-slate-200 transition-colors flex items-center gap-1" title="Cetak Surat Jalan">
-                                                        <FileText size={12} /> SJ
-                                                    </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); printGoodsNote(t); }} className="px-2 py-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-[11px] font-semibold border border-indigo-200 transition-colors flex items-center gap-1" title="Cetak Nota Barang">
-                                                        <ShoppingBag size={12} /> Barang
-                                                    </button>
                                                     <button onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }} className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition-colors" title="Detail Transaksi">
                                                         <Eye size={14} />
                                                     </button>
@@ -2567,7 +2550,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                     ))}
                                     {visibleTransactions.length < filteredTransactions.length && (
                                         <tr>
-                                            <td colSpan={9} className="p-4 text-center text-slate-400">
+                                            <td colSpan={10} className="p-4 text-center text-slate-400">
                                                 <div ref={loadMoreRef}>Memuat transaksi berikutnya...</div>
                                             </td>
                                         </tr>
@@ -2725,251 +2708,6 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 </div>
                             ) : (
                                 <p className="text-slate-400 text-sm text-center">Pilih transaksi dari daftar di samping untuk memproses pembayaran utang pelanggan.</p>
-                            )}
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* --- TAB: PURCHASE HISTORY --- */}
-            {
-                activeTab === 'purchase_history' && (
-                    <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200">
-                        <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 flex justify-between">
-                            <span>Riwayat Pembelian Stok</span>
-                            <span className="text-indigo-600">Total: {formatIDR(filteredPurchases.reduce((s, p) => s + p.totalAmount, 0))}</span>
-                        </div>
-                        {searchQuery && (
-                            <div className="px-4 py-2 bg-primary/10 border-b border-primary/20 text-sm text-primary">
-                                <span className="font-medium">{filteredPurchases.length}</span> hasil ditemukan untuk "{searchQuery}"
-                            </div>
-                        )}
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
-                                    <tr>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('id')}>ID <SortIcon column="id" /></th>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('date')}>Tanggal <SortIcon column="date" /></th>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('invoiceNumber')}>Faktur <SortIcon column="invoiceNumber" /></th>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('supplierName')}>Supplier <SortIcon column="supplierName" /></th>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('description')}>Keterangan <SortIcon column="description" /></th>
-                                        <th className="p-4 font-medium">Item</th>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('totalAmount')}>Total <SortIcon column="totalAmount" /></th>
-                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('paymentStatus')}>Status <SortIcon column="paymentStatus" /></th>
-                                        <th className="p-4 font-medium text-right">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {visiblePurchases.map(p => (
-                                        <tr key={p.id} className="hover:bg-slate-50 cursor-pointer group" onClick={() => setDetailPurchase(p)}>
-                                            <td className="p-4 font-mono text-xs text-slate-400">#{p.id.substring(0, 6)}</td>
-                                            <td className="p-4 text-slate-600">
-                                                <div className="flex flex-col">
-                                                    <span>{new Date(p.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                                    <span className="text-xs text-slate-400">{new Date(p.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
-                                                </div>
-                                            </td>
-                                            <td className="p-4 font-mono text-sm text-slate-700">{p.invoiceNumber || '-'}</td>
-                                            <td className="p-4 font-medium text-slate-800">{p.supplierName}</td>
-                                            <td className="p-4 text-slate-600">
-                                                {p.type === PurchaseType.RETURN && p.originalPurchaseId
-                                                    ? (() => {
-                                                        const original = purchases.find(orig => orig.id === p.originalPurchaseId);
-                                                        return original?.invoiceNumber
-                                                            ? `Retur dari ${original.invoiceNumber}`
-                                                            : p.description;
-                                                    })()
-                                                    : p.description
-                                                }
-                                            </td>
-                                            <td className="p-4 text-slate-600">{p.items ? p.items.reduce((sum, i) => sum + i.qty, 0) : 0}</td>
-                                            <td className="p-4 text-slate-800">{formatIDR(p.totalAmount)}</td>
-                                            <td className="p-4">
-                                                <span className={`px-2 py-1 rounded text-xs font-bold ${p.type === PurchaseType.RETURN
-                                                    ? 'bg-purple-100 text-purple-600'
-                                                    : p.paymentStatus === 'LUNAS'
-                                                        ? 'bg-green-100 text-green-600'
-                                                        : p.paymentStatus === 'SEBAGIAN'
-                                                            ? 'bg-orange-100 text-orange-600'
-                                                            : 'bg-red-100 text-red-600'
-                                                    }`}>
-                                                    {p.type === PurchaseType.RETURN ? 'RETUR' : p.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : p.paymentStatus}
-                                                    {p.isReturned && p.type !== PurchaseType.RETURN ? ' (Ada Retur)' : ''}
-                                                </span>
-                                            </td>
-                                            <td className="p-4 text-right">
-                                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={(e) => { e.stopPropagation(); printPurchaseNote(p); }} className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 flex items-center gap-1" title="Cetak Nota">
-                                                        <Printer size={12} /> Nota
-                                                    </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); handleDeletePurchase(p.id); }} className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100 flex items-center gap-1" title="Hapus Pembelian">
-                                                        <Trash2 size={12} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {visiblePurchases.length < filteredPurchases.length && (
-                                        <tr>
-                                            <td colSpan={6} className="p-4 text-center text-slate-400">
-                                                <div ref={loadMoreRef}>Loading more...</div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* --- TAB: SUPPLIER DEBT (UTANG) --- */}
-            {
-                activeTab === 'debt_supplier' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 flex justify-between">
-                                <span>Daftar Utang ke Supplier</span>
-                                <span className="text-red-600">Total: {formatIDR(payables.reduce((s, p) => s + (p.totalAmount - p.amountPaid), 0))}</span>
-                            </div>
-                            {searchQuery && (
-                                <div className="px-4 py-2 bg-primary/10 border-b border-primary/20 text-sm text-primary">
-                                    <span className="font-medium">{payables.length}</span> hasil ditemukan untuk "{searchQuery}"
-                                </div>
-                            )}
-                            <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
-                                {payables.length === 0 && <div className="p-8 text-center text-slate-400">Tidak ada utang ke supplier.</div>}
-                                {visiblePayables.map(p => (
-                                    <div key={p.id} className={`p-4 cursor-pointer border-l-4 transition-colors ${selectedPayable?.id === p.id ? 'bg-red-50 border-red-500' : 'hover:bg-slate-50 border-transparent'}`} onClick={() => setSelectedPayable(p)}>
-                                        <div className="flex justify-between items-start mb-1">
-                                            <div>
-                                                <div className="font-medium text-slate-800">{p.supplierName}</div>
-                                                <div className="flex gap-2 items-center">
-                                                    {p.invoiceNumber && <span className="font-mono text-xs text-slate-700 font-bold">{p.invoiceNumber}</span>}
-                                                    <span className="font-mono text-xs text-slate-400">#{p.id.substring(0, 6)}</span>
-                                                </div>
-                                            </div>
-                                            <div className="text-red-600 font-bold">{formatIDR(p.totalAmount - p.amountPaid)}</div>
-                                        </div>
-                                        <div className="flex justify-between items-end text-xs text-slate-500">
-                                            <div>
-                                                <div className="mb-1">{p.description}</div>
-                                                <div className="flex items-center gap-2"><Calendar size={12} /> {formatDate(p.date)}</div>
-                                            </div>
-                                            <div>Total: {formatIDR(p.totalAmount)}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                                {visiblePayables.length < payables.length && (
-                                    <div className="p-4 text-center text-slate-400">
-                                        <div ref={loadMoreRef}>Loading more...</div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 h-fit sticky top-6">
-                            <h3 className="font-bold text-lg mb-4 text-slate-800">Bayar Utang Supplier</h3>
-                            {selectedPayable ? (
-                                <div className="space-y-4">
-                                    <div className="p-3 bg-red-50 rounded-lg text-red-800 text-sm">
-                                        <span className="block text-xs text-red-400 uppercase tracking-wider font-bold mb-1">Supplier</span>
-                                        <span className="font-bold text-lg">{selectedPayable.supplierName}</span>
-                                        <div className="text-xs text-red-600 mt-1 font-mono">
-                                            {selectedPayable.invoiceNumber ? `${selectedPayable.invoiceNumber} (Ref: #${selectedPayable.id.substring(0, 6)})` : `Ref: #${selectedPayable.id}`}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs text-slate-500">Sisa Utang</label>
-                                        <div className="text-2xl font-bold text-slate-900">{formatIDR(selectedPayable.totalAmount - selectedPayable.amountPaid)}</div>
-                                    </div>
-
-                                    {/* History */}
-                                    {selectedPayable.paymentHistory && selectedPayable.paymentHistory.length > 0 && (
-                                        <div className="bg-slate-50 p-3 rounded-lg max-h-40 overflow-y-auto border border-slate-200">
-                                            <p className="text-xs font-bold text-slate-500 mb-2 uppercase">Riwayat Pembayaran</p>
-                                            {selectedPayable.paymentHistory.map((ph, idx) => (
-                                                <div key={idx} className="flex justify-between text-xs text-slate-600 mb-2 border-b border-dashed border-slate-200 pb-1 last:border-0 last:pb-0 last:mb-0">
-                                                    <div className="flex flex-col">
-                                                        <span>{new Date(ph.date).toLocaleDateString('id-ID')}</span>
-                                                        <span className="text-[10px] text-slate-400">{new Date(ph.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                                                        {ph.note && <span className="text-[10px] italic text-slate-500">"{ph.note}"</span>}
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <span className="font-bold text-slate-700">{formatIDR(ph.amount)}</span>
-                                                        <div className="text-[10px] text-slate-400">{ph.method}</div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    <div>
-                                        <label htmlFor="payableRepaymentAmount" className="text-sm font-medium text-slate-700">Jumlah Bayar</label>
-                                        <input
-                                            id="payableRepaymentAmount"
-                                            name="payableRepaymentAmount"
-                                            type="text"
-                                            className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                                            value={payableRepaymentAmount}
-                                            onChange={e => setPayableRepaymentAmount(numericInput(e.target.value))}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="payableRepaymentMethod" className="text-sm font-medium text-slate-700">Metode Bayar</label>
-                                        <select
-                                            id="payableRepaymentMethod"
-                                            name="payableRepaymentMethod"
-                                            className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-lg"
-                                            value={payableRepaymentMethod}
-                                            onChange={e => {
-                                                setPayableRepaymentMethod(e.target.value as PaymentMethod);
-                                                setPayableBankId('');
-                                            }}
-                                        >
-                                            <option value={PaymentMethod.CASH}>Tunai</option>
-                                            <option value={PaymentMethod.TRANSFER}>Transfer</option>
-                                        </select>
-                                    </div>
-                                    {payableRepaymentMethod === PaymentMethod.TRANSFER && (
-                                        <div>
-                                            <label htmlFor="payableBankId" className="text-sm font-medium text-slate-700">Dari Rekening</label>
-                                            <select
-                                                id="payableBankId"
-                                                name="payableBankId"
-                                                className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-lg text-sm"
-                                                value={payableBankId}
-                                                onChange={e => setPayableBankId(e.target.value)}
-                                            >
-                                                <option value="">-- Pilih --</option>
-                                                {banks.sort((a, b) => a.bankName.localeCompare(b.bankName)).map(b => (
-                                                    <option key={b.id} value={b.id}>{b.bankName} - {b.accountNumber}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    )}
-                                    <div>
-                                        <label htmlFor="payableNote" className="text-sm font-medium text-slate-700">Catatan</label>
-                                        <input
-                                            id="payableNote"
-                                            name="payableNote"
-                                            type="text"
-                                            className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                                            value={payableNote}
-                                            onChange={e => setPayableNote(e.target.value)}
-                                            placeholder="Ket. tambahan"
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={initiateRepaymentSupplier}
-                                        className="w-full bg-primary text-white py-2 rounded-lg font-semibold hover:bg-primary/90"
-                                    >
-                                        Bayar Utang
-                                    </button>
-                                    <button onClick={() => setSelectedPayable(null)} className="w-full text-slate-400 text-sm hover:text-slate-600">Batal</button>
-                                </div>
-                            ) : (
-                                <p className="text-slate-400 text-sm text-center">Pilih data pembelian dari daftar di samping untuk memproses pembayaran utang ke supplier.</p>
                             )}
                         </div>
                     </div>

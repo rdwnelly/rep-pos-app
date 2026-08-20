@@ -23,6 +23,7 @@ import {
   SupplierHistory,
   TransferHistory,
   MonthlyReport,
+  TravelAgentCommission,
 } from "../../screens";
 import BeritaAcaraPage from "./berita-acara/page";
 
@@ -51,6 +52,7 @@ const pageMap: Record<
   finance: { component: Finance, requiresCurrentUser: true },
   customer_history: { component: CustomerHistory, requiresCurrentUser: true },
   supplier_history: { component: SupplierHistory, requiresCurrentUser: true },
+  travel_commission: { component: TravelAgentCommission, requiresCurrentUser: true },
   real_stock_check: { component: RealStockCheck, requiresCurrentUser: true },
   sold_items: { component: SoldItems, requiresCurrentUser: true },
   transfer_history: { component: TransferHistory, requiresCurrentUser: true },

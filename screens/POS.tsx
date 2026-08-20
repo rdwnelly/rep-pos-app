@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Trash2, User, Plus, Minus, ShoppingBag, Printer, CreditCard, Banknote, Clock, ScanLine, StickyNote, Image as ImageIcon, X, ChevronLeft, ClipboardList, CheckCircle } from 'lucide-react';
+import { Search, Trash2, User, Plus, Minus, ShoppingBag, Printer, CreditCard, Banknote, Clock, ScanLine, StickyNote, Image as ImageIcon, X, ChevronLeft, ClipboardList, CheckCircle, BadgePercent } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
-import { Product, CartItem, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, Category } from '../types';
+import { Product, CartItem, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, Category, TravelBookingCommission, CommissionMethod, CommissionStatus } from '../types';
 import { formatIDR, generateId, formatDate, toMySQLDate } from '../utils';
 import { generatePrintInvoice, PrintInvoiceOptions } from '../utils/printHelpers';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
@@ -51,6 +51,7 @@ export const POS: React.FC = () => {
   const customers = useData(() => StorageService.getCustomers(), [], 'customers') || [];
   const banks = useData(() => StorageService.getBanks(), [], 'banks') || [];
   const categories = useData(() => StorageService.getCategories(), [], 'categories') || [];
+  const travelAgents = useData(() => StorageService.getTravelAgents(), [], 'travel_agents') || [];
   const storeSettings = useData(() => StorageService.getStoreSettings(), [], 'store_settings');
 
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -61,6 +62,7 @@ export const POS: React.FC = () => {
 
   // Customer State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [selectedTravelAgentId, setSelectedTravelAgentId] = useState<string>('');
   const [customerName, setCustomerName] = useState('Pelanggan Umum'); // Still used for display or custom walk-in name
   const [customerPhone, setCustomerPhone] = useState('');
   const [tableNumber, setTableNumber] = useState('');
@@ -155,14 +157,14 @@ export const POS: React.FC = () => {
     });
 
     if (event && cartIconRef.current) {
-        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-        const startX = rect.left + rect.width / 2;
-        const startY = rect.top + rect.height / 2;
-        const id = Date.now().toString() + Math.random().toString();
-        setFlyingItems(prev => [...prev, { id, startX, startY, image: product.image }]);
-        setTimeout(() => {
-            setFlyingItems(prev => prev.filter(item => item.id !== id));
-        }, 500);
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      const startX = rect.left + rect.width / 2;
+      const startY = rect.top + rect.height / 2;
+      const id = Date.now().toString() + Math.random().toString();
+      setFlyingItems(prev => [...prev, { id, startX, startY, image: product.image }]);
+      setTimeout(() => {
+        setFlyingItems(prev => prev.filter(item => item.id !== id));
+      }, 500);
     }
   };
 
@@ -353,6 +355,38 @@ export const POS: React.FC = () => {
 
       printReceipt(txToPrint, settings, printOptions);
 
+      // Otomatis buat entri Komisi Agen jika Mitra Agen dipilih saat transaksi POS
+      if (selectedTravelAgentId) {
+        const agent = travelAgents.find(a => a.id === selectedTravelAgentId);
+        if (agent) {
+          const invoiceNum = savedTransaction?.invoiceNumber || txToPrint.invoiceNumber || `TRV-POS-${Date.now().toString().slice(-6)}`;
+          const commRate = 10;
+          const totalComm = Math.round((totalAmount * commRate) / 100);
+
+          const autoCommission: TravelBookingCommission = {
+            id: generateId(),
+            bookingCode: invoiceNum,
+            agentId: agent.id,
+            agentName: agent.name,
+            agentCategory: agent.category,
+            customerId: selectedCustomerId || '',
+            touristName: customerName || 'Wisatawan POS',
+            paxCount: 1,
+            tourPackage: `Penjualan Kasir POS (${cart.slice(0, 2).map(i => i.name).join(', ')}${cart.length > 2 ? '...' : ''})`,
+            departureDate: new Date().toISOString().split('T')[0],
+            totalSales: totalAmount,
+            commissionMethod: CommissionMethod.PERCENTAGE,
+            commissionRate: commRate,
+            totalCommission: totalComm,
+            status: CommissionStatus.PENDING,
+            notes: `Otomatis dari Kasir POS (${invoiceNum})`,
+            createdAt: new Date().toISOString()
+          };
+
+          await StorageService.saveTravelCommission(autoCommission);
+        }
+      }
+
       // Reset
       setCart([]);
       setAmountPaid('');
@@ -361,17 +395,18 @@ export const POS: React.FC = () => {
       setPaymentNote('');
       setSelectedBankId('');
       setSelectedCustomerId('');
+      setSelectedTravelAgentId('');
       setCustomerName('Pelanggan Umum');
       setTableNumber('');
       setShowPaymentModal(false);
       searchInputRef.current?.focus();
       setShowSuccessModal(true);
-      
+
       // Auto close after 3 seconds
       setTimeout(() => {
         setShowSuccessModal(false);
       }, 3000);
-      
+
     } catch (error) {
       console.error(error);
       alert('Gagal memproses transaksi. Silakan coba lagi.');
@@ -409,7 +444,7 @@ export const POS: React.FC = () => {
       {flyingItems.map(item => (
         <FlyingItem key={item.id} item={item} cartRect={cartIconRef.current?.getBoundingClientRect()} />
       ))}
-      
+
       {/* Product Catalog Grid Container */}
       <div className="flex-1 flex flex-col bg-slate-50 border-r border-slate-200 overflow-hidden">
         {/* Search Bar Header */}
@@ -449,11 +484,10 @@ export const POS: React.FC = () => {
           <div className="flex items-center gap-2 min-w-max">
             <button
               onClick={() => setSelectedCategory('')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                selectedCategory === ''
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedCategory === ''
                   ? 'bg-amber-600 text-white shadow-sm'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+                }`}
             >
               Semua Menu ({products.length})
             </button>
@@ -463,16 +497,14 @@ export const POS: React.FC = () => {
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                    selectedCategory === cat.id
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${selectedCategory === cat.id
                       ? 'bg-amber-600 text-white shadow-sm'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
+                    }`}
                 >
                   <span>{cat.name}</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                    selectedCategory === cat.id ? 'bg-amber-700/50 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}>{catCount}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${selectedCategory === cat.id ? 'bg-amber-700/50 text-white' : 'bg-slate-200 text-slate-700'
+                    }`}>{catCount}</span>
                 </button>
               );
             })}
@@ -495,9 +527,8 @@ export const POS: React.FC = () => {
                     <ImageIcon size={32} className="text-amber-400" />
                   </div>
                 )}
-                <span className={`absolute bottom-1.5 right-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-md shadow-sm ${
-                  product.stock <= 5 ? 'bg-rose-600/90 text-white' : 'bg-slate-900/80 text-white'
-                }`}>
+                <span className={`absolute bottom-1.5 right-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-md shadow-sm ${product.stock <= 5 ? 'bg-rose-600/90 text-white' : 'bg-slate-900/80 text-white'
+                  }`}>
                   {product.stock} {product.unit || 'Pcs'}
                 </span>
               </div>
@@ -600,6 +631,25 @@ export const POS: React.FC = () => {
                   ))}
               </select>
             </div>
+
+            {/* Travel Agent Selector for POS Commission */}
+            {travelAgents.length > 0 && (
+              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100">
+                <BadgePercent size={16} className="text-amber-600 flex-shrink-0" />
+                <select
+                  className="bg-amber-50/90 text-amber-900 font-semibold text-xs rounded-lg px-2 py-1.5 border border-amber-200 w-full outline-none"
+                  value={selectedTravelAgentId}
+                  onChange={(e) => setSelectedTravelAgentId(e.target.value)}
+                >
+                  <option value="">-- Pilihan Mitra Agen (Opsional Komisi) --</option>
+                  {travelAgents.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.category})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <div className="flex justify-between items-center text-sm text-slate-500">
@@ -765,7 +815,7 @@ export const POS: React.FC = () => {
 
             ))}
           </div>
-          </div>
+        </div>
 
         {/* Sticky Pay Button Area */}
         <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-4px_15px_rgba(0,0,0,0.05)] shrink-0 z-20 sticky bottom-0 mt-auto">
@@ -797,7 +847,7 @@ export const POS: React.FC = () => {
         showPaymentModal && createPortal(
           <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
             <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
-              
+
               {/* Sisi Kiri: Receipt Preview */}
               <div className="w-full md:w-5/12 bg-slate-50 border-r border-slate-200 p-6 flex flex-col relative overflow-hidden">
                 <div className="text-center mb-4 pb-4 border-b border-dashed border-slate-300 shrink-0">
@@ -958,7 +1008,7 @@ export const POS: React.FC = () => {
                             placeholder="0"
                           />
                         </div>
-                        
+
                         {/* Quick Cash Buttons */}
                         <div className="grid grid-cols-4 gap-2 mt-2">
                           <button onClick={() => setAmountPaid(totalAmount.toString())} className="py-2 bg-primary/10 text-primary font-bold rounded-lg text-sm hover:bg-primary/20 transition-colors">Uang Pas</button>
@@ -1018,7 +1068,7 @@ export const POS: React.FC = () => {
                 {/* Footer Action */}
                 <div className="mt-6 pt-4 border-t border-slate-100 flex gap-3 shrink-0">
                   <button onClick={() => setShowPaymentModal(false)} className="px-6 py-4 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition-colors">Batal</button>
-                  <button 
+                  <button
                     onClick={() => {
                       if (paymentMethod === PaymentMethod.TRANSFER) {
                         if (!selectedBankId) {
@@ -1029,13 +1079,13 @@ export const POS: React.FC = () => {
                       } else {
                         handleCheckout();
                       }
-                    }} 
+                    }}
                     className="flex-1 py-4 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/30 hover:bg-primary-hover hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 text-lg"
                   >
                     {paymentMethod === PaymentMethod.TRANSFER ? (
-                      <>Generate QRIS <ScanLine size={22}/></>
+                      <>Generate QRIS <ScanLine size={22} /></>
                     ) : (
-                      <>Proses & Cetak <Printer size={22}/></>
+                      <>Proses & Cetak <Printer size={22} /></>
                     )}
                   </button>
                 </div>
@@ -1051,8 +1101,8 @@ export const POS: React.FC = () => {
         showQrisModal && paymentMethod === PaymentMethod.TRANSFER && selectedBankId && createPortal(
           <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-slate-900/95 backdrop-blur-md z-[10000] flex items-center justify-center p-4 md:p-8 animate-fade-in">
             <div className="bg-white rounded-[2rem] w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col md:flex-row relative animate-scale-in">
-              <button 
-                onClick={() => setShowQrisModal(false)} 
+              <button
+                onClick={() => setShowQrisModal(false)}
                 className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-full transition-colors z-10"
               >
                 <X size={24} />
@@ -1079,20 +1129,20 @@ export const POS: React.FC = () => {
               <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
                 <h3 className="text-3xl font-black text-slate-800 mb-2">Selesaikan Pembayaran</h3>
                 <p className="text-slate-500 mb-10 text-lg">Mohon tunjukkan layar ini kepada pelanggan untuk dipindai.</p>
-                
+
                 <div className="mb-12">
                   <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Total Tagihan</p>
                   <p className="text-5xl font-black text-primary">{formatIDR(totalAmount)}</p>
                 </div>
-                
-                <button 
+
+                <button
                   onClick={() => {
                     setShowQrisModal(false);
                     handleCheckout(); // Actually process the transaction
-                  }} 
+                  }}
                   className="w-full py-5 bg-emerald-500 text-white rounded-2xl font-bold shadow-xl shadow-emerald-500/30 hover:bg-emerald-600 hover:-translate-y-1 active:translate-y-0 transition-all flex items-center justify-center gap-3 text-xl"
                 >
-                  Konfirmasi Sukses <Printer size={28}/>
+                  Konfirmasi Sukses <Printer size={28} />
                 </button>
               </div>
             </div>
@@ -1103,12 +1153,12 @@ export const POS: React.FC = () => {
 
       {/* Success Modal */}
       {showSuccessModal && createPortal(
-        <div 
+        <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
           onClick={() => setShowSuccessModal(false)}
           style={{ animation: 'fadeIn 0.2s ease-out' }}
         >
-          <div 
+          <div
             className="bg-white rounded-3xl shadow-2xl p-10 flex flex-col items-center gap-4 max-w-sm mx-4"
             onClick={e => e.stopPropagation()}
             style={{ animation: 'scaleIn 0.3s ease-out' }}
@@ -1118,7 +1168,7 @@ export const POS: React.FC = () => {
             </div>
             <h3 className="text-2xl font-bold text-slate-800">Transaksi Berhasil!</h3>
             <p className="text-slate-500 text-center text-sm">Transaksi telah berhasil diproses dan disimpan.</p>
-            <button 
+            <button
               onClick={() => setShowSuccessModal(false)}
               className="mt-2 px-8 py-3 bg-emerald-500 text-white rounded-xl font-semibold hover:bg-emerald-600 active:scale-95 transition-all shadow-lg shadow-emerald-500/25"
             >

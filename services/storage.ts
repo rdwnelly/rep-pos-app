@@ -1,4 +1,4 @@
-import { Product, Transaction, User, CashFlow, Category, Division, Customer, Supplier, Purchase, StoreSettings, BankAccount, SyncQueueItem } from "../types";
+import { Product, Transaction, User, CashFlow, Category, Division, Customer, Supplier, Purchase, StoreSettings, BankAccount, SyncQueueItem, TravelAgent, TravelBookingCommission } from "../types";
 import { ApiService } from "./api";
 
 // Simple Event Bus for Data Changes
@@ -294,5 +294,33 @@ export const StorageService = {
   deleteBeritaAcaraArchive: async (id: string) => {
     await ApiService.deleteBeritaAcaraArchive(id);
     notifyListeners('berita_acara_archives');
+  },
+
+  // Travel Agents
+  getTravelAgents: async (): Promise<TravelAgent[]> => {
+    return await ApiService.getTravelAgents();
+  },
+  saveTravelAgent: async (agent: TravelAgent) => {
+    if (!agent.id) await ApiService.saveTravelAgent(agent);
+    else await ApiService.updateTravelAgent(agent);
+    notifyListeners('travel_agents');
+  },
+  deleteTravelAgent: async (id: string) => {
+    await ApiService.deleteTravelAgent(id);
+    notifyListeners('travel_agents');
+  },
+
+  // Travel Commissions
+  getTravelCommissions: async (): Promise<TravelBookingCommission[]> => {
+    return await ApiService.getTravelCommissions();
+  },
+  saveTravelCommission: async (commission: TravelBookingCommission) => {
+    if (!commission.id) await ApiService.saveTravelCommission(commission);
+    else await ApiService.updateTravelCommission(commission);
+    notifyListeners('travel_commissions');
+  },
+  deleteTravelCommission: async (id: string) => {
+    await ApiService.deleteTravelCommission(id);
+    notifyListeners('travel_commissions');
   },
 };

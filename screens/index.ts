@@ -13,3 +13,4 @@ export { SoldItems } from "./SoldItems";
 export { SupplierHistory } from "./SupplierHistory";
 export { TransferHistory } from "./TransferHistory";
 export { MonthlyReport } from "./MonthlyReport";
+export { TravelAgentCommission } from "./TravelAgentCommission";

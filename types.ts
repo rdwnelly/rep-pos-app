@@ -127,6 +127,8 @@ export interface Transaction {
   discountType?: 'PERCENTAGE' | 'FIXED';
   discountAmount?: number;
   tableNumber?: string; // New: Optional table number
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export enum PurchaseType {
@@ -157,6 +159,8 @@ export interface Purchase {
   invoiceNumber?: string; // New: Generated Invoice Number (POXX-XXXX)
   userId?: string; // New: User who recorded this purchase
   userName?: string; // New: Name of user who recorded this purchase
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export enum CashFlowType {
@@ -256,4 +260,53 @@ export interface BeritaAcaraArchive extends BaseEntity {
   totalExpense: number;
   totalClean: number;
   createdAt: number;
+}
+
+export enum CommissionMethod {
+  PERCENTAGE = 'PERCENTAGE',
+  FLAT_PER_PAX = 'FLAT_PER_PAX',
+  FLAT_PER_GROUP = 'FLAT_PER_GROUP'
+}
+
+export enum CommissionStatus {
+  PENDING = 'PENDING',
+  PAID = 'PAID',
+  CANCELLED = 'CANCELLED'
+}
+
+export interface TravelAgent extends BaseEntity {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  category: string;
+  bankName: string;
+  accountNumber: string;
+  holderName: string;
+  notes?: string;
+  createdAt?: string;
+}
+
+export interface TravelBookingCommission extends BaseEntity {
+  id: string;
+  bookingCode: string;
+  agentId: string;
+  agentName: string;
+  agentCategory?: string;
+  customerId?: string;
+  touristName: string;
+  paxCount: number;
+  tourPackage: string;
+  departureDate: string;
+  totalSales: number;
+  commissionMethod: CommissionMethod;
+  commissionRate: number;
+  totalCommission: number;
+  status: CommissionStatus;
+  paymentDate?: string;
+  paymentMethod?: PaymentMethod;
+  bankId?: string;
+  bankName?: string;
+  notes?: string;
+  createdAt?: string;
 }
