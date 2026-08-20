@@ -127,7 +127,9 @@ export interface Transaction {
   discount?: number;
   discountType?: 'PERCENTAGE' | 'FIXED';
   discountAmount?: number;
+  subtotal?: number;
   tableNumber?: string; // New: Optional table number
+  revisionCount?: number; // New: Revision count for Reopen / Add-on Order
   createdAt?: string;
   updatedAt?: string;
 }

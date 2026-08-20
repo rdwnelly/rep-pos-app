@@ -7,7 +7,7 @@ import { formatIDR, formatDate, formatDateDateOnly, formatTimeOnly, exportToCSV,
 import { generatePrintInvoice, generatePrintTransactionDetail, generatePrintPurchaseDetail, generatePrintPurchaseNote } from '../utils/printHelpers';
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
-import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet, Bluetooth, Receipt, UserCheck, Truck, DollarSign, PieChart, BookOpen } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet, Bluetooth, Receipt, UserCheck, Truck, DollarSign, PieChart, BookOpen, RefreshCw } from 'lucide-react';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 
 interface FinanceProps {
@@ -3197,7 +3197,21 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                         <Trash2 size={20} />
                                     </button>
                                 )}
-                                <div className="flex justify-end gap-2 ml-auto">
+                                <div className="flex justify-end gap-2 ml-auto flex-wrap">
+                                    {detailTransaction.type !== TransactionType.RETURN && (
+                                        <button
+                                            onClick={() => {
+                                                if (confirm(`Buka kembali transaksi #${detailTransaction.invoiceNumber || detailTransaction.id.substring(0, 8)} untuk penambahan pesanan (Add-on Order / Reopen)?`)) {
+                                                    sessionStorage.setItem('pos_reopen_transaction', JSON.stringify(detailTransaction));
+                                                    window.location.href = '/pos';
+                                                }
+                                            }}
+                                            className="bg-indigo-50 border border-indigo-300 text-indigo-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-100 flex items-center gap-2"
+                                            title="Reopen transaksi untuk menambah pesanan barang baru"
+                                        >
+                                            <RefreshCw size={16} /> Reopen / Tambah Pesanan
+                                        </button>
+                                    )}
                                     {detailTransaction.type !== TransactionType.RETURN && (
                                         <button
                                             onClick={() => openReturnTxModal(detailTransaction)}
