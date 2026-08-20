@@ -817,8 +817,8 @@ export const POS: React.FC = () => {
           </div>
         </div>
 
-        {/* Sticky Pay Button Area */}
-        <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-4px_15px_rgba(0,0,0,0.05)] shrink-0 z-20 sticky bottom-0 mt-auto">
+        {/* Floating Sticky Pay Button Area */}
+        <div className="p-4 bg-white border-t border-slate-200 shadow-[0_-8px_20px_rgba(0,0,0,0.08)] shrink-0 z-30 sticky bottom-0 mt-auto">
           <button
             onClick={() => {
               if (discountType === 'PERCENTAGE' && discount > 100) {
@@ -833,7 +833,7 @@ export const POS: React.FC = () => {
               setShowPaymentModal(true);
             }}
             disabled={cart.length === 0}
-            className="w-full bg-primary text-white py-3.5 rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary-hover active:translate-y-0 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-2 text-lg"
+            className="w-full bg-primary text-white py-3.5 rounded-xl font-bold shadow-lg shadow-primary/30 hover:bg-primary-hover active:translate-y-0 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-2 text-lg cursor-pointer"
           >
             <Printer size={22} />
             Bayar & Cetak
@@ -1065,9 +1065,9 @@ export const POS: React.FC = () => {
                   )}
                 </div>
 
-                {/* Footer Action */}
-                <div className="mt-6 pt-4 border-t border-slate-100 flex gap-3 shrink-0">
-                  <button onClick={() => setShowPaymentModal(false)} className="px-6 py-4 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition-colors">Batal</button>
+                {/* Floating Footer Action */}
+                <div className="sticky bottom-0 bg-white pt-4 pb-2 border-t border-slate-200 flex gap-3 shrink-0 mt-auto shadow-[0_-12px_24px_rgba(0,0,0,0.12)] -mx-6 -mb-6 p-6 z-30 rounded-b-2xl">
+                  <button onClick={() => setShowPaymentModal(false)} className="px-6 py-3.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition-colors">Batal</button>
                   <button
                     onClick={() => {
                       if (paymentMethod === PaymentMethod.TRANSFER) {
@@ -1080,12 +1080,12 @@ export const POS: React.FC = () => {
                         handleCheckout();
                       }
                     }}
-                    className="flex-1 py-4 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/30 hover:bg-primary-hover hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 text-lg"
+                    className="flex-1 py-3.5 bg-primary text-white rounded-xl font-bold shadow-xl shadow-primary/30 hover:bg-primary-hover hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 text-lg cursor-pointer"
                   >
                     {paymentMethod === PaymentMethod.TRANSFER ? (
                       <>Generate QRIS <ScanLine size={22} /></>
                     ) : (
-                      <>Proses & Cetak <Printer size={22} /></>
+                      <><Printer size={22} /> Bayar & Cetak</>
                     )}
                   </button>
                 </div>
