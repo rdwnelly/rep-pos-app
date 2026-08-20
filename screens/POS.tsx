@@ -720,8 +720,29 @@ export const POS: React.FC = () => {
               <span className="text-slate-600 font-bold">Total Tagihan</span>
               <span className="text-2xl font-bold text-slate-900">{formatIDR(totalAmount)}</span>
             </div>
+
+            {/* Floating Action Button */}
+            <button
+              onClick={() => {
+                if (discountType === 'PERCENTAGE' && discount > 100) {
+                  alert('Diskon tidak valid: Tidak boleh lebih dari 100%');
+                  return;
+                }
+                if (discountType === 'FIXED' && discount > subtotal) {
+                  alert('Diskon tidak valid: Tidak boleh melebihi subtotal');
+                  return;
+                }
+                setAmountPaid(''); // Reset on open
+                setShowPaymentModal(true);
+              }}
+              disabled={cart.length === 0}
+              className="w-full mt-3 bg-primary text-white py-3.5 rounded-2xl font-extrabold shadow-xl shadow-primary/30 hover:shadow-2xl hover:shadow-primary/40 hover:-translate-y-1 active:translate-y-0 active:scale-[0.99] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-2.5 text-lg cursor-pointer border border-white/20 tracking-wide"
+            >
+              <Printer size={22} />
+              Bayar & Cetak
+            </button>
           </div>
-          <div className="mt-3 grid grid-cols-1 gap-2">
+          <div className="mt-2 grid grid-cols-1 gap-2">
             {cart.length > 0 && (
               <button
                 onClick={() => {
@@ -729,9 +750,9 @@ export const POS: React.FC = () => {
                     setCart([]);
                   }
                 }}
-                className="py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors flex items-center justify-center gap-2 w-full"
+                className="py-1.5 bg-red-50 text-red-600 rounded-xl text-xs font-medium hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5 w-full"
               >
-                <Trash2 size={16} />
+                <Trash2 size={14} />
                 Kosongkan Keranjang
               </button>
             )}
@@ -817,28 +838,7 @@ export const POS: React.FC = () => {
           </div>
         </div>
 
-        {/* Floating Sticky Pay Button Area */}
-        <div className="p-4 bg-white border-t border-slate-200 shadow-[0_-8px_20px_rgba(0,0,0,0.08)] shrink-0 z-30 sticky bottom-0 mt-auto">
-          <button
-            onClick={() => {
-              if (discountType === 'PERCENTAGE' && discount > 100) {
-                alert('Diskon tidak valid: Tidak boleh lebih dari 100%');
-                return;
-              }
-              if (discountType === 'FIXED' && discount > subtotal) {
-                alert('Diskon tidak valid: Tidak boleh melebihi subtotal');
-                return;
-              }
-              setAmountPaid(''); // Reset on open
-              setShowPaymentModal(true);
-            }}
-            disabled={cart.length === 0}
-            className="w-full bg-primary text-white py-3.5 rounded-xl font-bold shadow-lg shadow-primary/30 hover:bg-primary-hover active:translate-y-0 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-2 text-lg cursor-pointer"
-          >
-            <Printer size={22} />
-            Bayar & Cetak
-          </button>
-        </div>
+
       </div>
 
 
