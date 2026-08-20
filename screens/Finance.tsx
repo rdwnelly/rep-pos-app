@@ -79,6 +79,8 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     const [paymentMethodFilter, setPaymentMethodFilter] = useState(''); // Filter payment method for cashflow
     const [statusFilter, setStatusFilter] = useState(''); // Filter payment status/type for transactions/purchases
     const [userFilter, setUserFilter] = useState(''); // Filter by user/cashier
+    const [txPaymentMethodFilter, setTxPaymentMethodFilter] = useState<string>(''); // Filter payment method for transactions
+    const [groupByPaymentMethod, setGroupByPaymentMethod] = useState<boolean>(false); // Group view toggle for transactions
 
     // Sort State
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -733,7 +735,78 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         });
     };
 
-    const filteredTransactions = useMemo(() => sortItems(applySearch(applyDateFilter(applyUserFilter(applyStatusFilter(applyCashierFilter(transactions, 'transaction'), 'transaction'), 'transaction')), 'transaction')), [transactions, searchQuery, startDate, endDate, sortConfig, currentUser, userFilter, statusFilter]);
+    const applyTxPaymentMethodFilter = (items: Transaction[]) => {
+        if (!txPaymentMethodFilter) return items;
+        return items.filter(t => {
+            if (txPaymentMethodFilter === 'TEMPO' || txPaymentMethodFilter === 'BON') {
+                return (t.paymentMethod as string) === 'TEMPO' || t.paymentMethod === PaymentMethod.BON;
+            }
+            return t.paymentMethod === txPaymentMethodFilter;
+        });
+    };
+
+    const filteredTransactions = useMemo(() => sortItems(applySearch(applyTxPaymentMethodFilter(applyDateFilter(applyUserFilter(applyStatusFilter(applyCashierFilter(transactions, 'transaction'), 'transaction'), 'transaction'))), 'transaction')), [transactions, searchQuery, startDate, endDate, sortConfig, currentUser, userFilter, statusFilter, txPaymentMethodFilter]);
+
+    const txMethodSummary = useMemo(() => {
+        let cashTotal = 0, cashCount = 0;
+        let transferTotal = 0, transferCount = 0;
+        let bonTotal = 0, bonCount = 0;
+        let qrisTotal = 0, qrisCount = 0;
+
+        filteredTransactions.forEach(t => {
+            const m = (t.paymentMethod || '').toString().toUpperCase();
+            if (m === 'CASH' || m === 'TUNAI') {
+                cashTotal += t.totalAmount;
+                cashCount++;
+            } else if (m === 'TRANSFER' || m === 'BANK') {
+                transferTotal += t.totalAmount;
+                transferCount++;
+            } else if (m === 'TEMPO' || m === 'BON' || m === 'HUTANG') {
+                bonTotal += t.totalAmount;
+                bonCount++;
+            } else if (m === 'QRIS' || m === 'E-WALLET' || m === 'EWALLET') {
+                qrisTotal += t.totalAmount;
+                qrisCount++;
+            } else {
+                cashTotal += t.totalAmount;
+                cashCount++;
+            }
+        });
+
+        return {
+            cashTotal, cashCount,
+            transferTotal, transferCount,
+            bonTotal, bonCount,
+            qrisTotal, qrisCount
+        };
+    }, [filteredTransactions]);
+
+    const groupedTransactionsByMethod = useMemo(() => {
+        const groups: Record<string, Transaction[]> = {
+            'TUNAI (CASH)': [],
+            'TRANSFER BANK': [],
+            'BON / HUTANG (TEMPO)': [],
+            'QRIS / DIGITAL': [],
+            'LAINNYA': []
+        };
+
+        filteredTransactions.forEach(t => {
+            const m = (t.paymentMethod || '').toString().toUpperCase();
+            if (m === 'CASH' || m === 'TUNAI') {
+                groups['TUNAI (CASH)'].push(t);
+            } else if (m === 'TRANSFER' || m === 'BANK') {
+                groups['TRANSFER BANK'].push(t);
+            } else if (m === 'TEMPO' || m === 'BON' || m === 'HUTANG') {
+                groups['BON / HUTANG (TEMPO)'].push(t);
+            } else if (m === 'QRIS' || m === 'E-WALLET' || m === 'EWALLET') {
+                groups['QRIS / DIGITAL'].push(t);
+            } else {
+                groups['LAINNYA'].push(t);
+            }
+        });
+
+        return groups;
+    }, [filteredTransactions]);
     const filteredPurchases = useMemo(() => sortItems(applySearch(applyDateFilter(applyUserFilter(applyStatusFilter(applyCashierFilter(purchases, 'purchase'), 'purchase'), 'purchase')), 'purchase')), [purchases, searchQuery, startDate, endDate, sortConfig, currentUser, userFilter, statusFilter]);
     const filteredCashFlows = useMemo(() => sortItems(applySearch(applyPaymentMethodFilter(applyCategoryFilter(applyDateFilter(applyUserFilter(applyCashierFilter(cashFlows, 'cashflow'), 'cashflow')))), 'cashflow')), [cashFlows, searchQuery, startDate, endDate, categoryFilter, paymentMethodFilter, sortConfig, currentUser, userFilter]);
 
@@ -2236,26 +2309,48 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                         )}
 
                         {activeTab === 'history' && (
-                            <div className="relative min-w-[150px]">
-                                <select
-                                    id="statusFilter"
-                                    name="statusFilter"
-                                    className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-700 pr-8 appearance-none cursor-pointer font-medium"
-                                    value={statusFilter}
-                                    onChange={e => setStatusFilter(e.target.value)}
-                                >
-                                    <option value="">Semua Status</option>
-                                    <option value={PaymentStatus.PAID}>Lunas</option>
-                                    <option value={PaymentStatus.PARTIAL}>Sebagian</option>
-                                    <option value={PaymentStatus.UNPAID}>Belum Lunas</option>
-                                    <option value="RETUR">Retur</option>
-                                </select>
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                    <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
+                            <>
+                                <div className="relative min-w-[170px]">
+                                    <label htmlFor="txPaymentMethodFilter" className="sr-only">Filter Metode Pembayaran</label>
+                                    <select
+                                        id="txPaymentMethodFilter"
+                                        name="txPaymentMethodFilter"
+                                        className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-700 pr-8 appearance-none cursor-pointer font-bold"
+                                        value={txPaymentMethodFilter}
+                                        onChange={e => setTxPaymentMethodFilter(e.target.value)}
+                                    >
+                                        <option value="">Semua Metode Bayar</option>
+                                        <option value={PaymentMethod.CASH}>💵 Tunai (CASH)</option>
+                                        <option value={PaymentMethod.TRANSFER}>🏦 Transfer Bank</option>
+                                        <option value={PaymentMethod.BON}>📑 BON / Hutang (Tempo)</option>
+                                        <option value={PaymentMethod.QRIS}>📱 QRIS / E-Wallet</option>
+                                    </select>
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                        <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
                                 </div>
-                            </div>
+
+                                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
+                                    <button
+                                        type="button"
+                                        onClick={() => setGroupByPaymentMethod(false)}
+                                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${!groupByPaymentMethod ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                        title="Tampilan Tabel Standar"
+                                    >
+                                        📋 Tabel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setGroupByPaymentMethod(true)}
+                                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${groupByPaymentMethod ? 'bg-amber-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                        title="Kelompokkan Berdasarkan Metode Pembayaran"
+                                    >
+                                        📁 Kelompokkan Metode
+                                    </button>
+                                </div>
+                            </>
                         )}
                     </div>
                 )}
@@ -2432,131 +2527,279 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             {/* --- TAB: SALES TRANSACTION HISTORY --- */}
             {
                 activeTab === 'history' && (
-                    <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200">
-                        <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 text-xs flex justify-between items-center">
-                            <span className="flex items-center gap-2 font-bold text-slate-800 text-sm">
-                                <Receipt className="text-amber-600" size={18} />
-                                Riwayat Transaksi Penjualan ({filteredTransactions.length})
-                            </span>
-                            <span className="text-amber-700 font-extrabold text-sm">
-                                Total: {formatIDR(filteredTransactions.reduce((s, t) => s + t.totalAmount, 0))}
-                            </span>
-                        </div>
-                        {searchQuery && (
-                            <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-900 font-medium">
-                                <span>{filteredTransactions.length}</span> hasil transaksi ditemukan untuk "{searchQuery}"
+                    <div className="space-y-4">
+                        {/* Rekapitulasi Metode Transaksi (Method Cards Bar) */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                            <div
+                                onClick={() => setTxPaymentMethodFilter(txPaymentMethodFilter === PaymentMethod.CASH ? '' : PaymentMethod.CASH)}
+                                className={`p-3 rounded-2xl border cursor-pointer transition-all ${txPaymentMethodFilter === PaymentMethod.CASH ? 'bg-emerald-600 text-white border-emerald-700 shadow-md scale-[1.02]' : 'bg-white border-slate-200 text-slate-800 hover:bg-emerald-50/50 shadow-2xs'}`}
+                            >
+                                <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wide opacity-80">
+                                    <span>💵 Tunai (CASH)</span>
+                                    <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${txPaymentMethodFilter === PaymentMethod.CASH ? 'bg-white/30 text-white' : 'bg-slate-100 text-slate-700'}`}>{txMethodSummary.cashCount} Tx</span>
+                                </div>
+                                <div className={`text-base font-black mt-1 ${txPaymentMethodFilter === PaymentMethod.CASH ? 'text-white' : 'text-emerald-600'}`}>{formatIDR(txMethodSummary.cashTotal)}</div>
                             </div>
-                        )}
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs">
-                                <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
-                                    <tr>
-                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('date')}>Tanggal <SortIcon column="date" /></th>
-                                        <th className="p-3.5 bg-amber-50/60 border-b-2 border-amber-500/50 cursor-pointer" onClick={() => handleSort('date')}>
-                                            <div className="flex items-center gap-1.5 text-amber-900 font-extrabold">
-                                                Waktu / Jam
-                                                <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded-md font-mono tracking-tight shadow-xs">
-                                                    ↓ Terbaru
-                                                </span>
-                                            </div>
-                                        </th>
-                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('invoiceNumber')}>No Faktur & Ref <SortIcon column="invoiceNumber" /></th>
-                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('customerName')}>Pelanggan <SortIcon column="customerName" /></th>
-                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentMethod')}>Metode <SortIcon column="paymentMethod" /></th>
-                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentNote')}>Keterangan <SortIcon column="paymentNote" /></th>
-                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('totalAmount')}>Total <SortIcon column="totalAmount" /></th>
-                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('discountAmount')}>Diskon <SortIcon column="discountAmount" /></th>
-                                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentStatus')}>Status <SortIcon column="paymentStatus" /></th>
-                                        <th className="p-3.5 text-center whitespace-nowrap">Aksi Cetak & Opsi</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {filteredTransactions.length === 0 && (
+
+                            <div
+                                onClick={() => setTxPaymentMethodFilter(txPaymentMethodFilter === PaymentMethod.TRANSFER ? '' : PaymentMethod.TRANSFER)}
+                                className={`p-3 rounded-2xl border cursor-pointer transition-all ${txPaymentMethodFilter === PaymentMethod.TRANSFER ? 'bg-blue-600 text-white border-blue-700 shadow-md scale-[1.02]' : 'bg-white border-slate-200 text-slate-800 hover:bg-blue-50/50 shadow-2xs'}`}
+                            >
+                                <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wide opacity-80">
+                                    <span>🏦 Transfer Bank</span>
+                                    <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${txPaymentMethodFilter === PaymentMethod.TRANSFER ? 'bg-white/30 text-white' : 'bg-slate-100 text-slate-700'}`}>{txMethodSummary.transferCount} Tx</span>
+                                </div>
+                                <div className={`text-base font-black mt-1 ${txPaymentMethodFilter === PaymentMethod.TRANSFER ? 'text-white' : 'text-blue-600'}`}>{formatIDR(txMethodSummary.transferTotal)}</div>
+                            </div>
+
+                            <div
+                                onClick={() => setTxPaymentMethodFilter(txPaymentMethodFilter === PaymentMethod.BON ? '' : PaymentMethod.BON)}
+                                className={`p-3 rounded-2xl border cursor-pointer transition-all ${txPaymentMethodFilter === PaymentMethod.BON || txPaymentMethodFilter === 'TEMPO' ? 'bg-rose-600 text-white border-rose-700 shadow-md scale-[1.02]' : 'bg-white border-slate-200 text-slate-800 hover:bg-rose-50/50 shadow-2xs'}`}
+                            >
+                                <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wide opacity-80">
+                                    <span>📑 BON / Hutang</span>
+                                    <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${txPaymentMethodFilter === PaymentMethod.BON || txPaymentMethodFilter === 'TEMPO' ? 'bg-white/30 text-white' : 'bg-slate-100 text-slate-700'}`}>{txMethodSummary.bonCount} Tx</span>
+                                </div>
+                                <div className={`text-base font-black mt-1 ${txPaymentMethodFilter === PaymentMethod.BON || txPaymentMethodFilter === 'TEMPO' ? 'text-white' : 'text-rose-600'}`}>{formatIDR(txMethodSummary.bonTotal)}</div>
+                            </div>
+
+                            <div
+                                onClick={() => setTxPaymentMethodFilter(txPaymentMethodFilter === PaymentMethod.QRIS ? '' : PaymentMethod.QRIS)}
+                                className={`p-3 rounded-2xl border cursor-pointer transition-all ${txPaymentMethodFilter === PaymentMethod.QRIS ? 'bg-purple-600 text-white border-purple-700 shadow-md scale-[1.02]' : 'bg-white border-slate-200 text-slate-800 hover:bg-purple-50/50 shadow-2xs'}`}
+                            >
+                                <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wide opacity-80">
+                                    <span>📱 QRIS / Digital</span>
+                                    <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${txPaymentMethodFilter === PaymentMethod.QRIS ? 'bg-white/30 text-white' : 'bg-slate-100 text-slate-700'}`}>{txMethodSummary.qrisCount} Tx</span>
+                                </div>
+                                <div className={`text-base font-black mt-1 ${txPaymentMethodFilter === PaymentMethod.QRIS ? 'text-white' : 'text-purple-600'}`}>{formatIDR(txMethodSummary.qrisTotal)}</div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200">
+                            <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 text-xs flex justify-between items-center">
+                                <span className="flex items-center gap-2 font-bold text-slate-800 text-sm">
+                                    <Receipt className="text-amber-600" size={18} />
+                                    Riwayat Transaksi Penjualan ({filteredTransactions.length})
+                                </span>
+                                <span className="text-amber-700 font-extrabold text-sm">
+                                    Total: {formatIDR(filteredTransactions.reduce((s, t) => s + t.totalAmount, 0))}
+                                </span>
+                            </div>
+                            {searchQuery && (
+                                <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-900 font-medium">
+                                    <span>{filteredTransactions.length}</span> hasil transaksi ditemukan untuk "{searchQuery}"
+                                </div>
+                            )}
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
                                         <tr>
-                                            <td colSpan={10} className="p-8 text-center text-slate-400">Tidak ada riwayat transaksi penjualan ditemukan.</td>
-                                        </tr>
-                                    )}
-                                    {visibleTransactions.map(t => (
-                                        <tr key={t.id} onClick={() => setDetailTransaction(t)} className="hover:bg-slate-50 cursor-pointer transition-colors group">
-                                            <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
-                                                {formatDateDateOnly(t.date)}
-                                            </td>
-                                            <td className="p-3.5 whitespace-nowrap bg-amber-50/20">
-                                                <span className="font-mono text-xs font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded border border-amber-200 inline-block shadow-2xs">
-                                                    {formatTimeOnly(t.createdAt || t.date)}
-                                                </span>
-                                            </td>
-                                            <td className="p-3.5 whitespace-nowrap">
-                                                <div className="font-mono text-xs font-bold text-slate-800">{t.invoiceNumber || '-'}</div>
-                                                <div className="text-[10px] font-mono text-slate-400">#{t.id.substring(0, 8)}</div>
-                                            </td>
-                                            <td className="p-3.5 whitespace-nowrap">
-                                                <div className="font-semibold text-slate-800">{t.customerName}</div>
-                                                {t.customerPhone && <div className="text-[10px] text-slate-400 font-mono">{t.customerPhone}</div>}
-                                            </td>
-                                            <td className="p-3.5 text-slate-700 font-medium whitespace-nowrap">
-                                                <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-bold">
-                                                    {t.paymentMethod} {t.bankName ? `(${t.bankName})` : ''}
-                                                </span>
-                                            </td>
-                                            <td className="p-3.5 text-slate-600 max-w-[200px] truncate">
-                                                {t.type === TransactionType.RETURN && t.originalTransactionId
-                                                    ? (() => {
-                                                        const original = transactions.find(orig => orig.id === t.originalTransactionId);
-                                                        return original?.invoiceNumber
-                                                            ? `Retur dari ${original.invoiceNumber}`
-                                                            : (t.paymentNote || '-');
-                                                    })()
-                                                    : (t.paymentNote || '-')
-                                                }
-                                            </td>
-                                            <td className="p-3.5 font-extrabold text-slate-900 whitespace-nowrap">
-                                                {formatIDR(t.totalAmount)}
-                                            </td>
-                                            <td className="p-3.5 text-rose-600 font-bold whitespace-nowrap">
-                                                {t.discountAmount ? `-${formatIDR(t.discountAmount)}` : '-'}
-                                            </td>
-                                            <td className="p-3.5 whitespace-nowrap">
-                                                <span className={`px-2.5 py-0.5 rounded text-[10px] font-extrabold border ${
-                                                    t.type === TransactionType.RETURN
-                                                        ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                                        : t.paymentStatus === 'LUNAS'
-                                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                                            : t.paymentStatus === 'BELUM_LUNAS'
-                                                                ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                                                : 'bg-amber-50 text-amber-800 border-amber-200'
-                                                }`}>
-                                                    {t.type === TransactionType.RETURN ? 'RETUR' : t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus}
-                                                    {t.isReturned && t.type !== TransactionType.RETURN ? ' (Ada Retur)' : ''}
-                                                </span>
-                                            </td>
-                                            <td className="p-3.5 text-center whitespace-nowrap">
-                                                <div className="flex items-center justify-center gap-1.5">
-                                                    <button onClick={(e) => { e.stopPropagation(); printInvoice(t); }} className="px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-semibold border border-amber-200 transition-colors flex items-center gap-1" title="Cetak Nota">
-                                                        <Printer size={12} /> Nota
-                                                    </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); printBluetoothInvoice(t); }} className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold border border-emerald-200 transition-colors flex items-center gap-1" title="Cetak Struk Bluetooth">
-                                                        <Bluetooth size={12} /> BT
-                                                    </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }} className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition-colors" title="Detail Transaksi">
-                                                        <Eye size={14} />
-                                                    </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }} className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition-colors" title="Hapus Transaksi">
-                                                        <Trash2 size={14} />
-                                                    </button>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('date')}>Tanggal <SortIcon column="date" /></th>
+                                            <th className="p-3.5 bg-amber-50/60 border-b-2 border-amber-500/50 cursor-pointer" onClick={() => handleSort('date')}>
+                                                <div className="flex items-center gap-1.5 text-amber-900 font-extrabold">
+                                                    Waktu / Jam
+                                                    <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded-md font-mono tracking-tight shadow-xs">
+                                                        ↓ Terbaru
+                                                    </span>
                                                 </div>
-                                            </td>
+                                            </th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('invoiceNumber')}>No Faktur & Ref <SortIcon column="invoiceNumber" /></th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('customerName')}>Pelanggan <SortIcon column="customerName" /></th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentMethod')}>Metode <SortIcon column="paymentMethod" /></th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentNote')}>Keterangan <SortIcon column="paymentNote" /></th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('totalAmount')}>Total <SortIcon column="totalAmount" /></th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('discountAmount')}>Diskon <SortIcon column="discountAmount" /></th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentStatus')}>Status <SortIcon column="paymentStatus" /></th>
+                                            <th className="p-3.5 text-center whitespace-nowrap">Aksi Cetak & Opsi</th>
                                         </tr>
-                                    ))}
-                                    {visibleTransactions.length < filteredTransactions.length && (
-                                        <tr>
-                                            <td colSpan={10} className="p-4 text-center text-slate-400">
-                                                <div ref={loadMoreRef}>Memuat transaksi berikutnya...</div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {filteredTransactions.length === 0 && (
+                                            <tr>
+                                                <td colSpan={10} className="p-8 text-center text-slate-400">Tidak ada riwayat transaksi penjualan ditemukan.</td>
+                                            </tr>
+                                        )}
+                                        {groupByPaymentMethod ? (
+                                            Object.entries(groupedTransactionsByMethod).map(([groupName, groupTxs]) => {
+                                                if (groupTxs.length === 0) return null;
+                                                const groupSubtotal = groupTxs.reduce((sum, t) => sum + t.totalAmount, 0);
+
+                                                return (
+                                                    <React.Fragment key={groupName}>
+                                                        <tr className="bg-slate-100 border-y border-slate-300">
+                                                            <td colSpan={10} className="p-3 text-xs font-extrabold text-slate-800">
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="flex items-center gap-2 uppercase tracking-wider text-slate-900 font-black">
+                                                                        📁 {groupName}
+                                                                        <span className="bg-white border border-slate-300 text-slate-700 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold">
+                                                                            {groupTxs.length} Transaksi
+                                                                        </span>
+                                                                    </span>
+                                                                    <span className="text-amber-900 font-mono text-xs font-black bg-amber-100/80 border border-amber-300 px-2.5 py-1 rounded-lg shadow-2xs">
+                                                                        Subtotal: {formatIDR(groupSubtotal)}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                        {groupTxs.map(t => (
+                                                            <tr key={t.id} onClick={() => setDetailTransaction(t)} className="hover:bg-slate-50 cursor-pointer transition-colors group">
+                                                                <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
+                                                                    {formatDateDateOnly(t.date)}
+                                                                </td>
+                                                                <td className="p-3.5 whitespace-nowrap bg-amber-50/20">
+                                                                    <span className="font-mono text-xs font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded border border-amber-200 inline-block shadow-2xs">
+                                                                        {formatTimeOnly(t.createdAt || t.date)}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-3.5 whitespace-nowrap">
+                                                                    <div className="font-mono text-xs font-bold text-slate-800">{t.invoiceNumber || '-'}</div>
+                                                                    <div className="text-[10px] font-mono text-slate-400">#{t.id.substring(0, 8)}</div>
+                                                                </td>
+                                                                <td className="p-3.5 whitespace-nowrap">
+                                                                    <div className="font-semibold text-slate-800">{t.customerName}</div>
+                                                                    {t.customerPhone && <div className="text-[10px] text-slate-400 font-mono">{t.customerPhone}</div>}
+                                                                </td>
+                                                                <td className="p-3.5 text-slate-700 font-medium whitespace-nowrap">
+                                                                    <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-bold">
+                                                                        {t.paymentMethod} {t.bankName ? `(${t.bankName})` : ''}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-3.5 text-slate-600 max-w-[200px] truncate">
+                                                                    {t.type === TransactionType.RETURN && t.originalTransactionId
+                                                                        ? (() => {
+                                                                            const original = transactions.find(orig => orig.id === t.originalTransactionId);
+                                                                            return original?.invoiceNumber
+                                                                                ? `Retur dari ${original.invoiceNumber}`
+                                                                                : (t.paymentNote || '-');
+                                                                        })()
+                                                                        : (t.paymentNote || '-')
+                                                                    }
+                                                                </td>
+                                                                <td className="p-3.5 font-extrabold text-slate-900 whitespace-nowrap">
+                                                                    {formatIDR(t.totalAmount)}
+                                                                </td>
+                                                                <td className="p-3.5 text-rose-600 font-bold whitespace-nowrap">
+                                                                    {t.discountAmount ? `-${formatIDR(t.discountAmount)}` : '-'}
+                                                                </td>
+                                                                <td className="p-3.5 whitespace-nowrap">
+                                                                    <span className={`px-2.5 py-0.5 rounded text-[10px] font-extrabold border ${
+                                                                        t.type === TransactionType.RETURN
+                                                                            ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                                            : t.paymentStatus === 'LUNAS'
+                                                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                                : t.paymentStatus === 'BELUM_LUNAS'
+                                                                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                                                                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                                                                    }`}>
+                                                                        {t.type === TransactionType.RETURN ? 'RETUR' : t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus}
+                                                                        {t.isReturned && t.type !== TransactionType.RETURN ? ' (Ada Retur)' : ''}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-3.5 text-center whitespace-nowrap">
+                                                                    <div className="flex items-center justify-center gap-1.5">
+                                                                        <button onClick={(e) => { e.stopPropagation(); printInvoice(t); }} className="px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-semibold border border-amber-200 transition-colors flex items-center gap-1" title="Cetak Nota">
+                                                                            <Printer size={12} /> Nota
+                                                                        </button>
+                                                                        <button onClick={(e) => { e.stopPropagation(); printBluetoothInvoice(t); }} className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold border border-emerald-200 transition-colors flex items-center gap-1" title="Cetak Struk Bluetooth">
+                                                                            <Bluetooth size={12} /> BT
+                                                                        </button>
+                                                                        <button onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }} className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition-colors" title="Detail Transaksi">
+                                                                            <Eye size={14} />
+                                                                        </button>
+                                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }} className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition-colors" title="Hapus Transaksi">
+                                                                            <Trash2 size={14} />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </React.Fragment>
+                                                );
+                                            })
+                                        ) : (
+                                            visibleTransactions.map(t => (
+                                                <tr key={t.id} onClick={() => setDetailTransaction(t)} className="hover:bg-slate-50 cursor-pointer transition-colors group">
+                                                    <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
+                                                        {formatDateDateOnly(t.date)}
+                                                    </td>
+                                                    <td className="p-3.5 whitespace-nowrap bg-amber-50/20">
+                                                        <span className="font-mono text-xs font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded border border-amber-200 inline-block shadow-2xs">
+                                                            {formatTimeOnly(t.createdAt || t.date)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3.5 whitespace-nowrap">
+                                                        <div className="font-mono text-xs font-bold text-slate-800">{t.invoiceNumber || '-'}</div>
+                                                        <div className="text-[10px] font-mono text-slate-400">#{t.id.substring(0, 8)}</div>
+                                                    </td>
+                                                    <td className="p-3.5 whitespace-nowrap">
+                                                        <div className="font-semibold text-slate-800">{t.customerName}</div>
+                                                        {t.customerPhone && <div className="text-[10px] text-slate-400 font-mono">{t.customerPhone}</div>}
+                                                    </td>
+                                                    <td className="p-3.5 text-slate-700 font-medium whitespace-nowrap">
+                                                        <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-bold">
+                                                            {t.paymentMethod} {t.bankName ? `(${t.bankName})` : ''}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3.5 text-slate-600 max-w-[200px] truncate">
+                                                        {t.type === TransactionType.RETURN && t.originalTransactionId
+                                                            ? (() => {
+                                                                const original = transactions.find(orig => orig.id === t.originalTransactionId);
+                                                                return original?.invoiceNumber
+                                                                    ? `Retur dari ${original.invoiceNumber}`
+                                                                    : (t.paymentNote || '-');
+                                                            })()
+                                                            : (t.paymentNote || '-')
+                                                        }
+                                                    </td>
+                                                    <td className="p-3.5 font-extrabold text-slate-900 whitespace-nowrap">
+                                                        {formatIDR(t.totalAmount)}
+                                                    </td>
+                                                    <td className="p-3.5 text-rose-600 font-bold whitespace-nowrap">
+                                                        {t.discountAmount ? `-${formatIDR(t.discountAmount)}` : '-'}
+                                                    </td>
+                                                    <td className="p-3.5 whitespace-nowrap">
+                                                        <span className={`px-2.5 py-0.5 rounded text-[10px] font-extrabold border ${
+                                                            t.type === TransactionType.RETURN
+                                                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                                : t.paymentStatus === 'LUNAS'
+                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                    : t.paymentStatus === 'BELUM_LUNAS'
+                                                                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                                                        : 'bg-amber-50 text-amber-800 border-amber-200'
+                                                        }`}>
+                                                            {t.type === TransactionType.RETURN ? 'RETUR' : t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus}
+                                                            {t.isReturned && t.type !== TransactionType.RETURN ? ' (Ada Retur)' : ''}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3.5 text-center whitespace-nowrap">
+                                                        <div className="flex items-center justify-center gap-1.5">
+                                                            <button onClick={(e) => { e.stopPropagation(); printInvoice(t); }} className="px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-semibold border border-amber-200 transition-colors flex items-center gap-1" title="Cetak Nota">
+                                                                <Printer size={12} /> Nota
+                                                            </button>
+                                                            <button onClick={(e) => { e.stopPropagation(); printBluetoothInvoice(t); }} className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold border border-emerald-200 transition-colors flex items-center gap-1" title="Cetak Struk Bluetooth">
+                                                                <Bluetooth size={12} /> BT
+                                                            </button>
+                                                            <button onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }} className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition-colors" title="Detail Transaksi">
+                                                                <Eye size={14} />
+                                                            </button>
+                                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }} className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition-colors" title="Hapus Transaksi">
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                        {visibleTransactions.length < filteredTransactions.length && (
+                                            <tr>
+                                                <td colSpan={10} className="p-4 text-center text-slate-400">
+                                                    <div ref={loadMoreRef}>Memuat transaksi berikutnya...</div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 )

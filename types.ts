@@ -74,7 +74,8 @@ export enum PaymentMethod {
   CASH = 'CASH',
   TRANSFER = 'TRANSFER',
   TEMPO = 'TEMPO',
-  BON = 'BON'
+  BON = 'BON',
+  QRIS = 'QRIS'
 }
 
 export interface BankAccount {
