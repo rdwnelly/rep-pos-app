@@ -18,6 +18,12 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
     const [groupByCategory, setGroupByCategory] = useState<boolean>(true);
+    const [viewMode, setViewMode] = useState<'category_grouped' | 'product_grouped' | 'all_items'>('category_grouped');
+
+    // Sub-Report Category Modal State
+    const [activeCategoryModal, setActiveCategoryModal] = useState<string | null>(null);
+    const [modalSearch, setModalSearch] = useState<string>('');
+    const [modalSortKey, setModalSortKey] = useState<'qty' | 'revenue' | 'profit' | 'name'>('qty');
 
     // Sort State
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
@@ -150,6 +156,268 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
         });
         return groups;
     }, [soldItems, selectedCategory]);
+
+    // Interface for Category Product Grouping Summary
+    interface CategoryProductSummary {
+        id?: string;
+        name: string;
+        sku: string;
+        unit: string;
+        categoryName: string;
+        totalQty: number;
+        avgPrice: number;
+        totalRevenue: number;
+        totalHpp: number;
+        totalProfit: number;
+        transactionCount: number;
+    }
+
+    // Modal Aggregated Products for Selected Category Sub-Report
+    const modalCategoryProducts = useMemo(() => {
+        if (!activeCategoryModal) return [];
+
+        const itemsForCat = soldItems.filter(item => {
+            const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Kategori';
+            return cat === activeCategoryModal;
+        });
+
+        const productMap: { [key: string]: CategoryProductSummary } = {};
+
+        itemsForCat.forEach(item => {
+            const key = item.id || item.name;
+            if (!productMap[key]) {
+                productMap[key] = {
+                    id: item.id,
+                    name: item.name,
+                    sku: item.sku || '-',
+                    unit: item.unit || 'Pcs',
+                    categoryName: item.categoryName || 'Tanpa Kategori',
+                    totalQty: 0,
+                    avgPrice: item.finalPrice,
+                    totalRevenue: 0,
+                    totalHpp: 0,
+                    totalProfit: 0,
+                    transactionCount: 0
+                };
+            }
+
+            const isReturn = item.transactionType === TransactionType.RETURN;
+            const qtyVal = isReturn ? -item.qty : item.qty;
+            const revVal = isReturn ? -(item.finalPrice * item.qty) : (item.finalPrice * item.qty);
+            const hppVal = isReturn ? -((item.hpp || 0) * item.qty) : ((item.hpp || 0) * item.qty);
+
+            productMap[key].totalQty += qtyVal;
+            productMap[key].totalRevenue += revVal;
+            productMap[key].totalHpp += hppVal;
+            productMap[key].totalProfit += (revVal - hppVal);
+            productMap[key].transactionCount += 1;
+        });
+
+        let list = Object.values(productMap);
+
+        if (modalSearch.trim()) {
+            const q = modalSearch.toLowerCase();
+            list = list.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+        }
+
+        list.sort((a, b) => {
+            if (modalSortKey === 'qty') return b.totalQty - a.totalQty;
+            if (modalSortKey === 'revenue') return b.totalRevenue - a.totalRevenue;
+            if (modalSortKey === 'profit') return b.totalProfit - a.totalProfit;
+            if (modalSortKey === 'name') return a.name.localeCompare(b.name);
+            return 0;
+        });
+
+        return list;
+    }, [activeCategoryModal, soldItems, modalSearch, modalSortKey]);
+
+    const modalCategoryTotals = useMemo(() => {
+        if (!activeCategoryModal) return { totalQty: 0, totalRevenue: 0, totalHpp: 0, totalProfit: 0, uniqueProducts: 0 };
+
+        const uniqueProducts = modalCategoryProducts.length;
+        const totalQty = modalCategoryProducts.reduce((sum, p) => sum + p.totalQty, 0);
+        const totalRevenue = modalCategoryProducts.reduce((sum, p) => sum + p.totalRevenue, 0);
+        const totalHpp = modalCategoryProducts.reduce((sum, p) => sum + p.totalHpp, 0);
+        const totalProfit = modalCategoryProducts.reduce((sum, p) => sum + p.totalProfit, 0);
+
+        return { totalQty, totalRevenue, totalHpp, totalProfit, uniqueProducts };
+    }, [modalCategoryProducts, activeCategoryModal]);
+
+    // Product-level Aggregation across filtered transactions
+    const allProductSummaries = useMemo(() => {
+        let filtered = soldItems;
+        if (selectedCategory !== 'ALL') {
+            filtered = filtered.filter(item => {
+                const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Kategori';
+                return cat === selectedCategory;
+            });
+        }
+
+        const productMap: { [key: string]: CategoryProductSummary } = {};
+
+        filtered.forEach(item => {
+            const key = item.id || item.name;
+            const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Kategori';
+            if (!productMap[key]) {
+                productMap[key] = {
+                    id: item.id,
+                    name: item.name,
+                    sku: item.sku || '-',
+                    unit: item.unit || 'Pcs',
+                    categoryName: cat,
+                    totalQty: 0,
+                    avgPrice: item.finalPrice,
+                    totalRevenue: 0,
+                    totalHpp: 0,
+                    totalProfit: 0,
+                    transactionCount: 0
+                };
+            }
+
+            const isReturn = item.transactionType === TransactionType.RETURN;
+            const qtyVal = isReturn ? -item.qty : item.qty;
+            const revVal = isReturn ? -(item.finalPrice * item.qty) : (item.finalPrice * item.qty);
+            const hppVal = isReturn ? -((item.hpp || 0) * item.qty) : ((item.hpp || 0) * item.qty);
+
+            productMap[key].totalQty += qtyVal;
+            productMap[key].totalRevenue += revVal;
+            productMap[key].totalHpp += hppVal;
+            productMap[key].totalProfit += (revVal - hppVal);
+            productMap[key].transactionCount += 1;
+        });
+
+        return Object.values(productMap).sort((a, b) => b.totalQty - a.totalQty);
+    }, [soldItems, selectedCategory]);
+
+    const handlePrintCategorySubReport = (
+        catName: string,
+        products: CategoryProductSummary[],
+        totals: { totalQty: number; totalRevenue: number; totalHpp: number; totalProfit: number; uniqueProducts: number }
+    ) => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        const showHPP = currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.OWNER;
+
+        const rowsHtml = products.map((p, idx) => `
+            <tr>
+                <td style="text-align: center;">${idx + 1}</td>
+                <td><strong>${p.name}</strong><br/><small style="color: #64748b;">SKU: ${p.sku}</small></td>
+                <td style="text-align: center;">${p.unit}</td>
+                <td style="text-align: center; font-weight: bold;">${p.totalQty}</td>
+                <td style="text-align: right;">${formatIDR(p.avgPrice)}</td>
+                <td style="text-align: right; font-weight: bold;">${formatIDR(p.totalRevenue)}</td>
+                ${showHPP ? `<td style="text-align: right;">${formatIDR(p.totalHpp)}</td>` : ''}
+                ${showHPP ? `<td style="text-align: right; font-weight: bold; color: #2563eb;">${formatIDR(p.totalProfit)}</td>` : ''}
+            </tr>
+        `).join('');
+
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Sub-Laporan Barang Terjual - Kategori ${catName}</title>
+                    <style>
+                        body { font-family: 'Inter', sans-serif; font-size: 11px; padding: 20px; color: #1e293b; }
+                        .header { border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 15px; }
+                        .title { font-size: 16px; font-weight: bold; margin: 0; text-transform: uppercase; }
+                        .subtitle { font-size: 11px; color: #64748b; margin-top: 4px; }
+                        .metrics { display: flex; gap: 15px; margin-bottom: 15px; background-color: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
+                        .metric-box { flex: 1; }
+                        .metric-label { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: bold; }
+                        .metric-val { font-size: 13px; font-weight: bold; margin-top: 2px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                        th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; font-size: 10px; }
+                        th { background-color: #f1f5f9; font-weight: bold; text-transform: uppercase; }
+                        .footer { margin-top: 20px; text-align: right; font-size: 10px; color: #64748b; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1 class="title">Sub-Laporan Barang Terjual (Per Produk)</h1>
+                        <div class="subtitle">Kategori: <strong>${catName}</strong> | Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                    </div>
+
+                    <div class="metrics">
+                        <div class="metric-box">
+                            <div class="metric-label">Jumlah Jenis Produk</div>
+                            <div class="metric-val">${totals.uniqueProducts} Variasi</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Total Qty Terjual</div>
+                            <div class="metric-val">${totals.totalQty} Unit</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Total Omset Penjualan</div>
+                            <div class="metric-val" style="color: #059669;">${formatIDR(totals.totalRevenue)}</div>
+                        </div>
+                        ${showHPP ? `
+                        <div class="metric-box">
+                            <div class="metric-label">Total Laba Bersih</div>
+                            <div class="metric-val" style="color: #2563eb;">${formatIDR(totals.totalProfit)}</div>
+                        </div>
+                        ` : ''}
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 30px; text-align: center;">No</th>
+                                <th>Nama Produk & SKU</th>
+                                <th style="text-align: center;">Satuan</th>
+                                <th style="text-align: center;">Qty Terjual</th>
+                                <th style="text-align: right;">Harga Jual</th>
+                                <th style="text-align: right;">Total Omset</th>
+                                ${showHPP ? '<th style="text-align: right;">Total HPP</th>' : ''}
+                                ${showHPP ? '<th style="text-align: right;">Laba Bersih</th>' : ''}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+
+                    <div class="footer">
+                        <p>Dicetak dari Sistem Kasir POS pada ${new Date().toLocaleString('id-ID')}</p>
+                    </div>
+
+                    <script>window.onafterprint = function() { window.close(); }; window.print();</script>
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
+    };
+
+    const handleExportCategorySubReport = (
+        catName: string,
+        products: CategoryProductSummary[]
+    ) => {
+        const showHPP = currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.OWNER;
+
+        const headers = ['No', 'Nama Produk', 'SKU', 'Kategori', 'Satuan', 'Qty Terjual', 'Harga Jual', 'Total Omset'];
+        if (showHPP) {
+            headers.push('Total HPP', 'Laba Bersih');
+        }
+
+        const rows = products.map((p, idx) => {
+            const row = [
+                (idx + 1).toString(),
+                p.name,
+                p.sku,
+                p.categoryName,
+                p.unit,
+                p.totalQty.toString(),
+                p.avgPrice.toString(),
+                p.totalRevenue.toString()
+            ];
+            if (showHPP) {
+                row.push(p.totalHpp.toString(), p.totalProfit.toString());
+            }
+            return row;
+        });
+
+        const safeName = catName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        exportToCSV(`laporan-sub-barang-kategori-${safeName}.csv`, headers, rows);
+    };
 
     const visibleSoldItems = useMemo(() => soldItems.slice(0, visibleCount), [soldItems, visibleCount]);
 
@@ -536,15 +804,21 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                     {Object.entries(categorySummaries).map(([catName, summary]) => (
                         <div
                             key={catName}
-                            onClick={() => setSelectedCategory(selectedCategory === catName ? 'ALL' : catName)}
-                            className={`p-3 rounded-xl border transition-all cursor-pointer ${selectedCategory === catName ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-500/30' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
+                            onClick={() => {
+                                setSelectedCategory(catName);
+                                setActiveCategoryModal(catName);
+                            }}
+                            className={`p-3 rounded-xl border transition-all cursor-pointer relative group ${selectedCategory === catName ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-500/30' : 'bg-white border-slate-200 hover:bg-amber-50/60 hover:border-amber-300 shadow-2xs'}`}
                         >
                             <div className="flex items-center justify-between text-xs font-semibold text-slate-600 truncate mb-1">
-                                <span className="truncate" title={catName}>{catName}</span>
+                                <span className="truncate font-bold text-slate-800" title={catName}>{catName}</span>
                                 <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold shrink-0">{summary.count}</span>
                             </div>
                             <div className="text-sm font-bold text-slate-800">{summary.totalQty} <span className="text-[10px] font-normal text-slate-500">terjual</span></div>
                             <div className="text-xs font-bold text-emerald-600 mt-0.5">{formatIDR(summary.totalRevenue)}</div>
+                            <div className="text-[9px] font-bold text-amber-700 mt-1 opacity-80 group-hover:opacity-100 flex items-center gap-1">
+                                🔍 Sub-Laporan Barang ➔
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -737,6 +1011,181 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                     </table>
                 </div>
             </div>
+
+            {/* Sub-Report Modal for Category */}
+            {activeCategoryModal && (
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+                    <div className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+                        {/* Modal Header */}
+                        <div className="p-4 sm:p-5 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/30">
+                                    <Folder size={22} />
+                                </div>
+                                <div>
+                                    <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                                        Sub-Laporan Barang Terjual: <span className="text-amber-400 font-extrabold uppercase tracking-wide">{activeCategoryModal}</span>
+                                    </h2>
+                                    <p className="text-xs text-slate-400">
+                                        Rincian barang terjual dikelompokkan berdasarkan produk
+                                        {startDate || endDate ? ` (Periode: ${startDate || 'Awal'} s/d ${endDate || 'Akhir'})` : ''}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setActiveCategoryModal(null)}
+                                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Metric Cards inside Modal */}
+                        <div className="p-4 bg-slate-50 border-b border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
+                            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Variasi Produk</div>
+                                <div className="text-lg font-black text-slate-800 mt-0.5">{modalCategoryTotals.uniqueProducts} <span className="text-xs font-semibold text-slate-400">Produk</span></div>
+                            </div>
+                            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Total Qty Terjual</div>
+                                <div className="text-lg font-black text-slate-800 mt-0.5">{modalCategoryTotals.totalQty} <span className="text-xs font-semibold text-slate-400">Unit</span></div>
+                            </div>
+                            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Total Omset Kategori</div>
+                                <div className="text-lg font-black text-emerald-600 mt-0.5">{formatIDR(modalCategoryTotals.totalRevenue)}</div>
+                            </div>
+                            {currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.OWNER && (
+                                <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                                    <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Total Laba Bersih</div>
+                                    <div className="text-lg font-black text-blue-600 mt-0.5">{formatIDR(modalCategoryTotals.totalProfit)}</div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Toolbar */}
+                        <div className="p-4 bg-white border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
+                            <div className="relative w-full sm:w-72">
+                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Cari barang / SKU dalam kategori..."
+                                    className="w-full pl-9 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-amber-500"
+                                    value={modalSearch}
+                                    onChange={e => setModalSearch(e.target.value)}
+                                />
+                                {modalSearch && (
+                                    <button onClick={() => setModalSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                                <span className="text-xs font-semibold text-slate-500">Urutkan:</span>
+                                <select
+                                    value={modalSortKey}
+                                    onChange={e => setModalSortKey(e.target.value as any)}
+                                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                                >
+                                    <option value="qty">🔢 Qty Terbanyak</option>
+                                    <option value="revenue">💰 Omset Penjualan Terbesar</option>
+                                    {currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.OWNER && (
+                                        <option value="profit">📈 Laba Bersih Terbanyak</option>
+                                    )}
+                                    <option value="name">🔤 Nama Produk (A-Z)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Modal Table Body */}
+                        <div className="overflow-y-auto flex-1 p-4">
+                            <table className="w-full text-left text-xs border-collapse">
+                                <thead className="bg-slate-100 border-b border-slate-200 text-slate-600 uppercase font-bold sticky top-0 z-10">
+                                    <tr>
+                                        <th className="p-3 text-center w-10">No</th>
+                                        <th className="p-3">Nama Produk & SKU</th>
+                                        <th className="p-3 text-center">Satuan</th>
+                                        <th className="p-3 text-center">Qty Terjual</th>
+                                        <th className="p-3 text-right">Harga Jual</th>
+                                        <th className="p-3 text-right">Total Omset</th>
+                                        <th className="p-3 text-center">% Kontribusi</th>
+                                        {currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.OWNER && (
+                                            <>
+                                                <th className="p-3 text-right">Total HPP</th>
+                                                <th className="p-3 text-right">Laba Bersih</th>
+                                            </>
+                                        )}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {modalCategoryProducts.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={10} className="p-8 text-center text-slate-400 font-medium">
+                                                Tidak ada produk ditemukan dalam kategori "{activeCategoryModal}".
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        modalCategoryProducts.map((prod, idx) => {
+                                            const contribPct = modalCategoryTotals.totalRevenue > 0
+                                                ? ((prod.totalRevenue / modalCategoryTotals.totalRevenue) * 100).toFixed(1)
+                                                : '0';
+
+                                            return (
+                                                <tr key={`${prod.name}-${idx}`} className="hover:bg-amber-50/60 transition-colors">
+                                                    <td className="p-3 text-center font-mono text-slate-400 font-bold">{idx + 1}</td>
+                                                    <td className="p-3 font-bold text-slate-800">
+                                                        <div>{prod.name}</div>
+                                                        <div className="text-[10px] text-slate-400 font-mono">SKU: {prod.sku}</div>
+                                                    </td>
+                                                    <td className="p-3 text-center font-medium text-slate-600">{prod.unit}</td>
+                                                    <td className="p-3 text-center font-black text-slate-900 bg-amber-50/60">{prod.totalQty}</td>
+                                                    <td className="p-3 text-right font-medium text-slate-700">{formatIDR(prod.avgPrice)}</td>
+                                                    <td className="p-3 text-right font-black text-emerald-600">{formatIDR(prod.totalRevenue)}</td>
+                                                    <td className="p-3 text-center">
+                                                        <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 font-mono text-[10px] font-bold text-slate-700">
+                                                            {contribPct}%
+                                                        </span>
+                                                    </td>
+                                                    {currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.OWNER && (
+                                                        <>
+                                                            <td className="p-3 text-right font-medium text-slate-600">{formatIDR(prod.totalHpp)}</td>
+                                                            <td className="p-3 text-right font-bold text-blue-600">{formatIDR(prod.totalProfit)}</td>
+                                                        </>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap justify-between items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => handlePrintCategorySubReport(activeCategoryModal, modalCategoryProducts, modalCategoryTotals)}
+                                    className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                                >
+                                    <Printer size={14} /> Cetak Sub-Laporan Kategori
+                                </button>
+                                <button
+                                    onClick={() => handleExportCategorySubReport(activeCategoryModal, modalCategoryProducts)}
+                                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                                >
+                                    <FileSpreadsheet size={14} /> Export CSV Sub-Kategori
+                                </button>
+                            </div>
+                            <button
+                                onClick={() => setActiveCategoryModal(null)}
+                                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold text-xs transition-all cursor-pointer"
+                            >
+                                Tutup
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

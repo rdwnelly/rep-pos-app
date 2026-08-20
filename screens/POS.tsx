@@ -591,7 +591,7 @@ export const POS: React.FC = () => {
 
       try {
         await StorageService.updateTransaction(updatedTransaction);
-        
+
         const settings = await StorageService.getStoreSettings();
         printReceipt(updatedTransaction, settings, {
           qrisCode: selectedBank?.qrisCode,
@@ -1648,7 +1648,7 @@ export const POS: React.FC = () => {
 
             {/* List Body */}
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
-              {openBills.filter(b => 
+              {openBills.filter(b =>
                 (b.tableNumber && b.tableNumber.toLowerCase().includes(openBillSearch.toLowerCase())) ||
                 b.customerName.toLowerCase().includes(openBillSearch.toLowerCase()) ||
                 b.billNumber.toLowerCase().includes(openBillSearch.toLowerCase())
@@ -1661,7 +1661,7 @@ export const POS: React.FC = () => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {openBills
-                    .filter(b => 
+                    .filter(b =>
                       (b.tableNumber && b.tableNumber.toLowerCase().includes(openBillSearch.toLowerCase())) ||
                       b.customerName.toLowerCase().includes(openBillSearch.toLowerCase()) ||
                       b.billNumber.toLowerCase().includes(openBillSearch.toLowerCase())
@@ -1720,7 +1720,7 @@ export const POS: React.FC = () => {
                               <Trash2 size={15} />
                             </button>
                           </div>
-                          
+
                           <div className="flex gap-1.5">
                             <button
                               onClick={() => handleLoadOpenBill(b)}
@@ -1786,11 +1786,10 @@ export const POS: React.FC = () => {
                       key={m}
                       type="button"
                       onClick={() => setOpenBillTableInput(m)}
-                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
-                        openBillTableInput === m
+                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${openBillTableInput === m
                           ? 'bg-amber-500 text-white shadow-sm scale-105'
                           : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200'
-                      }`}
+                        }`}
                     >
                       {m === 'Bungkus' ? 'Takeaway' : `Meja ${m}`}
                     </button>
