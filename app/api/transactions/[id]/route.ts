@@ -9,8 +9,79 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  return genericPUT(req, { params: Promise.resolve({ model: 'transactions', id }) });
+  const t = await sequelize.transaction();
+  try {
+    const { id } = await params;
+    const updateData = await req.json();
+
+    const Transaction = models.Transaction;
+    const Product = models.Product;
+    const CashFlow = models.CashFlow;
+
+    // 1. Find existing transaction
+    const oldTx: any = await Transaction.findByPk(id, { transaction: t });
+    if (!oldTx) {
+      await t.rollback();
+      return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
+    }
+
+    // 2. Adjust Stock differences if items are updated
+    if (updateData.items && Array.isArray(updateData.items)) {
+      const oldItems: any[] = oldTx.items || [];
+      const newItems: any[] = updateData.items;
+
+      // Revert old items stock
+      for (const oldItem of oldItems) {
+        const prod: any = await Product.findByPk(oldItem.id, { transaction: t });
+        if (prod) {
+          if (oldTx.type === 'RETURN') {
+            await prod.decrement('stock', { by: oldItem.qty, transaction: t });
+          } else {
+            await prod.increment('stock', { by: oldItem.qty, transaction: t });
+          }
+        }
+      }
+
+      // Deduct new items stock
+      for (const newItem of newItems) {
+        const prod: any = await Product.findByPk(newItem.id, { transaction: t });
+        if (prod) {
+          if ((updateData.type || oldTx.type) === 'RETURN') {
+            await prod.increment('stock', { by: newItem.qty, transaction: t });
+          } else {
+            await prod.decrement('stock', { by: newItem.qty, transaction: t });
+          }
+        }
+      }
+    }
+
+    // 3. Update Transaction record
+    await oldTx.update(updateData, { transaction: t });
+
+    // 4. Update associated CashFlow entry if amountPaid or totalAmount changed
+    if (updateData.amountPaid !== undefined || updateData.totalAmount !== undefined) {
+      const cf: any = await CashFlow.findOne({ where: { referenceId: id }, transaction: t });
+      if (cf) {
+        const isReturn = (updateData.type || oldTx.type) === 'RETURN';
+        const newPaid = updateData.amountPaid !== undefined ? updateData.amountPaid : oldTx.amountPaid;
+        const newTotal = updateData.totalAmount !== undefined ? updateData.totalAmount : oldTx.totalAmount;
+        const newAmount = isReturn ? Math.abs(newPaid) : (newPaid > 0 ? newPaid : newTotal);
+
+        await cf.update({
+          amount: newAmount,
+          description: `Penjualan ${updateData.invoiceNumber || oldTx.invoiceNumber || id} (Disunting)`
+        }, { transaction: t });
+      }
+    }
+
+    await t.commit();
+    const updatedTx = await Transaction.findByPk(id);
+    return NextResponse.json(updatedTx);
+  } catch (error: any) {
+    await t.rollback();
+    console.error('Update Transaction Error:', error);
+    return NextResponse.json({ error: error.message || String(error) }, { status: 500 });
+  }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
