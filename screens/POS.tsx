@@ -109,13 +109,45 @@ export const POS: React.FC = () => {
     setOpenBillNoteInput('');
   };
 
-  // Open Save Open Bill Pop-up Modal
-  const handleOpenSaveOpenBillModal = () => {
+  // Open Save Open Bill Pop-up Modal (or Direct Update if existing)
+  const handleOpenSaveOpenBillModal = async () => {
     if (cart.length === 0) {
       alert('Keranjang masih kosong! Silakan tambahkan pesanan terlebih dahulu.');
       return;
     }
 
+    // Jika sedang mengedit Open Bill yang sudah ada, langsung perbarui secara otomatis tanpa popup modal!
+    if (activeOpenBillId) {
+      const existingBill = openBills.find(b => b.id === activeOpenBillId);
+      if (existingBill) {
+        const targetTable = tableNumber.trim() || existingBill.tableNumber || '';
+        const targetCustomer = customerName.trim() || existingBill.customerName || 'Pelanggan Umum';
+        const nowIso = new Date().toISOString();
+
+        const updatedBill: OpenBill = {
+          ...existingBill,
+          tableNumber: targetTable || undefined,
+          customerName: targetCustomer,
+          items: [...cart],
+          subtotal,
+          discount,
+          discountType,
+          discountAmount: discountAmountValue,
+          totalAmount,
+          notes: paymentNote || existingBill.notes,
+          updatedAt: nowIso
+        };
+
+        await StorageService.saveOpenBill(updatedBill);
+        playBeep();
+
+        alert(`✓ Open Bill #${existingBill.billNumber} (${targetTable ? `Meja ${targetTable}` : targetCustomer}) berhasil diperbarui!`);
+        resetCartAndState();
+        return;
+      }
+    }
+
+    // Jika Open Bill BARU, buka modal popup pengisian Meja / Pelanggan
     setOpenBillTableInput(tableNumber || '');
     setOpenBillNameInput(customerName === 'Pelanggan Umum' ? '' : customerName);
     setOpenBillPhoneInput(customerPhone || '');
