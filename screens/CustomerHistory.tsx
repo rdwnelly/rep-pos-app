@@ -611,7 +611,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                                                     : (t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus) + (t.isReturned ? ' (Ada Retur)' : '')}
                                             </span>
                                         </td>
-                                        <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{t.paymentMethod}</td>
+                                        <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{((t.paymentMethod as string) === 'TEMPO' || t.paymentMethod === PaymentMethod.BON) ? 'BON (Hutang)' : t.paymentMethod}</td>
                                         <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{t.cashierName}</td>
                                         <td className="p-3.5 text-center whitespace-nowrap">
                                             <div className="flex items-center justify-center gap-1.5">
@@ -681,7 +681,9 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                                 </div>
                                 <div>
                                     <span className="text-slate-500 block text-xs">Metode Awal</span>
-                                    <span className="font-medium text-slate-900">{detailTransaction.paymentMethod}</span>
+                                    <span className="font-medium text-slate-900">
+                                        {((detailTransaction.paymentMethod as string) === 'TEMPO' || detailTransaction.paymentMethod === PaymentMethod.BON) ? 'BON (Hutang)' : detailTransaction.paymentMethod}
+                                    </span>
                                     {(() => {
                                         if (detailTransaction.bankId) {
                                             const bank = banks.find(b => b.id === detailTransaction.bankId);

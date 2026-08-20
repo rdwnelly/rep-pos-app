@@ -2567,9 +2567,9 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                 activeTab === 'debt_customer' && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 flex justify-between">
-                                <span>Daftar Piutang Pelanggan</span>
-                                <span className="text-orange-600">Total: {formatIDR(receivables.reduce((s, t) => s + (t.totalAmount - t.amountPaid), 0))}</span>
+                            <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 flex justify-between items-center">
+                                <span>Daftar BON & Piutang Pelanggan ({receivables.length})</span>
+                                <span className="text-rose-600 font-extrabold">Total Sisa Piutang: {formatIDR(receivables.reduce((s, t) => s + (t.totalAmount - t.amountPaid), 0))}</span>
                             </div>
                             {searchQuery && (
                                 <div className="px-4 py-2 bg-primary/10 border-b border-primary/20 text-sm text-primary">
@@ -2577,64 +2577,95 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 </div>
                             )}
                             <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
-                                {receivables.length === 0 && <div className="p-8 text-center text-slate-400">Tidak ada data piutang.</div>}
+                                {receivables.length === 0 && <div className="p-8 text-center text-slate-400">Tidak ada data BON / piutang pelanggan.</div>}
                                 {visibleReceivables.map(t => {
                                     const remaining = t.totalAmount - t.amountPaid;
                                     return (
-                                        <div key={t.id} className={`p-4 flex items-center justify-between cursor-pointer border-l-4 transition-colors ${selectedDebt?.id === t.id ? 'bg-primary/10 border-primary' : 'hover:bg-slate-50 border-transparent'}`} onClick={() => setSelectedDebt(t)}>
+                                        <div key={t.id} className={`p-4 flex items-center justify-between cursor-pointer border-l-4 transition-colors ${selectedDebt?.id === t.id ? 'bg-amber-50/60 border-amber-500' : 'hover:bg-slate-50 border-transparent'}`} onClick={() => setSelectedDebt(t)}>
                                             <div>
-                                                <h4 className="font-bold text-slate-800">{t.customerName}</h4>
-                                                <div className="flex items-center gap-2 text-xs text-slate-500">
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className="font-bold text-slate-800 text-sm">{t.customerName}</h4>
+                                                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
+                                                        {((t.paymentMethod as string) === 'TEMPO' || t.paymentMethod === PaymentMethod.BON) ? 'BON' : t.paymentMethod}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
                                                     {t.invoiceNumber && <span className="font-mono text-slate-700 font-bold">{t.invoiceNumber}</span>}
                                                     <span className="font-mono text-slate-400">#{t.id.substring(0, 6)}</span>
                                                     <span>•</span>
                                                     <Calendar size={12} /> {formatDate(t.date)}
                                                 </div>
+                                                <div className="text-xs text-slate-400 mt-0.5">
+                                                    {t.items?.length || 0} item barang • Kasir: {t.cashierName}
+                                                </div>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-red-600 font-bold">{formatIDR(remaining)}</p>
-                                                <p className="text-xs text-slate-400">dari {formatIDR(t.totalAmount)}</p>
+                                                <p className="text-rose-600 font-extrabold text-base">{formatIDR(remaining)}</p>
+                                                <p className="text-[11px] text-slate-400">Total BON: {formatIDR(t.totalAmount)}</p>
+                                                <p className="text-[10px] text-emerald-600 font-medium">Sudah Bayar: {formatIDR(t.amountPaid)}</p>
                                             </div>
                                         </div>
                                     );
                                 })}
                                 {visibleReceivables.length < receivables.length && (
                                     <div className="p-4 text-center text-slate-400">
-                                        <div ref={loadMoreRef}>Loading more...</div>
+                                        <div ref={loadMoreRef}>Memuat data berikutnya...</div>
                                     </div>
                                 )}
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 h-fit sticky top-6">
-                            <h3 className="font-bold text-lg mb-4 text-slate-800">Bayar Piutang</h3>
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 h-fit sticky top-6">
+                            <h3 className="font-bold text-base mb-3 text-slate-800">Detail & Pelunasan BON</h3>
                             {selectedDebt ? (
-                                <div className="space-y-4">
-                                    <div className="p-3 bg-primary/10 rounded-lg text-primary text-sm">
-                                        <span className="block text-xs text-primary/70 uppercase tracking-wider font-bold mb-1">Pelanggan</span>
-                                        <span className="font-bold text-lg">{selectedDebt.customerName}</span>
-                                        <div className="text-xs text-primary/80 mt-1 font-mono">
-                                            {selectedDebt.invoiceNumber ? `${selectedDebt.invoiceNumber} (Ref: #${selectedDebt.id.substring(0, 6)})` : `Ref: #${selectedDebt.id}`}
+                                <div className="space-y-3.5">
+                                    <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-slate-800 text-xs">
+                                        <span className="block text-[10px] text-amber-800 uppercase tracking-wider font-extrabold mb-0.5">Pelanggan BON</span>
+                                        <span className="font-extrabold text-base text-slate-900">{selectedDebt.customerName}</span>
+                                        <div className="text-[11px] text-slate-600 mt-1 font-mono flex justify-between">
+                                            <span>{selectedDebt.invoiceNumber ? selectedDebt.invoiceNumber : `#${selectedDebt.id.substring(0, 6)}`}</span>
+                                            <span>{formatDate(selectedDebt.date)}</span>
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="text-xs text-slate-500">Sisa Tagihan</label>
-                                        <div className="text-2xl font-bold text-slate-900">{formatIDR(selectedDebt.totalAmount - selectedDebt.amountPaid)}</div>
+
+                                    {/* Rincian Barang BON */}
+                                    {selectedDebt.items && selectedDebt.items.length > 0 && (
+                                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+                                            <p className="font-bold text-slate-700 mb-2 uppercase text-[10px] tracking-wider">Rincian Barang yang di-BON:</p>
+                                            <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                                                {selectedDebt.items.map((item, idx) => (
+                                                    <div key={idx} className="flex justify-between items-center text-slate-600">
+                                                        <span className="truncate max-w-[160px] font-medium">• {item.name} ({item.qty} {item.unit || 'Pcs'})</span>
+                                                        <span className="font-mono text-slate-800 font-semibold">{formatIDR(item.finalPrice * item.qty)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="mt-2 pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900">
+                                                <span>Total Pembelian BON</span>
+                                                <span>{formatIDR(selectedDebt.totalAmount)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="bg-rose-50 p-3 rounded-xl border border-rose-200 flex justify-between items-center">
+                                        <div>
+                                            <label className="text-[10px] text-rose-700 font-bold block uppercase tracking-wider">Sisa Piutang / Hutang</label>
+                                            <div className="text-2xl font-black text-rose-600">{formatIDR(selectedDebt.totalAmount - selectedDebt.amountPaid)}</div>
+                                        </div>
                                     </div>
 
-                                    {/* History */}
+                                    {/* Riwayat Pembayaran Angsuran */}
                                     {selectedDebt.paymentHistory && selectedDebt.paymentHistory.length > 0 && (
-                                        <div className="bg-slate-50 p-3 rounded-lg max-h-40 overflow-y-auto border border-slate-200">
-                                            <p className="text-xs font-bold text-slate-500 mb-2 uppercase">Riwayat Pembayaran</p>
+                                        <div className="bg-slate-50 p-3 rounded-xl max-h-36 overflow-y-auto border border-slate-200 text-xs">
+                                            <p className="font-bold text-slate-600 mb-2 uppercase text-[10px] tracking-wider">Riwayat Pembayaran / Cicilan:</p>
                                             {selectedDebt.paymentHistory.map((ph, idx) => (
                                                 <div key={idx} className="flex justify-between text-xs text-slate-600 mb-2 border-b border-dashed border-slate-200 pb-1 last:border-0 last:pb-0 last:mb-0">
                                                     <div className="flex flex-col">
-                                                        <span>{new Date(ph.date).toLocaleDateString('id-ID')}</span>
-                                                        <span className="text-[10px] text-slate-400">{new Date(ph.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                                                        <span className="font-semibold">{new Date(ph.date).toLocaleDateString('id-ID')} {new Date(ph.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
                                                         {ph.note && <span className="text-[10px] italic text-slate-500">"{ph.note}"</span>}
                                                     </div>
                                                     <div className="text-right">
-                                                        <span className="font-bold text-slate-700">{formatIDR(ph.amount)}</span>
+                                                        <span className="font-bold text-emerald-600">{formatIDR(ph.amount)}</span>
                                                         <div className="text-[10px] text-slate-400">{ph.method}</div>
                                                     </div>
                                                 </div>
@@ -2642,72 +2673,76 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                         </div>
                                     )}
 
-                                    <div>
-                                        <label htmlFor="repaymentAmount" className="text-sm font-medium text-slate-700">Jumlah Bayar</label>
-                                        <input
-                                            id="repaymentAmount"
-                                            name="repaymentAmount"
-                                            type="text"
-                                            className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                                            value={repaymentAmount}
-                                            onChange={e => setRepaymentAmount(numericInput(e.target.value))}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="repaymentMethod" className="text-sm font-medium text-slate-700">Metode Bayar</label>
-                                        <select
-                                            id="repaymentMethod"
-                                            name="repaymentMethod"
-                                            className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-lg"
-                                            value={repaymentMethod}
-                                            onChange={e => {
-                                                setRepaymentMethod(e.target.value as PaymentMethod);
-                                                setRepaymentBankId('');
-                                            }}
-                                        >
-                                            <option value={PaymentMethod.CASH}>Tunai</option>
-                                            <option value={PaymentMethod.TRANSFER}>Transfer</option>
-                                        </select>
-                                    </div>
-                                    {repaymentMethod === PaymentMethod.TRANSFER && (
+                                    {/* Form Pembayaran BON */}
+                                    <div className="space-y-3 pt-1">
                                         <div>
-                                            <label htmlFor="repaymentBankId" className="text-sm font-medium text-slate-700">Ke Rekening</label>
+                                            <label htmlFor="repaymentAmount" className="text-xs font-semibold text-slate-700">Jumlah Pembayaran / Angsuran</label>
+                                            <input
+                                                id="repaymentAmount"
+                                                name="repaymentAmount"
+                                                type="text"
+                                                className="w-full mt-1 px-3.5 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-sm font-bold"
+                                                value={repaymentAmount}
+                                                onChange={e => setRepaymentAmount(numericInput(e.target.value))}
+                                                placeholder="Rp 0"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label htmlFor="repaymentMethod" className="text-xs font-semibold text-slate-700">Metode Bayar</label>
                                             <select
-                                                id="repaymentBankId"
-                                                name="repaymentBankId"
-                                                className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-lg text-sm"
-                                                value={repaymentBankId}
-                                                onChange={e => setRepaymentBankId(e.target.value)}
+                                                id="repaymentMethod"
+                                                name="repaymentMethod"
+                                                className="w-full mt-1 px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-medium"
+                                                value={repaymentMethod}
+                                                onChange={e => {
+                                                    setRepaymentMethod(e.target.value as PaymentMethod);
+                                                    setRepaymentBankId('');
+                                                }}
                                             >
-                                                <option value="">-- Pilih --</option>
-                                                {banks.sort((a, b) => a.bankName.localeCompare(b.bankName)).map(b => (
-                                                    <option key={b.id} value={b.id}>{b.bankName} - {b.accountNumber}</option>
-                                                ))}
+                                                <option value={PaymentMethod.CASH}>Tunai</option>
+                                                <option value={PaymentMethod.TRANSFER}>Transfer</option>
                                             </select>
                                         </div>
-                                    )}
-                                    <div>
-                                        <label htmlFor="repaymentNote" className="text-sm font-medium text-slate-700">Catatan (Opsional)</label>
-                                        <input
-                                            id="repaymentNote"
-                                            name="repaymentNote"
-                                            type="text"
-                                            className="w-full mt-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                                            value={repaymentNote}
-                                            onChange={e => setRepaymentNote(e.target.value)}
-                                            placeholder="Ket. tambahan"
-                                        />
+                                        {repaymentMethod === PaymentMethod.TRANSFER && (
+                                            <div>
+                                                <label htmlFor="repaymentBankId" className="text-xs font-semibold text-slate-700">Ke Rekening</label>
+                                                <select
+                                                    id="repaymentBankId"
+                                                    name="repaymentBankId"
+                                                    className="w-full mt-1 px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-medium"
+                                                    value={repaymentBankId}
+                                                    onChange={e => setRepaymentBankId(e.target.value)}
+                                                >
+                                                    <option value="">-- Pilih Rekening --</option>
+                                                    {banks.sort((a, b) => a.bankName.localeCompare(b.bankName)).map(b => (
+                                                        <option key={b.id} value={b.id}>{b.bankName} - {b.accountNumber}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <label htmlFor="repaymentNote" className="text-xs font-semibold text-slate-700">Catatan Pelunasan (Opsional)</label>
+                                            <input
+                                                id="repaymentNote"
+                                                name="repaymentNote"
+                                                type="text"
+                                                className="w-full mt-1 px-3.5 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-xs"
+                                                value={repaymentNote}
+                                                onChange={e => setRepaymentNote(e.target.value)}
+                                                placeholder="Contoh: Cicilan BON ke-1"
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={initiateRepaymentCustomer}
+                                            className="w-full bg-primary text-white py-2.5 rounded-xl font-bold hover:bg-primary/90 shadow-sm transition-all text-xs"
+                                        >
+                                            Simpan Pembayaran BON
+                                        </button>
+                                        <button onClick={() => setSelectedDebt(null)} className="w-full text-slate-400 text-xs hover:text-slate-600 py-1">Batal</button>
                                     </div>
-                                    <button
-                                        onClick={initiateRepaymentCustomer}
-                                        className="w-full bg-primary text-white py-2 rounded-lg font-semibold hover:bg-primary/90"
-                                    >
-                                        Proses Pembayaran
-                                    </button>
-                                    <button onClick={() => setSelectedDebt(null)} className="w-full text-slate-400 text-sm hover:text-slate-600">Batal</button>
                                 </div>
                             ) : (
-                                <p className="text-slate-400 text-sm text-center">Pilih transaksi dari daftar di samping untuk memproses pembayaran utang pelanggan.</p>
+                                <p className="text-slate-400 text-xs text-center py-6">Pilih transaksi BON dari daftar di samping untuk melihat rincian barang dan memproses angsuran / pelunasan piutang.</p>
                             )}
                         </div>
                     </div>

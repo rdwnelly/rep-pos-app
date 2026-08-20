@@ -73,7 +73,8 @@ export enum PaymentStatus {
 export enum PaymentMethod {
   CASH = 'CASH',
   TRANSFER = 'TRANSFER',
-  TEMPO = 'TEMPO'
+  TEMPO = 'TEMPO',
+  BON = 'BON'
 }
 
 export interface BankAccount {
