@@ -194,8 +194,8 @@ export const generateESCPOSReceipt = (tx: Transaction, settings: StoreSettings):
         encoder.openCashDrawer(1); // Pin 5 (drawer 2)
     }
 
-    // Add extra newlines so it can be torn properly
-    encoder.newline(3)
+    // Add minimal newlines for clean cut without wasting paper
+    encoder.newline(1)
         .cut();
 
     return encoder.getBuffer();

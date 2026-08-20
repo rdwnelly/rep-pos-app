@@ -145,11 +145,11 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
 
     // CSS based on printer type
     let css = '';
-    const bodyBase = `body { width: 100%; margin: 0; padding: 0; background-color: #fff; display: flex; justify-content: center; }`;
+    const bodyBase = `@page { size: auto; margin: 0mm; } body { width: 100%; margin: 0; padding: 0; background-color: #fff; display: flex; justify-content: center; }`;
     let containerCss = '';
 
     if (type === '80mm') {
-        containerCss = `font-family: 'Inter', monospace; font-size: 12px; padding: 10px; width: 78mm; color: #000; text-align: left;`;
+        containerCss = `font-family: 'Inter', monospace; font-size: 11px; padding: 4px; width: 78mm; color: #000; text-align: left; line-height: 1.2;`;
         css = `${bodyBase} .print-page { ${containerCss} box-sizing: border-box; }`;
     } else if (isA4) {
         containerCss = `font-family: 'Inter', sans-serif; font-size: 10pt; padding: 2px 10px; width: 100%; max-width: 210mm; color: #000; line-height: 1; text-align: left;`;
@@ -195,7 +195,7 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
             .date-row { text-align: right; margin: 0; }
         `;
     } else {
-        containerCss = `font-family: 'Inter', monospace; font-size: 11px; padding: 5px; width: 56mm; color: #000; text-align: left;`;
+        containerCss = `font-family: 'Inter', monospace; font-size: 10px; padding: 2px; width: 56mm; color: #000; text-align: left; line-height: 1.2;`;
         css = `${bodyBase} .print-page { ${containerCss} box-sizing: border-box; }`;
     }
 
@@ -366,19 +366,19 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
         `;
     } else {
         let headerHtml = `
-            <div style="text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px;">
-                ${settings.showLogo !== false ? `<img src="/logokasir.jpg" alt="Logo" style="width: 60px; height: 60px; border-radius: 8px; margin-bottom: 5px; object-fit: cover;" />` : ''}
-                <h3 style="font-family: 'Lora', serif; margin: 0; font-size: 14px; text-transform: uppercase;">${settings.name || 'Toko'}</h3>
-                ${settings.showAddress !== false && settings.address ? `<p style="margin: 2px 0; font-size: 10px;">${settings.address}</p>` : ''}
-                ${settings.showPhone !== false && settings.phone ? `<p style="margin: 2px 0; font-size: 10px;">WA: ${settings.phone}</p>` : ''}
+            <div style="text-align: center; margin-bottom: 4px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
+                ${settings.showLogo !== false ? `<img src="/logokasir.jpg" alt="Logo" style="width: 50px; height: 50px; border-radius: 6px; margin-bottom: 3px; object-fit: cover;" />` : ''}
+                <h3 style="font-family: 'Lora', serif; margin: 0; font-size: 13px; text-transform: uppercase;">${settings.name || 'Toko'}</h3>
+                ${settings.showAddress !== false && settings.address ? `<p style="margin: 1px 0; font-size: 9px;">${settings.address}</p>` : ''}
+                ${settings.showPhone !== false && settings.phone ? `<p style="margin: 1px 0; font-size: 9px;">WA: ${settings.phone}</p>` : ''}
                 ${settings.showInstagram !== false && settings.instagram || settings.showTiktok !== false && settings.tiktok ?
-                `<p style="margin: 2px 0; font-size: 10px;">
+                `<p style="margin: 1px 0; font-size: 9px;">
                         ${settings.showInstagram !== false && settings.instagram ? `IG: ${settings.instagram}` : ''}
                         ${settings.showInstagram !== false && settings.instagram && settings.showTiktok !== false && settings.tiktok ? ' | ' : ''}
                         ${settings.showTiktok !== false && settings.tiktok ? `TikTok: ${settings.tiktok}` : ''}
                     </p>` : ''}
             </div>
-            <div style="margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px;">
+            <div style="margin-bottom: 4px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
                 <table style="width: 100%; border: none; font-size: 9px; border-collapse: collapse;" cellspacing="0" cellpadding="0">
                     <tr><td style="width: 35%; border: none; padding: 1px 0; vertical-align: top;">No. Struk</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.invoiceNumber || tx.id.substring(0, 8)}</td></tr>
                     <tr><td style="border: none; padding: 1px 0; vertical-align: top;">Tanggal</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${formatDate(tx.date)}</td></tr>
@@ -395,9 +395,9 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
 
         // Items HTML specific to thermal layout
         let thermalItemsHtml = `
-            <div style="margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px;">
+            <div style="margin-bottom: 4px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
                 ${tx.items.map(item => `
-                    <div style="display: flex; flex-direction: column; margin-bottom: 5px; font-size: 10px;">
+                    <div style="display: flex; flex-direction: column; margin-bottom: 3px; font-size: 9px;">
                         <div style="font-weight: bold;">${item.name}</div>
                         <div style="display: flex; justify-content: space-between;">
                             <span>${item.qty} ${item.unit || 'x'} ${formatIDR(item.finalPrice)}</span>
@@ -409,47 +409,47 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
         `;
 
         let contentHtml = `
-            <div style="margin-bottom: 10px; font-size: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+            <div style="margin-bottom: 4px; font-size: 9px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 1px;">
                     <span>Subtotal</span>
                     <span>${formatIDR(subTotal)}</span>
                 </div>
                 ${discountAmount > 0 ? `
-                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 1px;">
                     <span>Diskon</span>
                     <span>-${formatIDR(discountAmount)}</span>
                 </div>` : ''}
-                <div style="display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 12px; font-weight: bold; margin-top: 5px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 1px; font-size: 11px; font-weight: bold; margin-top: 3px;">
                     <span>GRAND TOTAL</span>
                     <span>${formatIDR(tx.totalAmount)}</span>
                 </div>
             </div>
 
-            <div style="margin-bottom: 10px; font-size: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+            <div style="margin-bottom: 4px; font-size: 9px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 1px;">
                     <span>Metode Bayar</span>
                     <span>${((tx.paymentMethod as string) === 'TEMPO' || tx.paymentMethod === 'BON') ? 'BON (Hutang)' : tx.paymentMethod}</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 1px;">
                     <span>Tunai / Diterima</span>
                     <span>${formatIDR(tx.amountPaid)}</span>
                 </div>
                 ${tx.change >= 0 ? `
-                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 1px;">
                     <span>Kembalian</span>
                     <span>${formatIDR(tx.change)}</span>
                 </div>` : ''}
                 ${tx.change < 0 ? `
-                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 1px;">
                     <span>Sisa Utang</span>
                     <span>${formatIDR(Math.abs(tx.change))}</span>
                 </div>` : ''}
             </div>
             
-            <div class="footer" style="text-align: center; font-size: 10px; margin-top: 15px;">
-                <p style="margin: 2px 0; font-weight: bold;">Terima kasih atas kunjungan Anda.</p>
-                <p style="margin: 2px 0; font-style: italic;">"Papua Punya Cerita, Kami Sajikan dalam Rasa"</p>
-                ${settings.showBank && bankInfo ? `<p style="margin:10px 0 0 0; text-align: left;">Info Transfer:<br/>${bankInfo}</p>` : ''}
+            <div class="footer" style="text-align: center; font-size: 9px; margin-top: 4px; padding-bottom: 0px;">
+                <p style="margin: 1px 0; font-weight: bold;">Terima kasih atas kunjungan Anda.</p>
+                <p style="margin: 1px 0; font-style: italic;">"Papua Punya Cerita, Kami Sajikan dalam Rasa"</p>
+                ${settings.showBank && bankInfo ? `<p style="margin:4px 0 0 0; text-align: left;">Info Transfer:<br/>${bankInfo}</p>` : ''}
             </div>
         `;
 
