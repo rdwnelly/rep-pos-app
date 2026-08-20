@@ -34,6 +34,8 @@ import {
   User,
   UserRole,
   Division,
+  TravelAgent,
+  TravelBookingCommission,
 } from "../types";
 
 const collectionRef = (name: string) => collection(db, name);
@@ -410,4 +412,24 @@ export const FirestoreService = {
     saveEntity<any>("berita_acara_archives", archive),
   deleteBeritaAcaraArchive: async (id: string) =>
     deleteDoc(doc(collectionRef("berita_acara_archives"), id)),
+
+  // Travel Agents
+  getTravelAgents: async (): Promise<TravelAgent[]> =>
+    getCollection<TravelAgent>("travel_agents"),
+  saveTravelAgent: async (agent: TravelAgent) =>
+    saveEntity<TravelAgent>("travel_agents", agent),
+  updateTravelAgent: async (agent: TravelAgent) =>
+    saveEntity<TravelAgent>("travel_agents", agent),
+  deleteTravelAgent: async (id: string) =>
+    deleteDoc(doc(collectionRef("travel_agents"), id)),
+
+  // Travel Commissions
+  getTravelCommissions: async (): Promise<TravelBookingCommission[]> =>
+    getCollectionOrdered<TravelBookingCommission>("travel_commissions", "departureDate", "desc"),
+  saveTravelCommission: async (commission: TravelBookingCommission) =>
+    saveEntity<TravelBookingCommission>("travel_commissions", commission),
+  updateTravelCommission: async (commission: TravelBookingCommission) =>
+    saveEntity<TravelBookingCommission>("travel_commissions", commission),
+  deleteTravelCommission: async (id: string) =>
+    deleteDoc(doc(collectionRef("travel_commissions"), id)),
 };

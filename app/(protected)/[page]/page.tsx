@@ -17,6 +17,7 @@ import {
   SoldItems,
   SupplierHistory,
   TransferHistory,
+  TravelAgentCommission,
 } from "../../../screens";
 
 const pageMap: Record<
@@ -44,6 +45,7 @@ const pageMap: Record<
   finance: { component: Finance, requiresCurrentUser: true },
   customer_history: { component: CustomerHistory, requiresCurrentUser: true },
   supplier_history: { component: SupplierHistory, requiresCurrentUser: true },
+  travel_commission: { component: TravelAgentCommission, requiresCurrentUser: true },
   real_stock_check: { component: RealStockCheck, requiresCurrentUser: true },
   sold_items: { component: SoldItems, requiresCurrentUser: true },
   transfer_history: { component: TransferHistory, requiresCurrentUser: true },
