@@ -168,8 +168,8 @@ export const generateESCPOSReceipt = (tx: Transaction, settings: StoreSettings):
     }
     encoder.bold(true).tableRow('TOTAL', formatIDR(tx.totalAmount), width).bold(false);
     
-    encoder.newline();
-    encoder.tableRow(`Bayar (${tx.paymentMethod})`, formatIDR(tx.amountPaid), width);
+    const methodLabel = ((tx.paymentMethod as string) === 'TEMPO' || tx.paymentMethod === 'BON') ? 'BON' : tx.paymentMethod;
+    encoder.tableRow(`Bayar (${methodLabel})`, formatIDR(tx.amountPaid), width);
     
     if (tx.change >= 0) {
         encoder.tableRow('Kembalian', formatIDR(tx.change), width);

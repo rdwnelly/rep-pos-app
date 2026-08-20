@@ -326,7 +326,7 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                                     <td style="text-align: right; font-weight: bold;">${formatNumber(tx.totalAmount)}</td>
                                 </tr>
                                 <tr>
-                                    <td>Bayar (${tx.paymentMethod})</td>
+                                    <td>Bayar (${((tx.paymentMethod as string) === 'TEMPO' || tx.paymentMethod === 'BON') ? 'BON' : tx.paymentMethod})</td>
                                     <td style="text-align: right;">${formatNumber(tx.amountPaid)}</td>
                                 </tr>
                                 ${tx.change < 0 ? `
@@ -428,7 +428,7 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
             <div style="margin-bottom: 10px; font-size: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
                     <span>Metode Bayar</span>
-                    <span>${tx.paymentMethod}</span>
+                    <span>${((tx.paymentMethod as string) === 'TEMPO' || tx.paymentMethod === 'BON') ? 'BON (Hutang)' : tx.paymentMethod}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
                     <span>Tunai / Diterima</span>

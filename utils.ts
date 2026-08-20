@@ -55,6 +55,12 @@ export const formatTimeOnly = (dateString: string): string => {
 
 
 
+export const formatPaymentMethod = (method?: string): string => {
+  if (!method) return '-';
+  if (method === 'TEMPO' || method === 'BON') return 'BON / HUTANG';
+  return method;
+};
+
 export const generateId = (): string => {
   return Math.random().toString(36).substr(2, 9);
 };

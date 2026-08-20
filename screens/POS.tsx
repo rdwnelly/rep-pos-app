@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Trash2, User, Plus, Minus, ShoppingBag, Printer, CreditCard, Banknote, Clock, ScanLine, StickyNote, Image as ImageIcon, X, ChevronLeft, ClipboardList, CheckCircle, BadgePercent } from 'lucide-react';
+import { Search, Trash2, User, Plus, Minus, ShoppingBag, Printer, CreditCard, Banknote, Clock, ScanLine, StickyNote, Image as ImageIcon, X, ChevronLeft, ClipboardList, CheckCircle, BadgePercent, Receipt } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Product, CartItem, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, Category, TravelBookingCommission, CommissionMethod, CommissionStatus } from '../types';
@@ -283,12 +283,12 @@ export const POS: React.FC = () => {
     }
 
     // Validation
-    if (paymentMethod === PaymentMethod.TEMPO && paid === 0) {
+    if ((paymentMethod === PaymentMethod.TEMPO || paymentMethod === PaymentMethod.BON) && paid === 0) {
       paid = 0;
-    } else if (paymentMethod === PaymentMethod.TEMPO && paid > totalAmount) {
-      alert('Peringatan: Jumlah pembayaran tidak boleh melebihi total harga barang untuk metode pembayaran tempo!');
+    } else if ((paymentMethod === PaymentMethod.TEMPO || paymentMethod === PaymentMethod.BON) && paid > totalAmount) {
+      alert('Peringatan: Jumlah pembayaran tidak boleh melebihi total harga barang untuk metode pembayaran BON / Hutang!');
       return;
-    } else if (paymentMethod !== PaymentMethod.TEMPO && paid < totalAmount) {
+    } else if (paymentMethod !== PaymentMethod.TEMPO && paymentMethod !== PaymentMethod.BON && paid < totalAmount) {
       alert('Pembayaran kurang!');
       return;
     }
@@ -485,8 +485,8 @@ export const POS: React.FC = () => {
             <button
               onClick={() => setSelectedCategory('')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedCategory === ''
-                  ? 'bg-amber-600 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-amber-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
             >
               Semua Menu ({products.length})
@@ -498,8 +498,8 @@ export const POS: React.FC = () => {
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${selectedCategory === cat.id
-                      ? 'bg-amber-600 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                 >
                   <span>{cat.name}</span>
@@ -940,7 +940,7 @@ export const POS: React.FC = () => {
                         onClick={() => {
                           setPaymentMethod(PaymentMethod.CASH);
                           setSelectedBankId('');
-                          if (paymentMethod === PaymentMethod.TEMPO && paymentNote === 'Max 1 minggu dari transaksi.') setPaymentNote('');
+                          if (paymentNote === 'BON Pembelian Barang (Hutang)') setPaymentNote('');
                         }}
                         className={`p-3 rounded-xl border-2 text-sm font-bold flex flex-col items-center gap-1.5 transition-all ${paymentMethod === PaymentMethod.CASH ? 'border-primary bg-primary/5 text-primary shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
                       >
@@ -950,7 +950,7 @@ export const POS: React.FC = () => {
                         onClick={() => {
                           setPaymentMethod(PaymentMethod.TRANSFER);
                           setAmountPaid(totalAmount.toString());
-                          if (paymentMethod === PaymentMethod.TEMPO && paymentNote === 'Max 1 minggu dari transaksi.') setPaymentNote('');
+                          if (paymentNote === 'BON Pembelian Barang (Hutang)') setPaymentNote('');
                         }}
                         className={`p-3 rounded-xl border-2 text-sm font-bold flex flex-col items-center gap-1.5 transition-all ${paymentMethod === PaymentMethod.TRANSFER ? 'border-primary bg-primary/5 text-primary shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
                       >
@@ -958,14 +958,14 @@ export const POS: React.FC = () => {
                       </button>
                       <button
                         onClick={() => {
-                          if (paymentMethod !== PaymentMethod.TEMPO) setPaymentNote('Max 1 minggu dari transaksi.');
-                          setPaymentMethod(PaymentMethod.TEMPO);
+                          if (paymentMethod !== PaymentMethod.TEMPO && paymentMethod !== PaymentMethod.BON) setPaymentNote('BON Pembelian Barang (Hutang)');
+                          setPaymentMethod(PaymentMethod.BON);
                           setAmountPaid('0');
                           setSelectedBankId('');
                         }}
-                        className={`p-3 rounded-xl border-2 text-sm font-bold flex flex-col items-center gap-1.5 transition-all ${paymentMethod === PaymentMethod.TEMPO ? 'border-primary bg-primary/5 text-primary shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
+                        className={`p-3 rounded-xl border-2 text-sm font-bold flex flex-col items-center gap-1.5 transition-all ${(paymentMethod === PaymentMethod.TEMPO || paymentMethod === PaymentMethod.BON) ? 'border-primary bg-primary/5 text-primary shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
                       >
-                        <Clock size={22} /> TEMPO
+                        <Receipt size={22} /> BON / HUTANG
                       </button>
                     </div>
                   </div>
@@ -1057,9 +1057,9 @@ export const POS: React.FC = () => {
                     </div>
                   )}
 
-                  {(paymentMethod === PaymentMethod.TEMPO || (paymentMethod === PaymentMethod.CASH && parseFloat(amountPaid) < totalAmount)) && (
+                  {(paymentMethod === PaymentMethod.TEMPO || paymentMethod === PaymentMethod.BON || (paymentMethod === PaymentMethod.CASH && parseFloat(amountPaid) < totalAmount)) && (
                     <div className="p-4 bg-orange-50 rounded-xl border border-orange-200 flex justify-between items-center animate-fade-in mt-2">
-                      <span className="text-orange-700 font-bold uppercase tracking-wider text-sm">Sisa Hutang</span>
+                      <span className="text-orange-700 font-bold uppercase tracking-wider text-sm">Sisa Hutang BON</span>
                       <span className="text-2xl font-black text-orange-600">{formatIDR(totalAmount - (parseFloat(amountPaid) || 0))}</span>
                     </div>
                   )}
