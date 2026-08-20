@@ -1,4 +1,4 @@
-import { Product, Transaction, User, CashFlow, Category, Division, Customer, Supplier, Purchase, StoreSettings, BankAccount, SyncQueueItem, TravelAgent, TravelBookingCommission } from "../types";
+import { Product, Transaction, User, CashFlow, Category, Division, Customer, Supplier, Purchase, StoreSettings, BankAccount, SyncQueueItem, TravelAgent, TravelBookingCommission, OpenBill } from "../types";
 import { ApiService } from "./api";
 
 // Simple Event Bus for Data Changes
@@ -322,5 +322,37 @@ export const StorageService = {
   deleteTravelCommission: async (id: string) => {
     await ApiService.deleteTravelCommission(id);
     notifyListeners('travel_commissions');
+  },
+
+  // Open Bills (Tagihan Terbuka)
+  getOpenBills: async (): Promise<OpenBill[]> => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('pos_open_bills') : null;
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  },
+  saveOpenBill: async (bill: OpenBill) => {
+    const bills = await StorageService.getOpenBills();
+    const index = bills.findIndex(b => b.id === bill.id);
+    if (index >= 0) {
+      bills[index] = bill;
+    } else {
+      bills.push(bill);
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pos_open_bills', JSON.stringify(bills));
+      window.dispatchEvent(new CustomEvent('open_bills_updated'));
+    }
+    notifyListeners('open_bills');
+  },
+  deleteOpenBill: async (id: string) => {
+    const bills = (await StorageService.getOpenBills()).filter(b => b.id !== id);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pos_open_bills', JSON.stringify(bills));
+      window.dispatchEvent(new CustomEvent('open_bills_updated'));
+    }
+    notifyListeners('open_bills');
   },
 };

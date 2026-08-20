@@ -132,6 +132,28 @@ export interface Transaction {
   updatedAt?: string;
 }
 
+export interface OpenBill {
+  id: string;
+  billNumber: string;
+  tableNumber?: string;
+  customerName: string;
+  customerId?: string;
+  customerPhone?: string;
+  items: CartItem[];
+  subtotal: number;
+  discount: number;
+  discountType?: 'PERCENTAGE' | 'FIXED';
+  discountAmount?: number;
+  totalAmount: number;
+  cashierId: string;
+  cashierName: string;
+  travelAgentId?: string;
+  notes?: string;
+  status: 'OPEN' | 'CLOSED';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export enum PurchaseType {
   PURCHASE = 'PURCHASE',
   RETURN = 'RETURN'
