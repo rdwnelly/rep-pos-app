@@ -4,14 +4,17 @@ import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Transaction, PaymentStatus, Customer, UserRole, User, PaymentMethod, StoreSettings, TransactionType } from '../types';
 import { formatIDR, formatDate, formatDateDateOnly, formatTimeOnly, exportToCSV, exportToExcel } from '../utils';
-import { generatePrintTransactionDetail } from '../utils/printHelpers';
-import { Download, Search, Filter, RotateCcw, X, Eye, FileText, Printer, FileSpreadsheet, UserCheck, Calendar } from 'lucide-react';
+import { generatePrintTransactionDetail, generatePrintInvoice } from '../utils/printHelpers';
+import { generateESCPOSReceipt } from '../utils/escposEncoder';
+import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
+import { Download, Search, Filter, RotateCcw, X, Eye, FileText, Printer, FileSpreadsheet, UserCheck, Calendar, Trash2, Bluetooth } from 'lucide-react';
 
 interface CustomerHistoryProps {
     currentUser: User | null;
 }
 
 export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser }) => {
+    const bluetooth = useBluetoothPrinter();
     const transactions = useData(() => StorageService.getTransactions(), [], 'transactions') || [];
     const customers = useData(() => StorageService.getCustomers(), [], 'customers') || [];
     const banks = useData(() => StorageService.getBanks(), [], 'banks') || [];
@@ -148,6 +151,22 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
 
         return { totalSales, totalPaid, totalDebt };
     }, [filteredTransactions]);
+
+    const handleDeleteTransaction = async (transactionId: string) => {
+        if (!confirm('Yakin ingin menghapus transaksi ini? Seluruh item dalam transaksi ini akan ikut terhapus. Aksi ini tidak dapat dibatalkan.')) return;
+        try {
+            await StorageService.deleteTransaction(transactionId);
+            window.dispatchEvent(new Event('transactions_updated'));
+            window.dispatchEvent(new Event('products_updated'));
+            if (detailTransaction?.id === transactionId) {
+                setDetailTransaction(null);
+            }
+            alert('Transaksi berhasil dihapus.');
+        } catch (error) {
+            console.error("Failed to delete transaction:", error);
+            alert("Gagal menghapus transaksi.");
+        }
+    };
 
 
 
@@ -300,6 +319,44 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
         const html = generatePrintTransactionDetail(tx, settings, formatIDR, formatDate);
         w.document.write(html);
         w.document.close();
+    };
+
+    const handlePrintReceipt = async (tx: Transaction) => {
+        try {
+            const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
+
+            // 1. Connect bluetooth in user gesture context if not connected
+            if (!bluetooth.isConnected) {
+                try {
+                    await bluetooth.connect();
+                } catch (connErr: any) {
+                    if (connErr.name === 'NotFoundError' || connErr.message?.includes('cancelled')) {
+                        return;
+                    }
+                    console.warn("[BT Printer] Connect attempt error:", connErr);
+                }
+            }
+
+            // 2. Direct print via bluetooth thermal ESC/POS without print popup dialog
+            if (bluetooth.isConnected) {
+                const escposData = generateESCPOSReceipt(tx, settings);
+                await bluetooth.print(escposData);
+                return;
+            }
+
+            // 3. Fallback if Bluetooth printer not connected
+            const w = window.open('', '', 'width=800,height=600');
+            if (!w) {
+                alert("Popup blocker mencegah cetak struk. Mohon izinkan popup untuk website ini.");
+                return;
+            }
+            const html = generatePrintInvoice(tx, settings, formatIDR, formatDate);
+            w.document.write(html);
+            w.document.close();
+        } catch (error: any) {
+            console.error('[BT Printer] Cetak gagal:', error);
+            alert(`Gagal mencetak struk: ${error.message || 'Periksa koneksi printer.'}`);
+        }
     };
 
     return (
@@ -557,12 +614,29 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                                         <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{t.paymentMethod}</td>
                                         <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{t.cashierName}</td>
                                         <td className="p-3.5 text-center whitespace-nowrap">
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }}
-                                                className="px-2.5 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-amber-200"
-                                            >
-                                                <Eye size={12} /> Detail
-                                            </button>
+                                            <div className="flex items-center justify-center gap-1.5">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handlePrintReceipt(t); }}
+                                                    className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-emerald-200"
+                                                    title="Cetak Struk Thermal Bluetooth (Langsung Otomatis Tanpa Popup)"
+                                                >
+                                                    <Bluetooth size={12} /> Struk
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }}
+                                                    className="px-2.5 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-amber-200"
+                                                    title="Lihat Detail Transaksi"
+                                                >
+                                                    <Eye size={12} /> Detail
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }}
+                                                    className="px-2.5 py-1 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-rose-200"
+                                                    title="Hapus Transaksi"
+                                                >
+                                                    <Trash2 size={12} /> Hapus
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 );
@@ -766,11 +840,27 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                                 })()}
                             </div>
                         </div>
-                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
-                            <button onClick={() => printTransactionDetail(detailTransaction)} className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50">
-                                <Printer size={16} /> Cetak Detail
+                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center flex-wrap gap-2">
+                            <button
+                                onClick={() => handleDeleteTransaction(detailTransaction.id)}
+                                className="bg-rose-50 border border-rose-200 text-rose-600 px-3.5 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-rose-100 transition-colors"
+                                title="Hapus Transaksi Ini"
+                            >
+                                <Trash2 size={16} /> Hapus Transaksi
                             </button>
-                            <button onClick={() => setDetailTransaction(null)} className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold">Tutup</button>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => handlePrintReceipt(detailTransaction)}
+                                    className="bg-emerald-600 text-white border border-emerald-700 px-3.5 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-emerald-700 transition-colors shadow-xs"
+                                    title="Cetak Langsung Struk Thermal Bluetooth (Tanpa Popup Konfirmasi)"
+                                >
+                                    <Bluetooth size={16} /> Cetak Struk
+                                </button>
+                                <button onClick={() => printTransactionDetail(detailTransaction)} className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50">
+                                    <Printer size={16} /> Cetak Detail
+                                </button>
+                                <button onClick={() => setDetailTransaction(null)} className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold">Tutup</button>
+                            </div>
                         </div>
                     </div>
                 </div>,
