@@ -7,7 +7,7 @@ import { formatIDR, formatDate, formatDateDateOnly, formatTimeOnly, exportToCSV,
 import { generatePrintTransactionDetail, generatePrintInvoice } from '../utils/printHelpers';
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
-import { Download, Search, Filter, RotateCcw, X, Eye, FileText, Printer, FileSpreadsheet, UserCheck, Calendar, Trash2, Bluetooth } from 'lucide-react';
+import { Download, Search, Filter, RotateCcw, X, Eye, FileText, Printer, FileSpreadsheet, UserCheck, Calendar, Trash2, Bluetooth, RefreshCw } from 'lucide-react';
 
 interface CustomerHistoryProps {
     currentUser: User | null;
@@ -851,6 +851,20 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                                 <Trash2 size={16} /> Hapus Transaksi
                             </button>
                             <div className="flex flex-wrap gap-2">
+                                {detailTransaction.type !== TransactionType.RETURN && (
+                                    <button
+                                        onClick={() => {
+                                            if (confirm(`Buka kembali transaksi #${detailTransaction.invoiceNumber || detailTransaction.id.substring(0, 8)} untuk penambahan pesanan (Add-on Order / Reopen)?`)) {
+                                                sessionStorage.setItem('pos_reopen_transaction', JSON.stringify(detailTransaction));
+                                                window.location.href = '/pos';
+                                            }
+                                        }}
+                                        className="bg-indigo-50 border border-indigo-300 text-indigo-700 px-3.5 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-indigo-100 transition-colors"
+                                        title="Reopen transaksi untuk menambah pesanan barang baru"
+                                    >
+                                        <RefreshCw size={16} /> Reopen / Tambah Pesanan
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => handlePrintReceipt(detailTransaction)}
                                     className="bg-emerald-600 text-white border border-emerald-700 px-3.5 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-emerald-700 transition-colors shadow-xs"

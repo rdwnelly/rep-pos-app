@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Trash2, User, Plus, Minus, ShoppingBag, Printer, CreditCard, Banknote, Clock, ScanLine, StickyNote, Image as ImageIcon, X, ChevronLeft, ClipboardList, CheckCircle, BadgePercent, Receipt } from 'lucide-react';
+import { Search, Trash2, User, Plus, Minus, ShoppingBag, Printer, CreditCard, Banknote, Clock, ScanLine, StickyNote, Image as ImageIcon, X, ChevronLeft, ClipboardList, CheckCircle, BadgePercent, Receipt, RefreshCw } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Product, CartItem, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, Category, TravelBookingCommission, CommissionMethod, CommissionStatus, OpenBill } from '../types';
@@ -84,6 +84,31 @@ export const POS: React.FC = () => {
   const [showOpenBillsModal, setShowOpenBillsModal] = useState(false);
   const [openBillSearch, setOpenBillSearch] = useState('');
 
+  // Reopen / Add-on Order State
+  const [reopenTx, setReopenTx] = useState<Transaction | null>(null);
+
+  // Check sessionStorage for Reopen Transaction payload on mount
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('pos_reopen_transaction');
+      if (raw) {
+        const tx: Transaction = JSON.parse(raw);
+        sessionStorage.removeItem('pos_reopen_transaction');
+
+        setReopenTx(tx);
+        setCart(tx.items || []);
+        setCustomerName(tx.customerName || 'Pelanggan Umum');
+        setCustomerPhone(tx.customerPhone || '');
+        setTableNumber(tx.tableNumber || '');
+        setDiscount(tx.discount || 0);
+        setDiscountType(tx.discountType || 'FIXED');
+        setSelectedCustomerId(tx.customerId || '');
+      }
+    } catch (e) {
+      console.error("Error reading reopen transaction payload:", e);
+    }
+  }, []);
+
   // Create/Edit Open Bill Popup Modal State
   const [showCreateOpenBillModal, setShowCreateOpenBillModal] = useState(false);
   const [openBillTableInput, setOpenBillTableInput] = useState('');
@@ -91,10 +116,11 @@ export const POS: React.FC = () => {
   const [openBillPhoneInput, setOpenBillPhoneInput] = useState('');
   const [openBillNoteInput, setOpenBillNoteInput] = useState('');
 
-  // Reset Cart & Open Bill State
+  // Reset Cart & Open Bill & Reopen State
   const resetCartAndState = () => {
     setCart([]);
     setActiveOpenBillId(null);
+    setReopenTx(null);
     setSelectedCustomerId('');
     setCustomerName('Pelanggan Umum');
     setCustomerPhone('');
@@ -410,6 +436,15 @@ export const POS: React.FC = () => {
     return Math.max(0, subtotal - discountAmountValue);
   }, [subtotal, discountAmountValue]);
 
+  const reopenPreviousPaid = useMemo(() => {
+    return reopenTx ? (reopenTx.amountPaid || 0) : 0;
+  }, [reopenTx]);
+
+  const reopenDeficit = useMemo(() => {
+    if (!reopenTx) return 0;
+    return Math.max(0, totalAmount - reopenPreviousPaid);
+  }, [reopenTx, totalAmount, reopenPreviousPaid]);
+
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
@@ -490,6 +525,90 @@ export const POS: React.FC = () => {
 
     if (stockErrors.length > 0) {
       alert(`Transaksi tidak dapat diproses! Item berikut melebihi stok:\n${stockErrors.join('\n')}`);
+      return;
+    }
+
+    // Reopen Transaction Checkout Mode
+    if (reopenTx) {
+      const selectedBank = banks.find(b => b.id === selectedBankId);
+      const paid = parseFloat(amountPaid) || 0;
+      const totalPaid = reopenPreviousPaid + paid;
+
+      if (totalPaid < totalAmount && paymentMethod !== PaymentMethod.TEMPO && paymentMethod !== PaymentMethod.BON) {
+        alert(`Pembayaran kurang! Sisa kekurangan: ${formatIDR(reopenDeficit)}.`);
+        return;
+      }
+
+      if (paymentMethod === PaymentMethod.TRANSFER && !selectedBankId) {
+        alert('Silakan pilih rekening bank tujuan transfer.');
+        return;
+      }
+
+      const revCount = (reopenTx.revisionCount || 0) + 1;
+      const baseInv = reopenTx.invoiceNumber
+        ? reopenTx.invoiceNumber.replace(/-Rev\d+$/i, '')
+        : `INV-${reopenTx.id.substring(0, 6)}`;
+      const newInvoiceNumber = `${baseInv}-Rev${revCount}`;
+
+      const newPaymentHistoryItem = paid > 0 ? {
+        id: generateId(),
+        date: new Date().toISOString(),
+        amount: paid,
+        method: paymentMethod,
+        bankId: selectedBankId,
+        bankName: selectedBank?.bankName,
+        note: `Tambahan Pesanan (${newInvoiceNumber})`
+      } : null;
+
+      const isDebt = totalPaid < totalAmount;
+      const status = isDebt ? (totalPaid > 0 ? PaymentStatus.PARTIAL : PaymentStatus.UNPAID) : PaymentStatus.PAID;
+
+      const updatedTransaction: Transaction = {
+        ...reopenTx,
+        items: [...cart],
+        subtotal,
+        discount,
+        discountType,
+        discountAmount: discountAmountValue,
+        totalAmount,
+        amountPaid: totalPaid,
+        change: totalPaid - totalAmount,
+        paymentStatus: status,
+        paymentMethod: paymentMethod,
+        paymentNote: paymentNote || reopenTx.paymentNote,
+        bankId: selectedBankId || reopenTx.bankId,
+        bankName: selectedBank?.bankName || reopenTx.bankName,
+        customerName: customerName || reopenTx.customerName,
+        customerPhone: customerPhone || reopenTx.customerPhone,
+        tableNumber: tableNumber || reopenTx.tableNumber,
+        invoiceNumber: newInvoiceNumber,
+        revisionCount: revCount,
+        paymentHistory: newPaymentHistoryItem
+          ? [...(reopenTx.paymentHistory || []), newPaymentHistoryItem]
+          : (reopenTx.paymentHistory || []),
+        updatedAt: new Date().toISOString()
+      };
+
+      try {
+        await StorageService.updateTransaction(updatedTransaction);
+        
+        const settings = await StorageService.getStoreSettings();
+        printReceipt(updatedTransaction, settings, {
+          qrisCode: selectedBank?.qrisCode,
+          bankName: selectedBank?.bankName
+        });
+
+        playBeep();
+        alert(`✓ Reopen Transaksi #${newInvoiceNumber} berhasil diproses!`);
+
+        resetCartAndState();
+        setShowPaymentModal(false);
+        setShowSuccessModal(true);
+        setTimeout(() => setShowSuccessModal(false), 3000);
+      } catch (err) {
+        console.error("Reopen Checkout Error:", err);
+        alert("Gagal memproses Reopen Transaksi.");
+      }
       return;
     }
 
@@ -843,6 +962,34 @@ export const POS: React.FC = () => {
             </div>
           )}
 
+          {/* Active Reopen Transaction Banner */}
+          {reopenTx && (
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3 rounded-2xl flex flex-col gap-1 text-xs font-bold mb-3 shadow-md animate-fade-in border border-blue-400">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5">
+                  <RefreshCw size={16} className="animate-spin-slow" />
+                  <span>REOPEN: Struk #{reopenTx.invoiceNumber || reopenTx.id.substring(0, 8)}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    if (confirm("Batalkan mode Reopen? Pesanan akan direset.")) {
+                      resetCartAndState();
+                    }
+                  }}
+                  className="bg-white/20 hover:bg-white/30 text-white px-2 py-0.5 rounded-lg text-[10px] uppercase font-black"
+                >
+                  Batal
+                </button>
+              </div>
+              <div className="flex justify-between text-[11px] text-blue-100 font-mono mt-1 pt-1 border-t border-blue-400/40">
+                <span>Sudah Dibayar: {formatIDR(reopenPreviousPaid)}</span>
+                <span className="font-extrabold text-yellow-300">
+                  Kekurangan: {formatIDR(reopenDeficit)}
+                </span>
+              </div>
+            </div>
+          )}
+
           <div className="mb-3">
             <div className="relative mb-2">
               <label htmlFor="customerSearch" className="sr-only">Cari Pelanggan</label>
@@ -996,7 +1143,7 @@ export const POS: React.FC = () => {
                     alert('Diskon tidak valid: Tidak boleh melebihi subtotal');
                     return;
                   }
-                  setAmountPaid(''); // Reset on open
+                  setAmountPaid(reopenTx ? (reopenDeficit > 0 ? reopenDeficit.toString() : '') : '');
                   setShowPaymentModal(true);
                 }}
                 disabled={cart.length === 0}
@@ -1004,7 +1151,7 @@ export const POS: React.FC = () => {
                 title="Bayar dan selesaikan transaksi"
               >
                 <Printer size={17} />
-                <span>Bayar</span>
+                <span>{reopenTx ? 'Bayar Kekurangan' : 'Bayar'}</span>
               </button>
             </div>
           </div>
@@ -1146,6 +1293,18 @@ export const POS: React.FC = () => {
                     <span>TOTAL</span>
                     <span>{formatIDR(totalAmount)}</span>
                   </div>
+                  {reopenTx && (
+                    <div className="mt-3 pt-2 border-t border-blue-200 text-xs font-sans bg-blue-50/80 p-2.5 rounded-xl border border-blue-200">
+                      <div className="flex justify-between text-slate-600">
+                        <span>Sudah Dibayar:</span>
+                        <span className="font-semibold">{formatIDR(reopenPreviousPaid)}</span>
+                      </div>
+                      <div className="flex justify-between font-extrabold text-amber-700 mt-1 text-sm">
+                        <span>Wajib Dibayar (Kekurangan):</span>
+                        <span>{formatIDR(reopenDeficit)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
