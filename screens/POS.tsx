@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Search, Trash2, User, Plus, Minus, ShoppingBag, Printer, CreditCard, Banknote, Clock, ScanLine, StickyNote, Image as ImageIcon, X, ChevronLeft, ClipboardList, CheckCircle, BadgePercent, Receipt } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
-import { Product, CartItem, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, Category, TravelBookingCommission, CommissionMethod, CommissionStatus } from '../types';
+import { Product, CartItem, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, Category, TravelBookingCommission, CommissionMethod, CommissionStatus, OpenBill } from '../types';
 import { formatIDR, generateId, formatDate, toMySQLDate } from '../utils';
 import { generatePrintInvoice, PrintInvoiceOptions } from '../utils/printHelpers';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
@@ -78,8 +78,160 @@ export const POS: React.FC = () => {
   const [showQrisModal, setShowQrisModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // Settings
+  // Open Bill State
+  const openBills = useData(() => StorageService.getOpenBills(), [], 'open_bills') || [];
+  const [activeOpenBillId, setActiveOpenBillId] = useState<string | null>(null);
+  const [showOpenBillsModal, setShowOpenBillsModal] = useState(false);
+  const [openBillSearch, setOpenBillSearch] = useState('');
 
+  // Reset Cart & Open Bill State
+  const resetCartAndState = () => {
+    setCart([]);
+    setActiveOpenBillId(null);
+    setSelectedCustomerId('');
+    setCustomerName('Pelanggan Umum');
+    setCustomerPhone('');
+    setTableNumber('');
+    setDiscount(0);
+    setDiscountType('FIXED');
+    setSelectedTravelAgentId('');
+    setPaymentNote('');
+  };
+
+  // Save or Update Open Bill
+  const handleSaveOpenBill = async () => {
+    if (cart.length === 0) {
+      alert('Keranjang masih kosong! Silakan tambahkan pesanan terlebih dahulu.');
+      return;
+    }
+
+    const targetTable = tableNumber.trim();
+    const targetCustomer = customerName.trim();
+
+    if (!targetTable && (!targetCustomer || targetCustomer === 'Pelanggan Umum')) {
+      alert('Mohon masukkan Nomor Meja atau Nama Pelanggan untuk mencatat Open Bill!');
+      return;
+    }
+
+    const existingBill = activeOpenBillId ? openBills.find(b => b.id === activeOpenBillId) : null;
+    const billId = activeOpenBillId || generateId();
+    const billNumber = existingBill?.billNumber || `OB-${targetTable ? `M${targetTable}-` : ''}${Math.floor(1000 + Math.random() * 9000)}`;
+    const nowIso = new Date().toISOString();
+
+    const newOpenBill: OpenBill = {
+      id: billId,
+      billNumber: billNumber,
+      tableNumber: targetTable || undefined,
+      customerName: targetCustomer || 'Pelanggan Umum',
+      customerId: selectedCustomerId || undefined,
+      customerPhone: customerPhone || undefined,
+      items: [...cart],
+      subtotal,
+      discount,
+      discountType,
+      discountAmount: discountAmountValue,
+      totalAmount,
+      cashierId: currentUser.id || 'cashier',
+      cashierName: currentUser.name || 'Kasir',
+      travelAgentId: selectedTravelAgentId || undefined,
+      notes: paymentNote || undefined,
+      status: 'OPEN',
+      createdAt: existingBill?.createdAt || nowIso,
+      updatedAt: nowIso
+    };
+
+    await StorageService.saveOpenBill(newOpenBill);
+    playBeep();
+
+    alert(`✓ Open Bill #${billNumber} (${targetTable ? `Meja ${targetTable}` : targetCustomer}) berhasil disimpan!`);
+    resetCartAndState();
+  };
+
+  // Load Open Bill to Cart
+  const handleLoadOpenBill = (bill: OpenBill) => {
+    setActiveOpenBillId(bill.id);
+    setCart(bill.items || []);
+    setTableNumber(bill.tableNumber || '');
+    setCustomerName(bill.customerName || 'Pelanggan Umum');
+    setSelectedCustomerId(bill.customerId || '');
+    setCustomerPhone(bill.customerPhone || '');
+    setDiscount(bill.discount || 0);
+    setDiscountType(bill.discountType || 'FIXED');
+    setSelectedTravelAgentId(bill.travelAgentId || '');
+    setPaymentNote(bill.notes || '');
+    setShowOpenBillsModal(false);
+  };
+
+  // Delete Open Bill
+  const handleDeleteOpenBill = async (id: string, billNumber: string) => {
+    if (confirm(`Hapus / Batalkan Open Bill #${billNumber}?`)) {
+      await StorageService.deleteOpenBill(id);
+      if (activeOpenBillId === id) {
+        resetCartAndState();
+      }
+    }
+  };
+
+  // Print Temporary Slip
+  const handlePrintTemporarySlip = async (bill: OpenBill) => {
+    if (bluetooth.isConnected) {
+      try {
+        const options = { ...storeSettings, cashierName: bill.cashierName };
+        await bluetooth.print(generateESCPOSReceipt({
+          id: bill.billNumber,
+          date: bill.createdAt,
+          items: bill.items,
+          totalAmount: bill.totalAmount,
+          amountPaid: 0,
+          change: -bill.totalAmount,
+          paymentStatus: PaymentStatus.UNPAID,
+          paymentMethod: PaymentMethod.CASH,
+          customerName: bill.customerName,
+          customerPhone: bill.customerPhone,
+          tableNumber: bill.tableNumber,
+          cashierId: bill.cashierId,
+          cashierName: bill.cashierName,
+          discount: bill.discount,
+          discountType: bill.discountType,
+          discountAmount: bill.discountAmount
+        }, options));
+        alert(`Struk pesanan sementara Open Bill #${bill.billNumber} berhasil dicetak!`);
+      } catch (err) {
+        alert("Gagal mencetak struk sementara via Bluetooth");
+      }
+    } else {
+      const w = window.open('', '', 'width=800,height=600');
+      if (w) {
+        const html = generatePrintInvoice(
+          {
+            id: bill.billNumber,
+            date: bill.createdAt,
+            items: bill.items,
+            totalAmount: bill.totalAmount,
+            amountPaid: 0,
+            change: -bill.totalAmount,
+            paymentStatus: PaymentStatus.UNPAID,
+            paymentMethod: PaymentMethod.CASH,
+            customerName: bill.customerName,
+            customerPhone: bill.customerPhone,
+            tableNumber: bill.tableNumber,
+            cashierId: bill.cashierId,
+            cashierName: bill.cashierName,
+            discount: bill.discount,
+            discountType: bill.discountType,
+            discountAmount: bill.discountAmount
+          },
+          storeSettings || ({} as any),
+          formatIDR,
+          formatDate
+        );
+        w.document.write(html);
+        w.document.close();
+      }
+    }
+  };
+
+  // Settings
   const currentUser = JSON.parse(localStorage.getItem('pos_current_user') || '{}') as UserType; // Need to grab current user
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -387,6 +539,12 @@ export const POS: React.FC = () => {
         }
       }
 
+      // Delete Open Bill if this transaction was from an Open Bill
+      if (activeOpenBillId) {
+        await StorageService.deleteOpenBill(activeOpenBillId);
+        setActiveOpenBillId(null);
+      }
+
       // Reset
       setCart([]);
       setAmountPaid('');
@@ -477,6 +635,25 @@ export const POS: React.FC = () => {
             )}
             <ScanLine className="absolute right-3.5 top-1/2 -translate-y-1/2 text-amber-600" size={18} />
           </div>
+
+          {/* Open Bill Button */}
+          <button
+            onClick={() => setShowOpenBillsModal(true)}
+            className="relative flex items-center gap-2 px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl font-bold text-xs transition-all shadow-xs shrink-0 cursor-pointer"
+            title="Lihat Daftar Tagihan Terbuka (Open Bill / Pesanan Meja)"
+          >
+            <Clock size={16} className="text-amber-700 animate-spin-slow" />
+            <span className="hidden sm:inline font-bold">Open Bill</span>
+            {openBills.length > 0 ? (
+              <span className="bg-amber-600 text-white px-2 py-0.5 rounded-full text-[11px] font-extrabold animate-pulse">
+                {openBills.length} Meja
+              </span>
+            ) : (
+              <span className="bg-amber-200/70 text-amber-900 px-2 py-0.5 rounded-full text-[10px]">
+                0
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Category Filter Horizontal Carousel */}
@@ -589,6 +766,23 @@ export const POS: React.FC = () => {
             </button>
             <h3 className="font-bold text-lg text-slate-800">Keranjang Belanja</h3>
           </div>
+
+          {/* Active Open Bill Banner */}
+          {activeOpenBillId && (
+            <div className="bg-amber-500 text-white p-3 rounded-2xl flex justify-between items-center text-xs font-bold mb-3 shadow-md animate-fade-in border border-amber-400">
+              <div className="flex items-center gap-2">
+                <Clock size={16} className="animate-spin-slow" />
+                <span>Mengedit: {tableNumber ? `Meja ${tableNumber}` : customerName}</span>
+              </div>
+              <button
+                onClick={resetCartAndState}
+                className="bg-amber-700/90 hover:bg-amber-800 text-white px-2.5 py-1 rounded-xl text-[10px] uppercase font-black transition-colors"
+                title="Batal mengedit Open Bill ini"
+              >
+                Batal Edit
+              </button>
+            </div>
+          )}
 
           <div className="mb-3">
             <div className="relative mb-2">
@@ -721,26 +915,39 @@ export const POS: React.FC = () => {
               <span className="text-2xl font-bold text-slate-900">{formatIDR(totalAmount)}</span>
             </div>
 
-            {/* Floating Action Button */}
-            <button
-              onClick={() => {
-                if (discountType === 'PERCENTAGE' && discount > 100) {
-                  alert('Diskon tidak valid: Tidak boleh lebih dari 100%');
-                  return;
-                }
-                if (discountType === 'FIXED' && discount > subtotal) {
-                  alert('Diskon tidak valid: Tidak boleh melebihi subtotal');
-                  return;
-                }
-                setAmountPaid(''); // Reset on open
-                setShowPaymentModal(true);
-              }}
-              disabled={cart.length === 0}
-              className="w-full mt-3 bg-primary text-white py-3.5 rounded-2xl font-extrabold shadow-xl shadow-primary/30 hover:shadow-2xl hover:shadow-primary/40 hover:-translate-y-1 active:translate-y-0 active:scale-[0.99] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-2.5 text-lg cursor-pointer border border-white/20 tracking-wide"
-            >
-              <Printer size={22} />
-              Bayar & Cetak
-            </button>
+            {/* Dual Action Buttons: Open Bill & Close Bill */}
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              <button
+                onClick={handleSaveOpenBill}
+                disabled={cart.length === 0}
+                className="py-3 px-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-2xl font-bold shadow-lg shadow-amber-500/20 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-1.5 text-xs sm:text-sm disabled:opacity-50 cursor-pointer"
+                title="Simpan pesanan ke Open Bill (Tagihan Terbuka)"
+              >
+                <Receipt size={17} />
+                <span>{activeOpenBillId ? 'Perbarui Bill' : 'Simpan Open Bill'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (discountType === 'PERCENTAGE' && discount > 100) {
+                    alert('Diskon tidak valid: Tidak boleh lebih dari 100%');
+                    return;
+                  }
+                  if (discountType === 'FIXED' && discount > subtotal) {
+                    alert('Diskon tidak valid: Tidak boleh melebihi subtotal');
+                    return;
+                  }
+                  setAmountPaid(''); // Reset on open
+                  setShowPaymentModal(true);
+                }}
+                disabled={cart.length === 0}
+                className="py-3 px-2 bg-primary hover:bg-primary-hover active:bg-primary text-white rounded-2xl font-extrabold shadow-lg shadow-primary/30 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5 text-xs sm:text-sm"
+                title="Bayar dan selesaikan transaksi (Close Bill)"
+              >
+                <Printer size={17} />
+                <span>Close Bill</span>
+              </button>
+            </div>
           </div>
           <div className="mt-2 grid grid-cols-1 gap-2">
             {cart.length > 0 && (
@@ -1179,6 +1386,149 @@ export const POS: React.FC = () => {
             @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
             @keyframes scaleIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
           `}</style>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal Daftar Open Bill Aktif */}
+      {showOpenBillsModal && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-scale-in">
+            {/* Header Modal */}
+            <div className="p-6 bg-gradient-to-r from-amber-600 to-amber-700 text-white flex justify-between items-center shrink-0">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Clock size={24} className="animate-spin-slow" />
+                  <h3 className="text-xl font-bold">Daftar Open Bill Aktif</h3>
+                  <span className="bg-white/20 text-white px-2.5 py-0.5 rounded-full text-xs font-bold">
+                    {openBills.length} Meja/Bill
+                  </span>
+                </div>
+                <p className="text-xs text-amber-100 mt-1">Kelola pesanan terbuka (pasca-bayar) pelanggan sebelum Close Bill</p>
+              </div>
+              <button
+                onClick={() => setShowOpenBillsModal(false)}
+                className="p-2 hover:bg-white/20 rounded-full transition-colors text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Sub-header Search */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center gap-3 shrink-0">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Cari Meja, Nama Pelanggan, No. HP, atau Kode Open Bill..."
+                  className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                  value={openBillSearch}
+                  onChange={(e) => setOpenBillSearch(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* List Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              {openBills.filter(b => 
+                (b.tableNumber && b.tableNumber.toLowerCase().includes(openBillSearch.toLowerCase())) ||
+                b.customerName.toLowerCase().includes(openBillSearch.toLowerCase()) ||
+                b.billNumber.toLowerCase().includes(openBillSearch.toLowerCase())
+              ).length === 0 ? (
+                <div className="text-center py-12 text-slate-400">
+                  <Clock size={48} className="mx-auto mb-3 opacity-30" />
+                  <p className="font-semibold text-slate-600">Tidak ada Open Bill aktif</p>
+                  <p className="text-xs text-slate-400 mt-1">Buat Open Bill baru dari layar Kasir dengan memasukkan nomor meja atau nama pelanggan</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {openBills
+                    .filter(b => 
+                      (b.tableNumber && b.tableNumber.toLowerCase().includes(openBillSearch.toLowerCase())) ||
+                      b.customerName.toLowerCase().includes(openBillSearch.toLowerCase()) ||
+                      b.billNumber.toLowerCase().includes(openBillSearch.toLowerCase())
+                    )
+                    .map(b => (
+                      <div key={b.id} className="bg-white border border-amber-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-3 relative overflow-hidden group">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              {b.tableNumber ? (
+                                <span className="px-2.5 py-1 bg-amber-500 text-white rounded-lg text-xs font-black uppercase tracking-wider">
+                                  MEJA {b.tableNumber}
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold">
+                                  PELANGGAN
+                                </span>
+                              )}
+                              <span className="font-mono text-xs font-bold text-slate-500">#{b.billNumber}</span>
+                            </div>
+                            <h4 className="font-bold text-slate-800 text-base mt-2">{b.customerName}</h4>
+                            {b.customerPhone && <p className="text-xs text-slate-500">{b.customerPhone}</p>}
+                          </div>
+                          <div className="text-right">
+                            <span className="text-xs text-slate-400 block font-mono">{formatDate(b.createdAt)}</span>
+                            <span className="text-lg font-black text-amber-600 mt-1 block">{formatIDR(b.totalAmount)}</span>
+                          </div>
+                        </div>
+
+                        {/* Items preview */}
+                        <div className="bg-slate-50 p-2.5 rounded-xl text-xs text-slate-600 font-mono space-y-1 max-h-24 overflow-y-auto">
+                          {b.items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between">
+                              <span className="truncate max-w-[200px]">{item.qty}x {item.name}</span>
+                              <span className="font-semibold text-slate-700">{formatIDR(item.finalPrice * item.qty)}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={() => handlePrintTemporarySlip(b)}
+                              className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1 transition-colors"
+                              title="Cetak Struk Pesanan Sementara / Slip Dapur"
+                            >
+                              <Printer size={15} />
+                              <span className="hidden sm:inline">Cetak Slip</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteOpenBill(b.id, b.billNumber)}
+                              className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-semibold transition-colors"
+                              title="Hapus / Batalkan Open Bill"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                          
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={() => handleLoadOpenBill(b)}
+                              className="px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors"
+                            >
+                              <Plus size={15} />
+                              Tambah Pesanan
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleLoadOpenBill(b);
+                                setShowPaymentModal(true);
+                              }}
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-sm transition-colors"
+                            >
+                              <CreditCard size={15} />
+                              Close Bill
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>,
         document.body
       )}
