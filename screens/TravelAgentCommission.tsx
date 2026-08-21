@@ -747,8 +747,8 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
               </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto touch-scroll">
+              <table className="w-full text-left text-xs min-w-[640px]">
                 <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
                   <tr>
                     <th className="p-3.5 whitespace-nowrap">Kode & Keberangkatan</th>

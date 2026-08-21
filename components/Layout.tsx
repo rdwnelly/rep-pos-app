@@ -23,15 +23,15 @@ const NavItem = React.memo<{
   return (
     <button
       onClick={() => onNavigate(item.id)}
-      className={`w-full flex items-center ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'} px-4 py-3 rounded-xl transition-all duration-150 ${isActive
+      className={`w-full flex items-center ${isSidebarOpen ? 'justify-start gap-2.5 sm:gap-3' : 'justify-center'} px-3 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-150 ${isActive
         ? 'bg-white text-primary shadow-lg shadow-black/10'
         : 'text-white/80 hover:bg-white/10 hover:text-white'
         }`}
       title={!isSidebarOpen ? item.label : ''}
     >
-      <Icon size={20} className="flex-shrink-0" />
+      <Icon className="w-4.5 h-4.5 sm:w-5 sm:h-5 flex-shrink-0" />
       {isSidebarOpen && (
-        <span className="font-medium whitespace-nowrap transition-opacity duration-150">
+        <span className="font-medium text-xs sm:text-sm whitespace-nowrap transition-opacity duration-150">
           {item.label}
         </span>
       )}
@@ -42,8 +42,11 @@ const NavItem = React.memo<{
 NavItem.displayName = 'NavItem';
 
 export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate, userRole, onLogout }) => {
-  // Load sidebar state from localStorage
+  // Load sidebar state from localStorage, otomatis ciutkan (false) jika lebar layar < 1024px
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      return false;
+    }
     const saved = localStorage.getItem('pos_sidebar_open');
     return saved !== null ? saved === 'true' : true;
   });
@@ -51,14 +54,33 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isOnline = useOnlineStatus();
 
-  // Persist sidebar state to localStorage
+  // Otomatis sembunyikan sidebar pada layar HP / Tablet (< 1024px) & saat ukuran layar berubah (resize)
   useEffect(() => {
-    localStorage.setItem('pos_sidebar_open', String(isSidebarOpen));
+    const handleAutoCollapse = () => {
+      if (window.innerWidth < 1024) {
+        setIsSidebarOpen(false);
+        setMobileMenuOpen(false);
+      }
+    };
+
+    handleAutoCollapse();
+    window.addEventListener('resize', handleAutoCollapse);
+    return () => window.removeEventListener('resize', handleAutoCollapse);
+  }, []);
+
+  // Simpan preferensi sidebar di localStorage hanya untuk layar desktop (>= 1024px)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+      localStorage.setItem('pos_sidebar_open', String(isSidebarOpen));
+    }
   }, [isSidebarOpen]);
 
-  // Close mobile menu when page changes
+  // Otomatis tutup menu mobile dan sembunyikan sidebar saat pengguna memilih menu / halaman
   useEffect(() => {
     setMobileMenuOpen(false);
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsSidebarOpen(false);
+    }
   }, [activePage]);
 
   // Memoize toggle function
@@ -118,9 +140,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 bg-primary text-white flex flex-col shadow-xl transition-all duration-300 ease-in-out md:static md:translate-x-0 relative overflow-hidden print:hidden
-        ${mobileMenuOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} 
-        ${isSidebarOpen ? 'md:w-64' : 'md:w-24'}
+        className={`fixed inset-y-0 left-0 z-50 bg-primary text-white flex flex-col shadow-xl transition-all duration-300 ease-in-out md:static md:translate-x-0 overflow-hidden print:hidden
+        ${mobileMenuOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64 md:translate-x-0'} 
+        ${isSidebarOpen ? 'md:w-64' : 'md:w-20'}
         `}
         style={{ contain: 'layout style paint' }}
       >
@@ -196,22 +218,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto bg-slate-100 flex flex-col relative w-full">
+      <main className="flex-1 overflow-y-auto bg-slate-100 flex flex-col relative w-full min-w-0">
         {/* Mobile Header */}
-        <div className="md:hidden bg-white px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-30 print:hidden">
-          <div className="flex items-center gap-3">
+        <div className="md:hidden bg-white px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between shadow-sm sticky top-0 z-30 print:hidden">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg"
+              className="p-1.5 -ml-1 text-slate-600 hover:bg-slate-100 rounded-lg active:bg-slate-200 transition-colors"
+              aria-label="Buka menu navigasi"
             >
-              <Menu size={24} />
+              <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
-            <span className="font-bold text-slate-800 text-lg">Kasir REP</span>
+            <span className="font-bold text-slate-800 text-base sm:text-lg tracking-tight">Kasir REP</span>
           </div>
-          {/* Optional: Add user avatar or other mobile actions here */}
         </div>
 
-        <div className={`flex-1 w-full mx-auto flex flex-col ${activePage === 'pos' ? 'p-0 max-w-full' : 'p-4 md:p-8 max-w-7xl'}`}>
+        <div className={`flex-1 w-full mx-auto flex flex-col min-w-0 ${activePage === 'pos' ? 'p-0 max-w-full' : 'p-3 sm:p-4 md:p-8 max-w-7xl'}`}>
           {children}
         </div>
       </main>

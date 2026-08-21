@@ -644,10 +644,14 @@ export default function BeritaAcaraPage() {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('custom_expense_categories');
             if (!saved) {
-                setCategoryOptions(allSalesCategories.map((cat, idx) => `${idx + 1}) ${cat}`));
+                const newList = allSalesCategories.map((cat, idx) => `${idx + 1}) ${cat}`);
+                setCategoryOptions(prev => {
+                    if (JSON.stringify(prev) === JSON.stringify(newList)) return prev;
+                    return newList;
+                });
             }
         }
-    }, [allSalesCategories]);
+    }, [categoriesStr]);
 
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [newCatInput, setNewCatInput] = useState("");

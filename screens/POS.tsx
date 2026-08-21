@@ -784,9 +784,9 @@ export const POS: React.FC = () => {
       {/* Product Catalog Grid Container */}
       <div className="flex-1 flex flex-col bg-slate-50 border-r border-slate-200 overflow-hidden">
         {/* Search Bar Header */}
-        <div className="p-4 border-b border-slate-200 flex gap-3 bg-white shadow-sm z-10">
+        <div className="p-2.5 sm:p-4 border-b border-slate-200 flex gap-2 sm:gap-3 bg-white shadow-sm z-10">
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 sm:w-4.5 sm:h-4.5" />
             <label htmlFor="posSearch" className="sr-only">Cari Produk POS</label>
             <input
               id="posSearch"
@@ -794,7 +794,7 @@ export const POS: React.FC = () => {
               ref={searchInputRef}
               type="text"
               placeholder="Scan Barcode atau Cari Nama Produk / Kode SKU..."
-              className="w-full pl-10 pr-20 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-xs font-semibold text-slate-800 transition-all"
+              className="w-full pl-9 pr-16 sm:pl-10 sm:pr-20 py-2 sm:py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-[11px] sm:text-xs font-semibold text-slate-800 transition-all"
               value={search}
               onChange={e => setSearch(e.target.value)}
               onKeyDown={handleSearchKeyDown}
@@ -805,29 +805,29 @@ export const POS: React.FC = () => {
                   setSearch('');
                   searchInputRef.current?.focus();
                 }}
-                className="absolute right-10 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 hover:bg-slate-200 rounded-lg"
+                className="absolute right-8 sm:right-10 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 hover:bg-slate-200 rounded-lg"
                 title="Hapus pencarian"
               >
-                <X size={15} />
+                <X size={14} />
               </button>
             )}
-            <ScanLine className="absolute right-3.5 top-1/2 -translate-y-1/2 text-amber-600" size={18} />
+            <ScanLine className="absolute right-2.5 sm:right-3.5 top-1/2 -translate-y-1/2 text-amber-600 w-4 h-4 sm:w-4.5 sm:h-4.5" />
           </div>
 
           {/* Open Bill Button */}
           <button
             onClick={() => setShowOpenBillsModal(true)}
-            className="relative flex items-center gap-2 px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl font-bold text-xs transition-all shadow-xs shrink-0 cursor-pointer"
+            className="relative flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 sm:py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl font-bold text-[11px] sm:text-xs transition-all shadow-xs shrink-0 cursor-pointer"
             title="Lihat Daftar Tagihan Terbuka (Open Bill / Pesanan Meja)"
           >
-            <Clock size={16} className="text-amber-700 animate-spin-slow" />
+            <Clock size={15} className="text-amber-700 animate-spin-slow" />
             <span className="hidden sm:inline font-bold">Open Bill</span>
             {openBills.length > 0 ? (
-              <span className="bg-amber-600 text-white px-2 py-0.5 rounded-full text-[11px] font-extrabold animate-pulse">
+              <span className="bg-amber-600 text-white px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-extrabold animate-pulse">
                 {openBills.length} Meja
               </span>
             ) : (
-              <span className="bg-amber-200/70 text-amber-900 px-2 py-0.5 rounded-full text-[10px]">
+              <span className="bg-amber-200/70 text-amber-900 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px]">
                 0
               </span>
             )}
@@ -835,11 +835,11 @@ export const POS: React.FC = () => {
         </div>
 
         {/* Category Filter Horizontal Carousel */}
-        <div className="bg-white border-b border-slate-200 px-4 py-2.5 sticky top-0 z-10 overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-2 min-w-max">
+        <div className="bg-white border-b border-slate-200 px-2 sm:px-4 py-1.5 sm:py-2.5 sticky top-0 z-10 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-max">
             <button
               onClick={() => setSelectedCategory('')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedCategory === ''
+              className={`px-2 sm:px-3.5 py-0.5 sm:py-1.5 rounded-lg sm:rounded-xl text-[9px] sm:text-xs font-bold transition-all ${selectedCategory === ''
                 ? 'bg-amber-600 text-white shadow-sm'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
@@ -852,13 +852,13 @@ export const POS: React.FC = () => {
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${selectedCategory === cat.id
+                  className={`px-2 sm:px-3.5 py-0.5 sm:py-1.5 rounded-lg sm:rounded-xl text-[9px] sm:text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${selectedCategory === cat.id
                     ? 'bg-amber-600 text-white shadow-sm'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                 >
                   <span>{cat.name}</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${selectedCategory === cat.id ? 'bg-amber-700/50 text-white' : 'bg-slate-200 text-slate-700'
+                  <span className={`text-[8px] sm:text-[10px] px-1 py-0.2 rounded-full ${selectedCategory === cat.id ? 'bg-amber-700/50 text-white' : 'bg-slate-200 text-slate-700'
                     }`}>{catCount}</span>
                 </button>
               );
@@ -866,36 +866,36 @@ export const POS: React.FC = () => {
           </div>
         </div>
 
-        {/* Product Cards Grid */}
-        <div className="flex-1 overflow-y-auto p-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 content-start pb-20 lg:pb-3">
+        {/* Product Cards Grid - Ultra Compact 1x1 3-Column Mobile Layout */}
+        <div className="flex-1 overflow-y-auto p-1 sm:p-3 grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-3 content-start pb-28 lg:pb-3 touch-scroll">
           {visibleProducts.map(product => (
             <button
               key={product.id}
               onClick={(e) => addToCart(product, e)}
-              className="group flex flex-col justify-between items-start text-left bg-white border border-slate-200 rounded-2xl p-3 hover:shadow-md hover:border-amber-500/60 transition-all active:scale-95 relative overflow-hidden"
+              className="group flex flex-col justify-between items-start text-left bg-white border border-slate-200 rounded-lg sm:rounded-2xl p-1 sm:p-2.5 hover:shadow-md hover:border-amber-500/60 transition-all active:scale-95 relative overflow-hidden"
             >
-              <div className="w-full aspect-square bg-slate-50 rounded-xl mb-2.5 overflow-hidden relative border border-slate-100">
+              <div className="w-full aspect-square bg-slate-50 rounded-md sm:rounded-xl mb-1 sm:mb-2 overflow-hidden relative border border-slate-100 flex items-center justify-center">
                 {product.image && !product.image.includes('picsum.photos') ? (
                   <img src={product.image} alt={product.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-amber-50/50 text-amber-600">
-                    <ImageIcon size={32} className="text-amber-400" />
+                    <ImageIcon className="text-amber-400 w-4 h-4 sm:w-8 sm:h-8" />
                   </div>
                 )}
-                <span className={`absolute bottom-1.5 right-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-md shadow-sm ${product.stock <= 5 ? 'bg-rose-600/90 text-white' : 'bg-slate-900/80 text-white'
+                <span className={`absolute bottom-0.5 right-0.5 sm:bottom-1.5 sm:right-1.5 text-[7px] sm:text-[10px] font-extrabold px-1 sm:px-2 py-0.2 rounded-full backdrop-blur-md shadow-sm ${product.stock <= 5 ? 'bg-rose-600/90 text-white' : 'bg-slate-900/80 text-white'
                   }`}>
                   {product.stock} {product.unit || 'Pcs'}
                 </span>
               </div>
 
               <div className="w-full">
-                <h4 className="font-bold text-slate-800 line-clamp-2 text-xs h-8 leading-snug">{product.name}</h4>
-                <div className="mt-1.5 flex items-center justify-between">
-                  <span className="font-extrabold text-amber-700 text-sm">
+                <h4 className="font-bold text-slate-800 truncate text-[9px] sm:text-xs h-3.5 sm:h-7 leading-tight">{product.name}</h4>
+                <div className="mt-0.5 sm:mt-1 flex items-center justify-between">
+                  <span className="font-extrabold text-amber-700 text-[9px] sm:text-xs">
                     {product.price === 0 ? 'Rp 0' : formatIDR(product.price)}
                   </span>
-                  <span className="p-1 bg-amber-50 text-amber-700 rounded-lg group-hover:bg-amber-600 group-hover:text-white transition-colors">
-                    <Plus size={13} />
+                  <span className="p-0.5 bg-amber-50 text-amber-700 rounded group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                    <Plus className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" />
                   </span>
                 </div>
               </div>
@@ -903,7 +903,7 @@ export const POS: React.FC = () => {
           ))}
           {/* Sentinel for Infinite Scroll */}
           {visibleProducts.length < filteredProducts.length && (
-            <div ref={loadMoreRef} className="col-span-full h-10 flex items-center justify-center text-slate-400">
+            <div ref={loadMoreRef} className="col-span-full h-10 flex items-center justify-center text-slate-400 text-xs">
               Loading more...
             </div>
           )}
@@ -911,16 +911,16 @@ export const POS: React.FC = () => {
       </div>
 
       {/* Mobile Bottom Bar */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40 flex items-center justify-between gap-4">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-2.5 sm:p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40 flex items-center justify-between gap-3 sm:gap-4">
         <div className="flex flex-col">
-          <span className="text-xs text-slate-500">{cart.reduce((acc, item) => acc + item.qty, 0)} Item di Keranjang</span>
-          <span className="text-lg font-bold text-primary">{formatIDR(totalAmount)}</span>
+          <span className="text-[10px] sm:text-xs text-slate-500">{cart.reduce((acc, item) => acc + item.qty, 0)} Item di Keranjang</span>
+          <span className="text-base sm:text-lg font-bold text-primary">{formatIDR(totalAmount)}</span>
         </div>
         <button
           onClick={() => setShowMobileCart(true)}
-          className="bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary-hover transition-colors shadow-lg shadow-primary/30 flex items-center gap-2"
+          className="bg-primary text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm hover:bg-primary-hover transition-colors shadow-lg shadow-primary/30 flex items-center gap-1.5 sm:gap-2"
         >
-          <ShoppingBag size={20} />
+          <ShoppingBag size={18} />
           Lihat Keranjang
         </button>
       </div>
@@ -929,32 +929,32 @@ export const POS: React.FC = () => {
       <div ref={cartIconRef} className={`
         flex flex-col bg-white
         lg:w-96 lg:static lg:h-full lg:overflow-hidden
-        fixed inset-0 z-[60] transition-transform duration-300 ease-in-out
+        fixed inset-0 z-[60] transition-transform duration-300 ease-in-out w-full max-w-full overflow-x-hidden
         ${showMobileCart ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
       `}>
-        <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col flex-1 overflow-hidden">
+        <div className="p-2.5 sm:p-4 border-b border-slate-100 bg-slate-50 flex flex-col flex-1 overflow-hidden w-full max-w-full">
 
           {/* Mobile Header for Cart */}
-          <div className="lg:hidden flex items-center gap-3 mb-4 pb-4 border-b border-slate-200">
+          <div className="lg:hidden flex items-center gap-2 mb-2 pb-2 border-b border-slate-200 shrink-0">
             <button
               onClick={() => setShowMobileCart(false)}
-              className="p-2 hover:bg-slate-200 rounded-lg text-slate-600"
+              className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-600"
             >
-              <ChevronLeft size={24} />
+              <ChevronLeft size={20} />
             </button>
-            <h3 className="font-bold text-lg text-slate-800">Keranjang Belanja</h3>
+            <h3 className="font-bold text-base text-slate-800">Keranjang Belanja</h3>
           </div>
 
           {/* Active Open Bill Banner */}
           {activeOpenBillId && (
-            <div className="bg-amber-500 text-white p-3 rounded-2xl flex justify-between items-center text-xs font-bold mb-3 shadow-md animate-fade-in border border-amber-400">
-              <div className="flex items-center gap-2">
-                <Clock size={16} className="animate-spin-slow" />
-                <span>Mengedit: {tableNumber ? `Meja ${tableNumber}` : customerName}</span>
+            <div className="bg-amber-500 text-white p-2 rounded-xl flex justify-between items-center text-xs font-bold mb-2 shadow-md animate-fade-in border border-amber-400 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <Clock size={14} className="animate-spin-slow" />
+                <span className="text-[11px]">Mengedit: {tableNumber ? `Meja ${tableNumber}` : customerName}</span>
               </div>
               <button
                 onClick={resetCartAndState}
-                className="bg-amber-700/90 hover:bg-amber-800 text-white px-2.5 py-1 rounded-xl text-[10px] uppercase font-black transition-colors"
+                className="bg-amber-700/90 hover:bg-amber-800 text-white px-2 py-0.5 rounded-lg text-[9px] uppercase font-black transition-colors"
                 title="Batal mengedit Open Bill ini"
               >
                 Batal Edit
@@ -964,11 +964,11 @@ export const POS: React.FC = () => {
 
           {/* Active Reopen Transaction Banner */}
           {reopenTx && (
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3 rounded-2xl flex flex-col gap-1 text-xs font-bold mb-3 shadow-md animate-fade-in border border-blue-400">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-2 rounded-xl flex flex-col gap-1 text-xs font-bold mb-2 shadow-md animate-fade-in border border-blue-400 shrink-0">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-1.5">
-                  <RefreshCw size={16} className="animate-spin-slow" />
-                  <span>REOPEN: Struk #{reopenTx.invoiceNumber || reopenTx.id.substring(0, 8)}</span>
+                  <RefreshCw size={14} className="animate-spin-slow" />
+                  <span className="text-[11px]">REOPEN: Struk #{reopenTx.invoiceNumber || reopenTx.id.substring(0, 8)}</span>
                 </div>
                 <button
                   onClick={() => {
@@ -976,12 +976,12 @@ export const POS: React.FC = () => {
                       resetCartAndState();
                     }
                   }}
-                  className="bg-white/20 hover:bg-white/30 text-white px-2 py-0.5 rounded-lg text-[10px] uppercase font-black"
+                  className="bg-white/20 hover:bg-white/30 text-white px-1.5 py-0.5 rounded text-[9px] uppercase font-black"
                 >
                   Batal
                 </button>
               </div>
-              <div className="flex justify-between text-[11px] text-blue-100 font-mono mt-1 pt-1 border-t border-blue-400/40">
+              <div className="flex justify-between text-[10px] text-blue-100 font-mono mt-0.5 pt-0.5 border-t border-blue-400/40">
                 <span>Sudah Dibayar: {formatIDR(reopenPreviousPaid)}</span>
                 <span className="font-extrabold text-yellow-300">
                   Kekurangan: {formatIDR(reopenDeficit)}
@@ -990,35 +990,36 @@ export const POS: React.FC = () => {
             </div>
           )}
 
-          <div className="mb-3">
-            <div className="relative mb-2">
+          {/* Customer & Agent Selector Card */}
+          <div className="mb-2 p-2 bg-white rounded-xl border border-slate-200 shadow-2xs shrink-0 space-y-1.5">
+            <div className="relative">
               <label htmlFor="customerSearch" className="sr-only">Cari Pelanggan</label>
               <input
                 id="customerSearch"
                 name="customerSearch"
                 type="text"
                 placeholder="Cari nama pelanggan..."
-                className="w-full px-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-2.5 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                 value={customerSearch}
                 onChange={(e) => setCustomerSearch(e.target.value)}
               />
               {customerSearch && (
                 <button
                   onClick={() => setCustomerSearch('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 hover:bg-slate-100 rounded"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-0.5 hover:bg-slate-100 rounded"
                   title="Hapus pencarian"
                 >
-                  <X size={14} />
+                  <X size={12} />
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <User size={18} className="text-slate-400" />
+            <div className="flex items-center gap-1.5">
+              <User size={15} className="text-slate-400 shrink-0" />
               <label htmlFor="customerSelect" className="sr-only">Pilih Pelanggan</label>
               <select
                 id="customerSelect"
                 name="customerSelect"
-                className="bg-transparent font-medium text-slate-700 focus:outline-none border-b border-dashed border-slate-300 w-full focus:border-primary transition-colors"
+                className="bg-transparent font-semibold text-xs text-slate-700 focus:outline-none border-b border-dashed border-slate-300 w-full focus:border-primary transition-colors py-0.5"
                 value={selectedCustomerId}
                 onChange={(e) => setSelectedCustomerId(e.target.value)}
               >
@@ -1034,10 +1035,10 @@ export const POS: React.FC = () => {
 
             {/* Travel Agent Selector for POS Commission */}
             {travelAgents.length > 0 && (
-              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100">
-                <BadgePercent size={16} className="text-amber-600 flex-shrink-0" />
+              <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
+                <BadgePercent size={14} className="text-amber-600 flex-shrink-0" />
                 <select
-                  className="bg-amber-50/90 text-amber-900 font-semibold text-xs rounded-lg px-2 py-1.5 border border-amber-200 w-full outline-none"
+                  className="bg-amber-50/90 text-amber-900 font-semibold text-[11px] rounded-lg px-2 py-1 border border-amber-200 w-full outline-none"
                   value={selectedTravelAgentId}
                   onChange={(e) => setSelectedTravelAgentId(e.target.value)}
                 >
@@ -1051,36 +1052,38 @@ export const POS: React.FC = () => {
               </div>
             )}
           </div>
-          <div className="space-y-2">
-            <div className="flex justify-between items-center text-sm text-slate-500">
+
+          {/* Sticky/Fixed TOP Total & Checkout Summary Block */}
+          <div className="mb-2 p-2.5 bg-white rounded-xl border border-slate-200 shadow-sm shrink-0 space-y-1.5 z-10">
+            <div className="flex justify-between items-center text-xs text-slate-500">
               <span>Subtotal</span>
-              <span>{formatIDR(subtotal)}</span>
+              <span className="font-semibold text-slate-700">{formatIDR(subtotal)}</span>
             </div>
-            <div className="flex justify-between items-center text-sm text-slate-500">
-              <div className="flex items-center gap-2">
+            <div className="flex justify-between items-center text-xs text-slate-500">
+              <div className="flex items-center gap-1.5">
                 <span>Diskon</span>
-                <div className="flex items-center bg-white border border-slate-300 rounded overflow-hidden">
+                <div className="flex items-center bg-slate-100 border border-slate-300 rounded overflow-hidden">
                   <button
                     onClick={() => { setDiscountType('FIXED'); setDiscount(0); }}
-                    className={`px-1.5 py-0.5 text-[10px] font-bold ${discountType === 'FIXED' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+                    className={`px-1.5 py-0.5 text-[9px] font-bold ${discountType === 'FIXED' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-200'}`}
                   >
                     Rp
                   </button>
                   <button
                     onClick={() => { setDiscountType('PERCENTAGE'); setDiscount(0); }}
-                    className={`px-1.5 py-0.5 text-[10px] font-bold ${discountType === 'PERCENTAGE' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+                    className={`px-1.5 py-0.5 text-[9px] font-bold ${discountType === 'PERCENTAGE' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-200'}`}
                   >
                     %
                   </button>
                 </div>
               </div>
-              <div className="flex items-center gap-1 w-24">
+              <div className="flex items-center gap-1 w-20">
                 <label htmlFor="discountInput" className="sr-only">Diskon</label>
                 <input
                   id="discountInput"
                   name="discountInput"
                   type="text"
-                  className={`w-full text-right bg-transparent border-b border-dashed outline-none font-medium pb-0.5 ${(discountType === 'PERCENTAGE' && discount > 100) || (discountType === 'FIXED' && discount > subtotal)
+                  className={`w-full text-right bg-transparent border-b border-dashed outline-none font-bold text-xs pb-0.5 ${(discountType === 'PERCENTAGE' && discount > 100) || (discountType === 'FIXED' && discount > subtotal)
                     ? 'border-red-500 text-red-600'
                     : 'border-slate-300 focus:border-primary text-slate-900'
                     }`}
@@ -1096,17 +1099,13 @@ export const POS: React.FC = () => {
 
             {/* Validation Warning */}
             {discountType === 'PERCENTAGE' && discount > 100 && (
-              <div className="text-right mb-1">
-                <span className="text-[10px] text-red-500 font-bold">
-                  ⚠ Tidak boleh lebih dari 100%
-                </span>
+              <div className="text-right">
+                <span className="text-[9px] text-red-500 font-bold">⚠ Max 100%</span>
               </div>
             )}
             {discountType === 'FIXED' && discount > subtotal && (
-              <div className="text-right mb-1">
-                <span className="text-[10px] text-red-500 font-bold">
-                  ⚠ Tidak boleh melebihi subtotal
-                </span>
+              <div className="text-right">
+                <span className="text-[9px] text-red-500 font-bold">⚠ Max Subtotal</span>
               </div>
             )}
 
@@ -1116,20 +1115,20 @@ export const POS: React.FC = () => {
                 <span>-{formatIDR(discountAmountValue)}</span>
               </div>
             )}
-            <div className="flex justify-between items-end pt-2 border-t border-slate-100">
-              <span className="text-slate-600 font-bold">Total Tagihan</span>
-              <span className="text-2xl font-bold text-slate-900">{formatIDR(totalAmount)}</span>
+            <div className="flex justify-between items-center pt-1 border-t border-slate-100">
+              <span className="text-slate-700 font-bold text-xs">Total Tagihan</span>
+              <span className="text-lg font-black text-slate-900">{formatIDR(totalAmount)}</span>
             </div>
 
             {/* Dual Action Buttons: Open Bill & Close Bill */}
-            <div className="grid grid-cols-2 gap-2 mt-3">
+            <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 onClick={handleOpenSaveOpenBillModal}
                 disabled={cart.length === 0}
-                className="py-3 px-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-2xl font-bold shadow-lg shadow-amber-500/20 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-1.5 text-xs sm:text-sm disabled:opacity-50 cursor-pointer"
+                className="py-2 px-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-xl font-bold shadow-md shadow-amber-500/20 transition-all flex items-center justify-center gap-1 text-xs disabled:opacity-50 cursor-pointer"
                 title="Simpan pesanan ke Open Bill (Tagihan Terbuka)"
               >
-                <Receipt size={17} />
+                <Receipt size={15} />
                 <span>{activeOpenBillId ? 'Perbarui Bill' : 'Simpan Open Bill'}</span>
               </button>
 
@@ -1147,15 +1146,14 @@ export const POS: React.FC = () => {
                   setShowPaymentModal(true);
                 }}
                 disabled={cart.length === 0}
-                className="py-3 px-2 bg-primary hover:bg-primary-hover active:bg-primary text-white rounded-2xl font-extrabold shadow-lg shadow-primary/30 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5 text-xs sm:text-sm"
+                className="py-2 px-2 bg-primary hover:bg-primary-hover active:bg-primary text-white rounded-xl font-extrabold shadow-md shadow-primary/30 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1 text-xs"
                 title="Bayar dan selesaikan transaksi"
               >
-                <Printer size={17} />
+                <Printer size={15} />
                 <span>{reopenTx ? 'Bayar Kekurangan' : 'Bayar'}</span>
               </button>
             </div>
-          </div>
-          <div className="mt-2 grid grid-cols-1 gap-2">
+
             {cart.length > 0 && (
               <button
                 onClick={() => {
@@ -1163,95 +1161,84 @@ export const POS: React.FC = () => {
                     setCart([]);
                   }
                 }}
-                className="py-1.5 bg-red-50 text-red-600 rounded-xl text-xs font-medium hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5 w-full"
+                className="py-1 text-[11px] text-red-600 hover:underline transition-colors flex items-center justify-center gap-1 w-full"
               >
-                <Trash2 size={14} />
+                <Trash2 size={12} />
                 Kosongkan Keranjang
               </button>
             )}
           </div>
 
-          {/* Cart Items List - Enhanced for Mobile Scrolling inside Fixed Div */}
-          <div className="flex-1 overflow-y-auto mt-4 -mr-4 pr-4 space-y-4">
+          {/* Cart Items List - Bottom Scrollable Area */}
+          <div className="flex-1 overflow-y-auto space-y-2 py-1 pr-1 touch-scroll min-h-0">
             {cart.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full text-slate-400 min-h-[200px]">
-                <ShoppingBag size={48} className="mb-2 opacity-20" />
-                <p>Keranjang Kosong</p>
+              <div className="flex flex-col items-center justify-center h-full text-slate-400 py-8">
+                <ShoppingBag size={36} className="mb-1.5 opacity-20" />
+                <p className="text-xs">Keranjang Belanja Kosong</p>
               </div>
             )}
             {cart.map((item, idx) => (
-              <div key={idx} className="flex gap-3 items-start border-b border-slate-50 pb-3 last:border-0">
-                <div className="flex-1">
-                  <h5 className="font-medium text-slate-800 text-sm">{item.name} <span className="text-xs text-slate-400 font-normal">({item.unit || 'Pcs'})</span></h5>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-slate-400">@{formatIDR(item.finalPrice)}</span>
-                  </div>
+              <div key={idx} className="flex items-center justify-between gap-2 p-2 bg-white rounded-xl border border-slate-200 text-xs">
+                <div className="flex-1 min-w-0 pr-1">
+                  <h5 className="font-bold text-slate-800 text-[11px] truncate">{item.name}</h5>
+                  <div className="text-[10px] text-slate-500 font-medium">@{formatIDR(item.finalPrice)} / {item.unit || 'Pcs'}</div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-sm font-semibold text-slate-700">{formatIDR(item.finalPrice * item.qty)}</span>
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 bg-slate-50 rounded-lg border border-slate-200">
-                      <button onClick={() => item.qty > 1 ? updateCartItem(idx, { qty: item.qty - 1 }) : removeFromCart(idx)} className="p-1 hover:bg-slate-200 rounded text-slate-500"><Minus size={14} /></button>
-                      <label htmlFor={`qty-${idx}`} className="sr-only">Quantity</label>
-                      <input
-                        id={`qty-${idx}`}
-                        name={`qty-${idx}`}
-                        type="text"
-                        className="text-sm font-bold w-12 text-center bg-transparent outline-none p-0"
-                        value={item.qty === 0 ? '' : item.qty}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9]/g, '');
-                          if (val === '') {
-                            updateCartItem(idx, { qty: 0 });
-                            return;
-                          }
-                          let newQty = parseInt(val);
-
-                          // Check total quantity for this product across all cart items
-                          const otherEntriesQty = cart.reduce((sum, cItem, cIdx) => (cItem.id === item.id && cIdx !== idx) ? sum + cItem.qty : sum, 0);
-
-                          if (newQty + otherEntriesQty > item.stock) {
-                            alert(`Jumlah melebihi stok! Stok tersedia: ${item.stock}. (Sudah ada ${otherEntriesQty} di baris lain)`);
-                            newQty = Math.max(0, item.stock - otherEntriesQty);
-                          }
-                          updateCartItem(idx, { qty: newQty });
-                        }}
-                        onBlur={() => {
-                          if (item.qty === 0) updateCartItem(idx, { qty: 1 });
-                        }}
-                      />
-                      <button
-                        onClick={() => {
-                          const totalQty = cart.filter(cItem => cItem.id === item.id).reduce((sum, cItem) => sum + cItem.qty, 0);
-                          if (totalQty < item.stock) {
-                            updateCartItem(idx, { qty: item.qty + 1 });
-                          } else {
-                            alert(`Stok habis! Maksimal ${item.stock}`);
-                          }
-                        }}
-                        className={`p-1 rounded ${cart.filter(cItem => cItem.id === item.id).reduce((sum, cItem) => sum + cItem.qty, 0) >= item.stock ? 'text-slate-300 cursor-not-allowed' : 'hover:bg-slate-200 text-slate-500'}`}
-                        disabled={cart.filter(cItem => cItem.id === item.id).reduce((sum, cItem) => sum + cItem.qty, 0) >= item.stock}
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
-                    {/* Delete Item Button */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center bg-slate-100 rounded-lg border border-slate-200">
+                    <button onClick={() => item.qty > 1 ? updateCartItem(idx, { qty: item.qty - 1 }) : removeFromCart(idx)} className="p-1 hover:bg-slate-200 rounded text-slate-600"><Minus size={12} /></button>
+                    <label htmlFor={`qty-${idx}`} className="sr-only">Quantity</label>
+                    <input
+                      id={`qty-${idx}`}
+                      name={`qty-${idx}`}
+                      type="text"
+                      className="text-xs font-extrabold w-8 text-center bg-transparent outline-none p-0"
+                      value={item.qty === 0 ? '' : item.qty}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        if (val === '') {
+                          updateCartItem(idx, { qty: 0 });
+                          return;
+                        }
+                        let newQty = parseInt(val);
+                        const otherEntriesQty = cart.reduce((sum, cItem, cIdx) => (cItem.id === item.id && cIdx !== idx) ? sum + cItem.qty : sum, 0);
+                        if (newQty + otherEntriesQty > item.stock) {
+                          alert(`Jumlah melebihi stok! Stok tersedia: ${item.stock}.`);
+                          newQty = Math.max(0, item.stock - otherEntriesQty);
+                        }
+                        updateCartItem(idx, { qty: newQty });
+                      }}
+                      onBlur={() => {
+                        if (item.qty === 0) updateCartItem(idx, { qty: 1 });
+                      }}
+                    />
                     <button
-                      onClick={() => removeFromCart(idx)}
-                      className="p-1.5 hover:bg-red-50 rounded text-red-500 hover:text-red-600 transition-colors"
-                      title="Hapus item"
+                      onClick={() => {
+                        const totalQty = cart.filter(cItem => cItem.id === item.id).reduce((sum, cItem) => sum + cItem.qty, 0);
+                        if (totalQty < item.stock) {
+                          updateCartItem(idx, { qty: item.qty + 1 });
+                        } else {
+                          alert(`Stok habis! Maksimal ${item.stock}`);
+                        }
+                      }}
+                      className={`p-1 rounded ${cart.filter(cItem => cItem.id === item.id).reduce((sum, cItem) => sum + cItem.qty, 0) >= item.stock ? 'text-slate-300 cursor-not-allowed' : 'hover:bg-slate-200 text-slate-600'}`}
+                      disabled={cart.filter(cItem => cItem.id === item.id).reduce((sum, cItem) => sum + cItem.qty, 0) >= item.stock}
                     >
-                      <Trash2 size={16} />
+                      <Plus size={12} />
                     </button>
                   </div>
+                  <span className="text-xs font-extrabold text-slate-800 min-w-[60px] text-right">{formatIDR(item.finalPrice * item.qty)}</span>
+                  <button
+                    onClick={() => removeFromCart(idx)}
+                    className="p-1 hover:bg-red-50 rounded text-red-500 hover:text-red-600 transition-colors"
+                    title="Hapus item"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
-
             ))}
           </div>
         </div>
-
-
       </div>
 
 
@@ -1319,7 +1306,7 @@ export const POS: React.FC = () => {
 
                 <div className="space-y-5 flex-1 shrink-0">
                   {/* Customer & Phone & Table */}
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label htmlFor="customerNameInput" className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Pelanggan</label>
                       <input
@@ -1787,8 +1774,8 @@ export const POS: React.FC = () => {
                       type="button"
                       onClick={() => setOpenBillTableInput(m)}
                       className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${openBillTableInput === m
-                          ? 'bg-amber-500 text-white shadow-sm scale-105'
-                          : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200'
+                        ? 'bg-amber-500 text-white shadow-sm scale-105'
+                        : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200'
                         }`}
                     >
                       {m === 'Bungkus' ? 'Takeaway' : `Meja ${m}`}
