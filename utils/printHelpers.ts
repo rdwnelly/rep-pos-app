@@ -137,6 +137,7 @@ function generateQRISPrintSection(qrisCode: string | undefined, amount: number, 
 export interface PrintInvoiceOptions {
     qrisCode?: string;
     bankName?: string;
+    isTemporarySlip?: boolean;
 }
 
 export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, formatIDR: (val: number) => string, formatDate: (date: string) => string, printOptions?: PrintInvoiceOptions) => {

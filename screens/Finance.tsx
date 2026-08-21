@@ -1861,18 +1861,24 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     const printBluetoothInvoice = async (tx: Transaction) => {
         try {
             const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
-            if (!bluetooth.isConnected) {
-                await bluetooth.connect();
+            let connected = bluetooth.isConnected;
+            if (!connected) {
+                try {
+                    connected = await bluetooth.connect({ silentOnly: true });
+                } catch {
+                    connected = false;
+                }
             }
-            if (bluetooth.isConnected) {
+            if (connected) {
                 const escposData = generateESCPOSReceipt(tx, settings);
                 await bluetooth.print(escposData);
+            } else {
+                alert("Printer Bluetooth RPP02N tidak terhubung. Pastikan Bluetooth & printer sudah dinyalakan.");
             }
         } catch (error: any) {
-            // Jika user batal atau BT mati, tidak tampilkan alert
-            // Status error sudah tersimpan di hook (bluetooth.status / bluetooth.errorMessage)
             if (error.name !== 'NotFoundError') {
                 console.error('Error printing via bluetooth:', error);
+                alert(`Gagal mencetak via Bluetooth: ${error.message || 'Periksa koneksi printer.'}`);
             }
         }
     };

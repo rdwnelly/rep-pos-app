@@ -257,9 +257,15 @@ export const POS: React.FC = () => {
     }
   };
 
-  // Print Temporary Slip
   const handlePrintTemporarySlip = async (bill: OpenBill) => {
-    if (bluetooth.isConnected) {
+    const isBtMode = storeSettings?.useBluetoothPrinter || !!localStorage.getItem('bt_printer_paired');
+
+    let connected = bluetooth.isConnected;
+    if (isBtMode && !connected) {
+      connected = await bluetooth.connect({ silentOnly: true });
+    }
+
+    if (connected) {
       try {
         const options = { ...storeSettings, cashierName: bill.cashierName };
         await bluetooth.print(generateESCPOSReceipt({
@@ -281,38 +287,46 @@ export const POS: React.FC = () => {
           discountAmount: bill.discountAmount
         }, options));
         alert(`Struk pesanan sementara Open Bill #${bill.billNumber} berhasil dicetak!`);
+        return;
       } catch (err) {
-        alert("Gagal mencetak struk sementara via Bluetooth");
+        alert("Gagal mencetak struk sementara via Bluetooth.");
+        return;
       }
-    } else {
-      const w = window.open('', '', 'width=800,height=600');
-      if (w) {
-        const html = generatePrintInvoice(
-          {
-            id: bill.billNumber,
-            date: bill.createdAt,
-            items: bill.items,
-            totalAmount: bill.totalAmount,
-            amountPaid: 0,
-            change: -bill.totalAmount,
-            paymentStatus: PaymentStatus.UNPAID,
-            paymentMethod: PaymentMethod.CASH,
-            customerName: bill.customerName,
-            customerPhone: bill.customerPhone,
-            tableNumber: bill.tableNumber,
-            cashierId: bill.cashierId,
-            cashierName: bill.cashierName,
-            discount: bill.discount,
-            discountType: bill.discountType,
-            discountAmount: bill.discountAmount
-          },
-          storeSettings || ({} as any),
-          formatIDR,
-          formatDate
-        );
-        w.document.write(html);
-        w.document.close();
-      }
+    }
+
+    if (isBtMode) {
+      alert("Printer Bluetooth RPP02N tidak terhubung. Pastikan Bluetooth & printer sudah dinyalakan.");
+      return;
+    }
+
+    const w = window.open('', '', 'width=800,height=600');
+    if (w) {
+      const html = generatePrintInvoice(
+        {
+          id: bill.billNumber,
+          date: bill.createdAt,
+          items: bill.items,
+          totalAmount: bill.totalAmount,
+          amountPaid: 0,
+          change: -bill.totalAmount,
+          paymentStatus: PaymentStatus.UNPAID,
+          paymentMethod: PaymentMethod.CASH,
+          customerName: bill.customerName,
+          customerPhone: bill.customerPhone,
+          tableNumber: bill.tableNumber,
+          cashierId: bill.cashierId,
+          cashierName: bill.cashierName,
+          discount: bill.discount,
+          discountType: bill.discountType,
+          discountAmount: bill.discountAmount
+        },
+        storeSettings || { name: 'Kasir REP' } as StoreSettings,
+        formatIDR,
+        formatDate,
+        { isTemporarySlip: true }
+      );
+      w.document.write(html);
+      w.document.close();
     }
   };
 
@@ -490,7 +504,7 @@ export const POS: React.FC = () => {
     // karena gesture context sudah hilang.
     if (storeSettings?.useBluetoothPrinter && !bluetooth.isConnected) {
       try {
-        await bluetooth.connect();
+        await bluetooth.connect({ silentOnly: true });
       } catch (e: any) {
         console.error("Bluetooth connect failed:", e);
         // Lanjut proses transaksi — print akan di-skip jika tidak terhubung
@@ -750,17 +764,44 @@ export const POS: React.FC = () => {
   };
 
   const printReceipt = async (tx: Transaction, settings: StoreSettings, printOptions?: PrintInvoiceOptions) => {
-    if (settings.useBluetoothPrinter) {
+    const isBtMode = settings.useBluetoothPrinter || !!localStorage.getItem('bt_printer_paired');
+
+    if (isBtMode) {
       try {
-        // Tidak perlu connect() di sini — sudah dilakukan di awal handleCheckout
-        // dalam user gesture context. Di sini langsung cetak saja.
-        const escposData = generateESCPOSReceipt(tx, settings);
-        await bluetooth.print(escposData);
+        let connected = bluetooth.isConnected;
+        if (!connected) {
+          try {
+            connected = await bluetooth.connect({ silentOnly: true });
+          } catch {
+            connected = false;
+          }
+        }
+        if (!connected) {
+          try {
+            connected = await bluetooth.connect({ silentOnly: false });
+          } catch {
+            connected = false;
+          }
+        }
+        if (connected) {
+          const escposData = generateESCPOSReceipt(tx, settings);
+          await bluetooth.print(escposData);
+          return;
+        }
+
+        if (confirm("Gagal mencetak via Bluetooth RPP02N. Apakah Anda ingin mencetak menggunakan dialog printer browser?")) {
+          const w = window.open('', '', 'width=800,height=600');
+          if (w) {
+            const html = generatePrintInvoice(tx, settings, formatIDR, formatDate, printOptions);
+            w.document.write(html);
+            w.document.close();
+          }
+        }
       } catch (error: any) {
         console.error("[BT Printer] Cetak gagal:", error);
-        alert(`Gagal mencetak struk: ${error.message || 'Periksa koneksi printer.'}`);
+        alert(`Gagal mencetak struk via Bluetooth: ${error.message || 'Periksa koneksi printer.'}`);
       }
-      return; // Berhenti di sini jika mode bluetooth aktif
+      return;
     }
 
     // Default Browser Print
