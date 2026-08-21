@@ -606,8 +606,8 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
                     <span>Daftar Mutasi Transfer ({filteredItems.length})</span>
                     <span className="text-amber-700 font-bold">Net Selisih: {formatIDR(summaryStats.netTransfer)}</span>
                 </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
+                <div className="overflow-x-auto touch-scroll">
+                    <table className="w-full text-left text-xs min-w-[640px]">
                         <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
                             <tr>
                                 <th className="p-3.5">Tanggal & Ref</th>

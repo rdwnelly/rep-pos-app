@@ -837,8 +837,8 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
+                <div className="overflow-x-auto touch-scroll">
+                    <table className="w-full text-left text-xs min-w-[640px]">
                         <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider">
                             <tr>
                                 <th className="p-3 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('date')}>

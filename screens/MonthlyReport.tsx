@@ -135,8 +135,8 @@ export const MonthlyReport: React.FC = () => {
                         <Printer size={16} /> Print
                     </button>
                 </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
+                <div className="overflow-x-auto touch-scroll">
+                    <table className="w-full text-left text-sm min-w-[500px]">
                         <thead className="bg-slate-50 text-slate-600 print:bg-slate-100">
                             <tr>
                                 <th className="p-4 font-semibold">Kategori</th>
