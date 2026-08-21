@@ -118,12 +118,22 @@ export const useBluetoothPrinter = () => {
 
     // --- Connect ke printer ---
     // Pertama coba getDevices() (tanpa dialog) untuk device yang sudah pernah dipilih
-    // Jika tidak ada, baru requestDevice() dengan filter nama RPP02N
-    const connect = useCallback(async (): Promise<boolean> => {
+    // Jika tidak ada dan silentOnly === false, baru requestDevice() dengan filter nama RPP02N
+    const connect = useCallback(async (options?: { silentOnly?: boolean }): Promise<boolean> => {
+        const silentOnly = options?.silentOnly ?? false;
+
+        // Fast path: jika sudah terhubung dan characteristic siap, kembalikan true langsung
+        if (deviceRef.current?.gatt?.connected && characteristicRef.current) {
+            setIsConnected(true);
+            setStatus('connected');
+            return true;
+        }
+
         if (!isBluetoothSupported()) {
             setStatus('error');
-            setErrorMessage('Web Bluetooth tidak didukung. Gunakan Chrome/Edge di Android atau Desktop.');
-            throw new Error('Web Bluetooth tidak didukung.');
+            setErrorMessage('Web Bluetooth tidak aktif di browser/koneksi ini. Gunakan Chrome/Edge via HTTPS atau http://localhost.');
+            if (!silentOnly) throw new Error('Web Bluetooth tidak didukung pada browser/koneksi ini.');
+            return false;
         }
 
         // Cek apakah Bluetooth hardware aktif
@@ -131,11 +141,15 @@ export const useBluetoothPrinter = () => {
             const available = await getBluetooth().getAvailability?.();
             if (available === false) {
                 setStatus('bt_off');
-                setErrorMessage('Bluetooth tidak aktif. Nyalakan Bluetooth terlebih dahulu.');
-                throw new Error('Bluetooth tidak aktif.');
+                setErrorMessage('Bluetooth tidak aktif. Nyalakan Bluetooth di HP / Komputer Anda.');
+                if (!silentOnly) throw new Error('Bluetooth hardware tidak aktif.');
+                return false;
             }
         } catch (e: any) {
-            if (e.message?.includes('Bluetooth tidak aktif')) throw e;
+            if (e.message?.includes('Bluetooth tidak aktif')) {
+                if (!silentOnly) throw e;
+                return false;
+            }
             // getAvailability tidak tersedia di semua browser, lanjutkan
         }
 
@@ -145,19 +159,26 @@ export const useBluetoothPrinter = () => {
         try {
             let device: any = null;
 
-            // Langkah 1: Coba ambil perangkat yang sudah dipilih sebelumnya (tanpa dialog)
-            if (getBluetooth().getDevices) {
+            // Langkah 1: Cek apakah ada deviceRef yang tersimpan di memory
+            if (deviceRef.current) {
+                device = deviceRef.current;
+            }
+
+            // Langkah 2: Coba ambil perangkat yang sudah dipilih sebelumnya (tanpa dialog)
+            if (!device && getBluetooth().getDevices) {
                 const savedId = localStorage.getItem(STORAGE_KEY);
+                const pairedDevices: any[] = await getBluetooth().getDevices();
                 if (savedId) {
-                    const pairedDevices: any[] = await getBluetooth().getDevices();
                     device = pairedDevices.find((d: any) => d.id === savedId) || null;
+                }
+                if (!device && pairedDevices.length > 0) {
+                    device = pairedDevices.find((d: any) => d.name === TARGET_PRINTER_NAME) || pairedDevices[0];
                 }
             }
 
-            // Langkah 2: Kalau belum ada, tampilkan dialog pemilihan printer
-            if (!device) {
+            // Langkah 3: Kalau belum ada dan BUKAN mode silent, tampilkan dialog pemilihan printer
+            if (!device && !silentOnly) {
                 // Gunakan acceptAllDevices agar SEMUA printer bluetooth muncul di dialog
-                // (tidak terbatas pada nama/service tertentu)
                 device = await getBluetooth().requestDevice({
                     acceptAllDevices: true,
                     optionalServices: PRINTER_SERVICE_UUIDS,
@@ -170,13 +191,19 @@ export const useBluetoothPrinter = () => {
             }
 
             if (!device) {
-                throw new Error('Tidak ada perangkat yang dipilih.');
+                setStatus('disconnected');
+                if (!silentOnly) throw new Error('Tidak ada perangkat printer Bluetooth yang dipilih.');
+                return false;
             }
 
             // Koneksi ke GATT
+            device.removeEventListener('gattserverdisconnected', handleDisconnected);
             device.addEventListener('gattserverdisconnected', handleDisconnected);
             const server = await device.gatt?.connect();
-            if (!server) throw new Error('Gagal terhubung ke GATT Server.');
+            if (!server) throw new Error('Gagal terhubung ke GATT Server printer.');
+
+            // Beri jeda 300ms agar GATT server RPP02N stabil sebelum setup characteristic
+            await new Promise(resolve => setTimeout(resolve, 300));
 
             const characteristic = await setupCharacteristic(server);
 
@@ -196,9 +223,10 @@ export const useBluetoothPrinter = () => {
                 return false;
             }
 
-            setStatus('error');
-            setErrorMessage(error.message || 'Gagal terhubung ke printer.');
-            throw error;
+            setStatus('disconnected');
+            setErrorMessage(error.message || 'Gagal terhubung ke printer Bluetooth.');
+            if (!silentOnly) throw error;
+            return false;
         }
     }, [handleDisconnected]);
 

@@ -324,27 +324,49 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
     const handlePrintReceipt = async (tx: Transaction) => {
         try {
             const settings = storeSettings || { name: 'Kasir REP' } as StoreSettings;
+            const isBtMode = settings?.useBluetoothPrinter || !!localStorage.getItem('bt_printer_paired');
 
-            // 1. Connect bluetooth in user gesture context if not connected
-            if (!bluetooth.isConnected) {
-                try {
-                    await bluetooth.connect();
-                } catch (connErr: any) {
-                    if (connErr.name === 'NotFoundError' || connErr.message?.includes('cancelled')) {
-                        return;
+            if (isBtMode) {
+                let isBtReady = bluetooth.isConnected;
+
+                // Step 1: Silent connect without popup
+                if (!isBtReady) {
+                    try {
+                        isBtReady = await bluetooth.connect({ silentOnly: true });
+                    } catch {
+                        isBtReady = false;
                     }
-                    console.warn("[BT Printer] Connect attempt error:", connErr);
                 }
-            }
 
-            // 2. Direct print via bluetooth thermal ESC/POS without print popup dialog
-            if (bluetooth.isConnected) {
-                const escposData = generateESCPOSReceipt(tx, settings);
-                await bluetooth.print(escposData);
+                // Step 2: If silent connect failed, try explicit connect with picker modal
+                if (!isBtReady) {
+                    try {
+                        isBtReady = await bluetooth.connect({ silentOnly: false });
+                    } catch {
+                        isBtReady = false;
+                    }
+                }
+
+                // Step 3: Direct ESC/POS thermal print without browser paper setup window
+                if (isBtReady) {
+                    const escposData = generateESCPOSReceipt(tx, settings);
+                    await bluetooth.print(escposData);
+                    return;
+                }
+
+                // Step 4: Fallback prompt if bluetooth thermal print failed
+                if (confirm("Gagal mencetak via Bluetooth RPP02N. Apakah Anda ingin mencetak menggunakan dialog printer browser?")) {
+                    const w = window.open('', '', 'width=800,height=600');
+                    if (w) {
+                        const html = generatePrintInvoice(tx, settings, formatIDR, formatDate);
+                        w.document.write(html);
+                        w.document.close();
+                    }
+                }
                 return;
             }
 
-            // 3. Fallback if Bluetooth printer not connected
+            // Fallback for non-bluetooth mode
             const w = window.open('', '', 'width=800,height=600');
             if (!w) {
                 alert("Popup blocker mencegah cetak struk. Mohon izinkan popup untuk website ini.");
