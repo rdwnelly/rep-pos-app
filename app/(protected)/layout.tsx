@@ -9,6 +9,7 @@ import { Layout } from "../../components/Layout";
 import { UserRole } from "../../types";
 import {
   About,
+  BackdateEntry,
   BarcodeGenerator,
   CustomerHistory,
   Dashboard,
@@ -62,6 +63,7 @@ const pageMap: Record<
   barcode: { component: BarcodeGenerator },
   "berita-acara": { component: BeritaAcaraPage },
   monthly_report: { component: MonthlyReport, requiresCurrentUser: true },
+  backdate_entry: { component: BackdateEntry, requiresCurrentUser: true },
 };
 
 export default function ProtectedLayout({

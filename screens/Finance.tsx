@@ -2658,7 +2658,14 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                                     </span>
                                                                 </td>
                                                                 <td className="p-3.5 whitespace-nowrap">
-                                                                    <div className="font-mono text-xs font-bold text-slate-800">{t.invoiceNumber || '-'}</div>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="font-mono text-xs font-bold text-slate-800">{t.invoiceNumber || '-'}</span>
+                                                                        {t.is_manual_entry && (
+                                                                            <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-extrabold px-1.5 py-0.2 rounded shadow-2xs">
+                                                                                ⏱️ SUSULAN
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
                                                                     <div className="text-[10px] font-mono text-slate-400">#{t.id.substring(0, 8)}</div>
                                                                 </td>
                                                                 <td className="p-3.5 whitespace-nowrap">
@@ -2680,6 +2687,11 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                                         })()
                                                                         : (t.paymentNote || '-')
                                                                     }
+                                                                    {t.is_manual_entry && t.manual_entry_reason && (
+                                                                        <div className="text-[10px] text-amber-800 italic font-medium truncate" title={t.manual_entry_reason}>
+                                                                            Alasan: {t.manual_entry_reason}
+                                                                        </div>
+                                                                    )}
                                                                 </td>
                                                                 <td className="p-3.5 font-extrabold text-slate-900 whitespace-nowrap">
                                                                     {formatIDR(t.totalAmount)}
@@ -2734,7 +2746,14 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                         </span>
                                                     </td>
                                                     <td className="p-3.5 whitespace-nowrap">
-                                                        <div className="font-mono text-xs font-bold text-slate-800">{t.invoiceNumber || '-'}</div>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-mono text-xs font-bold text-slate-800">{t.invoiceNumber || '-'}</span>
+                                                            {t.is_manual_entry && (
+                                                                <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-extrabold px-1.5 py-0.2 rounded shadow-2xs">
+                                                                    ⏱️ SUSULAN
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <div className="text-[10px] font-mono text-slate-400">#{t.id.substring(0, 8)}</div>
                                                     </td>
                                                     <td className="p-3.5 whitespace-nowrap">
@@ -2756,6 +2775,11 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                             })()
                                                             : (t.paymentNote || '-')
                                                         }
+                                                        {t.is_manual_entry && t.manual_entry_reason && (
+                                                            <div className="text-[10px] text-amber-800 italic font-medium truncate" title={t.manual_entry_reason}>
+                                                                Alasan: {t.manual_entry_reason}
+                                                            </div>
+                                                        )}
                                                     </td>
                                                     <td className="p-3.5 font-extrabold text-slate-900 whitespace-nowrap">
                                                         {formatIDR(t.totalAmount)}
@@ -3246,6 +3270,22 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 <button onClick={() => setDetailTransaction(null)}><X size={20} className="text-slate-400" /></button>
                             </div>
                             <div className="p-6 max-h-[70vh] overflow-y-auto">
+                                {detailTransaction.is_manual_entry && (
+                                    <div className="mb-4 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl text-xs space-y-1.5 text-amber-900 shadow-2xs">
+                                        <div className="font-black text-amber-900 flex items-center gap-1.5 text-xs">
+                                            <span>⏱️</span> MODUL TRANSAKSI SUSULAN (BACKDATE ENTRY)
+                                        </div>
+                                        <div className="text-slate-700">
+                                            <span className="font-semibold text-slate-900">Alasan:</span> {detailTransaction.manual_entry_reason || '-'}
+                                        </div>
+                                        <div className="text-slate-600 flex justify-between text-[11px] pt-1.5 border-t border-amber-200/60">
+                                            <span>Diinput oleh: <b>{detailTransaction.manual_entry_by || detailTransaction.cashierName || 'Admin'}</b></span>
+                                            {detailTransaction.createdAt && (
+                                                <span>Waktu input: {formatDate(detailTransaction.createdAt)}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
                                     <div>
                                         <span className="text-slate-500 block text-xs">Waktu Transaksi</span>

@@ -1,4 +1,5 @@
 export { About } from "./About";
+export { BackdateEntry } from "./BackdateEntry";
 export { BarcodeGenerator } from "./BarcodeGenerator";
 export { CustomerHistory } from "./CustomerHistory";
 export { Dashboard } from "./Dashboard";

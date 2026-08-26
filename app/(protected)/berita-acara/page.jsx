@@ -157,8 +157,13 @@ export default function BeritaAcaraPage() {
         });
 
         currentTransactions.forEach(t => {
-            const tDate = new Date(t.date);
-            if (tDate >= startDate && tDate <= endDate) {
+            if (!t || !t.date) return;
+            const rawDateStr = typeof t.date === 'string' ? t.date : '';
+            const tDateOnly = rawDateStr.slice(0, 10);
+            const tDate = new Date(rawDateStr.replace(' ', 'T'));
+            const isMatch = tDateOnly === tanggal || (!isNaN(tDate.getTime()) && tDate >= startDate && tDate <= endDate);
+
+            if (isMatch) {
                 hasData = true;
                 t.items.forEach(item => {
                     const originalCatName = item.categoryName || 'Lainnya';
@@ -201,8 +206,13 @@ export default function BeritaAcaraPage() {
         });
 
         currentCashflows.forEach(cf => {
-            const cfDate = new Date(cf.date);
-            if (cfDate >= startDate && cfDate <= endDate && cf.type === CashFlowType.OUT) {
+            if (!cf || !cf.date) return;
+            const rawCfDateStr = typeof cf.date === 'string' ? cf.date : '';
+            const cfDateOnly = rawCfDateStr.slice(0, 10);
+            const cfDate = new Date(rawCfDateStr.replace(' ', 'T'));
+            const isMatch = cfDateOnly === tanggal || (!isNaN(cfDate.getTime()) && cfDate >= startDate && cfDate <= endDate);
+
+            if (isMatch && cf.type === CashFlowType.OUT) {
                 hasData = true;
                 const desc = (cf.description || '').toLowerCase();
                 const cfCat = (cf.category || '').toLowerCase();
