@@ -1,0 +1,140 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ────────────────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return getUserRole() in ['SUPERADMIN', 'OWNER', 'ADMIN'];
+    }
+
+    function isCashier() {
+      return getUserRole() == 'CASHIER';
+    }
+
+    function isWarehouse() {
+      return getUserRole() == 'GUDANG';
+    }
+
+    // ─── Users Collection ────────────────────────────────────────
+    // Setiap user login bisa baca data dirinya sendiri.
+    // Hanya SUPERADMIN yang bisa baca semua user.
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || getUserRole() == 'SUPERADMIN');
+      allow write: if isAuthenticated() && getUserRole() == 'SUPERADMIN';
+    }
+
+    // ─── Store Settings ──────────────────────────────────────────
+    match /store_settings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isAdmin();
+    }
+
+    // ─── Products ────────────────────────────────────────────────
+    // Semua user bisa baca produk.
+    // Hanya Admin yang bisa create/delete produk.
+    // Semua yang login bisa update (untuk update stok dari transaksi).
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isAuthenticated() && (isAdmin() || isWarehouse());
+      allow update: if isAuthenticated(); // Stock updates from transactions
+    }
+
+    // ─── Categories ──────────────────────────────────────────────
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isAdmin();
+    }
+
+    // ─── Divisions ───────────────────────────────────────────────
+    match /divisions/{divisionId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isAdmin();
+    }
+
+    // ─── Customers ───────────────────────────────────────────────
+    match /customers/{customerId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && !isWarehouse();
+    }
+
+    // ─── Suppliers ───────────────────────────────────────────────
+    match /suppliers/{supplierId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isAdmin();
+    }
+
+    // ─── Banks ───────────────────────────────────────────────────
+    match /banks/{bankId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isAdmin();
+    }
+
+    // ─── Transactions ────────────────────────────────────────────
+    // Semua user login bisa create transaksi (Kasir perlu ini).
+    // Kasir hanya bisa baca transaksi miliknya sendiri.
+    // Admin ke atas bisa baca semua.
+    // Hapus hanya untuk Owner/Superadmin.
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.cashierId == request.auth.uid);
+      allow create: if isAuthenticated(); // Kasir, Admin, dll semua bisa buat transaksi
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.cashierId == request.auth.uid);
+      allow delete: if isAuthenticated() && getUserRole() in ['SUPERADMIN', 'OWNER'];
+    }
+
+    // ─── Purchases ───────────────────────────────────────────────
+    match /purchases/{purchaseId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && !isCashier();
+      allow delete: if isAuthenticated() && getUserRole() in ['SUPERADMIN', 'OWNER'];
+    }
+
+    // ─── Cash Flow ───────────────────────────────────────────────
+    match /cashflow/{cashflowId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && isAdmin();
+      allow delete: if isAuthenticated() && getUserRole() in ['SUPERADMIN', 'OWNER'];
+    }
+
+    // ─── Stock Adjustments ───────────────────────────────────────
+    match /stock_adjustments/{adjustmentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isAdmin() || isWarehouse());
+      allow delete: if isAuthenticated() && (isAdmin() || isWarehouse());
+    }
+
+    // ─── Berita Acara Archives ───────────────────────────────────
+    match /berita_acara_archives/{archiveId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isAdmin();
+    }
+
+    // ─── Open Bills ──────────────────────────────────────────────
+    match /open_bills/{billId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // ─── Travel Agents ───────────────────────────────────────────
+    match /travel_agents/{agentId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isAdmin();
+    }
+
+    // ─── Travel Commissions ──────────────────────────────────────
+    match /travel_commissions/{commissionId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && !isWarehouse();
+    }
+  }
+}

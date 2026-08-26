@@ -133,6 +133,10 @@ export interface Transaction {
   revisionCount?: number; // New: Revision count for Reopen / Add-on Order
   createdAt?: string;
   updatedAt?: string;
+  // Backdate / Manual Entry Audit Trail
+  is_manual_entry?: boolean;       // Flag: transaksi susulan (backdate)
+  manual_entry_reason?: string;    // Alasan wajib diisi saat input manual
+  manual_entry_by?: string;        // UID/nama admin yang menginput
 }
 
 export interface OpenBill {

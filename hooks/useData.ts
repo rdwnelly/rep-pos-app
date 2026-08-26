@@ -1,10 +1,27 @@
 import { useState, useEffect } from 'react';
 import { subscribeToChanges } from '../services/storage';
+import { auth } from '../src/lib/firebase';
 
 export function useData<T>(fetcher: () => Promise<T>, deps: any[] = [], relevantEntities?: string | string[]): T | undefined {
     const [data, setData] = useState<T | undefined>(undefined);
+    // Track whether Firebase Auth has resolved (user or null — either way, auth is ready)
+    const [authReady, setAuthReady] = useState(false);
 
     useEffect(() => {
+        // Wait for Firebase Auth to resolve before making any Firestore calls.
+        // This prevents "Missing or insufficient permissions" errors that occur
+        // when Firestore Security Rules require request.auth != null but the SDK
+        // hasn't confirmed the user's identity yet at component mount time.
+        const unsubscribeAuth = auth.onAuthStateChanged(() => {
+            setAuthReady(true);
+            unsubscribeAuth();
+        });
+        return () => unsubscribeAuth();
+    }, []);
+
+    useEffect(() => {
+        if (!authReady) return;
+
         let isMounted = true;
 
         const fetchData = async () => {
@@ -19,9 +36,6 @@ export function useData<T>(fetcher: () => Promise<T>, deps: any[] = [], relevant
         fetchData();
 
         const unsubscribe = subscribeToChanges((changedEntity?: string) => {
-            // If no specific entity changed (global reset) OR 
-            // if we don't care about specific entities (legacy behavior) OR
-            // if the changed entity is one we care about
             if (!changedEntity || !relevantEntities) {
                 fetchData();
             } else {
@@ -36,7 +50,8 @@ export function useData<T>(fetcher: () => Promise<T>, deps: any[] = [], relevant
             isMounted = false;
             unsubscribe();
         };
-    }, deps);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authReady, ...deps]);
 
     return data;
 }

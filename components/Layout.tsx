@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { LayoutDashboard, ShoppingCart, Package, Receipt, Wallet, Settings, LogOut, Users, Menu, ChevronLeft, Barcode, ShoppingBag, UserCheck, Truck, ArrowRightLeft, Undo2, ClipboardCheck, X, Info, FileText, Wifi, WifiOff, Building2, BadgePercent } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Receipt, Wallet, Settings, LogOut, Users, Menu, ChevronLeft, Barcode, ShoppingBag, UserCheck, Truck, ArrowRightLeft, Undo2, ClipboardCheck, X, Info, FileText, Wifi, WifiOff, Building2, BadgePercent, FileClock } from 'lucide-react';
 import { UserRole } from '../types';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
@@ -120,6 +120,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
       items.push({ id: 'transfer_history', label: 'Riwayat Transfer', icon: ArrowRightLeft });
       items.push({ id: 'return_history', label: 'Riwayat Retur', icon: Undo2 });
       items.push({ id: 'barcode', label: 'Cetak Barcode', icon: Barcode });
+    }
+
+    // Transaksi Susulan: Kasir (POS) juga bisa akses, bukan hanya Admin
+    if (userRole !== UserRole.WAREHOUSE && userRole !== UserRole.SUPERADMIN) {
+      items.push({ id: 'backdate_entry', label: 'Transaksi Susulan', icon: FileClock });
     }
 
     items.push({ id: 'settings', label: 'Pengaturan', icon: Settings });
