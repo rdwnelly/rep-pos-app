@@ -295,7 +295,7 @@ export const POS: React.FC = () => {
     }
 
     if (isBtMode) {
-      alert("Printer Bluetooth RPP02N tidak terhubung. Pastikan Bluetooth & printer sudah dinyalakan.");
+      alert("Printer Bluetooth tidak terhubung. Pastikan Bluetooth & printer sudah dinyalakan.");
       return;
     }
 
@@ -704,8 +704,17 @@ export const POS: React.FC = () => {
         const agent = travelAgents.find(a => a.id === selectedTravelAgentId);
         if (agent) {
           const invoiceNum = savedTransaction?.invoiceNumber || txToPrint.invoiceNumber || `TRV-POS-${Date.now().toString().slice(-6)}`;
-          const commRate = 10;
-          const totalComm = Math.round((totalAmount * commRate) / 100);
+          const commMethod = agent.commissionMethod || CommissionMethod.PERCENTAGE;
+          const commRate = agent.commissionRate !== undefined && agent.commissionRate !== null ? Number(agent.commissionRate) : 10;
+
+          let totalComm = 0;
+          if (commMethod === CommissionMethod.PERCENTAGE) {
+            totalComm = Math.round((totalAmount * commRate) / 100);
+          } else if (commMethod === CommissionMethod.FLAT_PER_PAX) {
+            totalComm = Math.round(commRate * 1);
+          } else if (commMethod === CommissionMethod.FLAT_PER_GROUP) {
+            totalComm = Math.round(commRate);
+          }
 
           const autoCommission: TravelBookingCommission = {
             id: generateId(),
@@ -719,11 +728,11 @@ export const POS: React.FC = () => {
             tourPackage: `Penjualan Kasir POS (${cart.slice(0, 2).map(i => i.name).join(', ')}${cart.length > 2 ? '...' : ''})`,
             departureDate: new Date().toISOString().split('T')[0],
             totalSales: totalAmount,
-            commissionMethod: CommissionMethod.PERCENTAGE,
+            commissionMethod: commMethod,
             commissionRate: commRate,
             totalCommission: totalComm,
             status: CommissionStatus.PENDING,
-            notes: `Otomatis dari Kasir POS (${invoiceNum})`,
+            notes: `Otomatis dari Kasir POS (${invoiceNum}) - Skema: ${commMethod === CommissionMethod.PERCENTAGE ? `${commRate}%` : formatIDR(commRate)}`,
             createdAt: new Date().toISOString()
           };
 
@@ -789,7 +798,7 @@ export const POS: React.FC = () => {
           return;
         }
 
-        if (confirm("Gagal mencetak via Bluetooth RPP02N. Apakah Anda ingin mencetak menggunakan dialog printer browser?")) {
+        if (confirm("Gagal mencetak via Bluetooth. Apakah Anda ingin mencetak menggunakan dialog printer browser?")) {
           const w = window.open('', '', 'width=800,height=600');
           if (w) {
             const html = generatePrintInvoice(tx, settings, formatIDR, formatDate, printOptions);

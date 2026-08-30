@@ -315,6 +315,12 @@ export interface TravelAgent extends BaseEntity {
   holderName: string;
   notes?: string;
   createdAt?: string;
+  // Target & Skema Komisi Driver / Guide
+  commissionMethod?: CommissionMethod; // Skema bawaan (PERCENTAGE, FLAT_PER_PAX, FLAT_PER_GROUP)
+  commissionRate?: number; // Tarif bawaan (% persentase atau nominal flat Rp)
+  monthlyTargetRevenue?: number; // Target omzet belanja bulanan yang dibawa (Rp)
+  monthlyTargetPax?: number; // Target jumlah wisatawan / pax bulanan
+  targetBonusRate?: number; // Bonus insentif jika mencapai target (% atau nominal Rp)
 }
 
 export interface TravelBookingCommission extends BaseEntity {
@@ -332,6 +338,7 @@ export interface TravelBookingCommission extends BaseEntity {
   commissionMethod: CommissionMethod;
   commissionRate: number;
   totalCommission: number;
+  bonusCommission?: number; // Bonus pencapaian target jika ada
   status: CommissionStatus;
   paymentDate?: string;
   paymentMethod?: PaymentMethod;

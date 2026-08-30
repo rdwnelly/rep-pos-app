@@ -1,22 +1,29 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 
-// Nama target printer thermal mobile
-const TARGET_PRINTER_NAME = 'RPP02N';
-
-// UUID service printer thermal ESC/POS (common untuk berbagai merek)
+// UUID service printer thermal ESC/POS (universal untuk berbagai merek: Panda, Iware, MPT, POS-58, EPPOS, RPP02N, dll)
 const PRINTER_SERVICE_UUIDS = [
-    '000018f0-0000-1000-8000-00805f9b34fb', // Standard ESC/POS
-    'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Mini thermal
-    '0000ff00-0000-1000-8000-00805f9b34fb', // Common Chinese BLE printers (FFxx series)
-    '0000ffe0-0000-1000-8000-00805f9b34fb', // HM-10 UART module (banyak dipakai KZ-58BT dll)
+    '000018f0-0000-1000-8000-00805f9b34fb', // Standard ESC/POS Service
+    'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Mini Thermal Printer (RPP02N, POS-58, dll)
+    '0000ff00-0000-1000-8000-00805f9b34fb', // Common Chinese BLE printers (FF00 series)
+    '0000ffe0-0000-1000-8000-00805f9b34fb', // HM-10 / CC2541 UART (KZ-58BT, Panda, Iware, dll)
+    '0000fff0-0000-1000-8000-00805f9b34fb', // FFF0 BLE Serial UART
     '0000ae00-0000-1000-8000-00805f9b34fb', // Alternate thermal printer service
-    '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISSC/Microchip BLE UART
+    '0000af30-0000-1000-8000-00805f9b34fb', // AF30 series
+    '0000fee7-0000-1000-8000-00805f9b34fb', // Tencent/WeChat BLE Printer
+    '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISSC / Microchip BLE UART
+    '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART Service (NUS)
 ];
 
-// Key untuk menyimpan perangkat yang sudah terpilih
-const STORAGE_KEY = 'bt_printer_paired';
+// Key untuk menyimpan ID dan Nama perangkat printer yang sudah dipilih
+const STORAGE_ID_KEY = 'bt_printer_paired';
+const STORAGE_NAME_KEY = 'bt_printer_name';
 
 export type BluetoothStatus = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error' | 'bt_off';
+
+export interface ConnectOptions {
+    silentOnly?: boolean;
+    forceSelect?: boolean;
+}
 
 export const useBluetoothPrinter = () => {
     const [status, setStatus] = useState<BluetoothStatus>('idle');
@@ -84,13 +91,12 @@ export const useBluetoothPrinter = () => {
             console.error('[BT Printer] Gagal getPrimaryServices():', e);
         }
 
-        throw new Error('Tidak menemukan karakteristik write pada printer ini. Pastikan printer mendukung BLE.');
+        throw new Error('Tidak menemukan karakteristik write pada printer ini. Pastikan printer mendukung BLE / Bluetooth Thermal.');
     };
 
     // --- Auto-reconnect handler saat terputus ---
     const handleDisconnected = useCallback(async () => {
         setIsConnected(false);
-        setDeviceName(null);
         characteristicRef.current = null;
         setStatus('disconnected');
 
@@ -104,7 +110,8 @@ export const useBluetoothPrinter = () => {
                     if (server) {
                         const characteristic = await setupCharacteristic(server);
                         characteristicRef.current = characteristic;
-                        setDeviceName(device.name || TARGET_PRINTER_NAME);
+                        const savedName = localStorage.getItem(STORAGE_NAME_KEY);
+                        setDeviceName(device.name || savedName || 'Printer Bluetooth');
                         setIsConnected(true);
                         setStatus('connected');
                         setErrorMessage(null);
@@ -117,13 +124,13 @@ export const useBluetoothPrinter = () => {
     }, []);
 
     // --- Connect ke printer ---
-    // Pertama coba getDevices() (tanpa dialog) untuk device yang sudah pernah dipilih
-    // Jika tidak ada dan silentOnly === false, baru requestDevice() dengan filter nama RPP02N
-    const connect = useCallback(async (options?: { silentOnly?: boolean }): Promise<boolean> => {
+    // Mendukung koneksi ke semua merk Bluetooth Thermal Printer
+    const connect = useCallback(async (options?: ConnectOptions): Promise<boolean> => {
         const silentOnly = options?.silentOnly ?? false;
+        const forceSelect = options?.forceSelect ?? false;
 
-        // Fast path: jika sudah terhubung dan characteristic siap, kembalikan true langsung
-        if (deviceRef.current?.gatt?.connected && characteristicRef.current) {
+        // Fast path: jika sudah terhubung dan bukan paksa pilih baru
+        if (!forceSelect && deviceRef.current?.gatt?.connected && characteristicRef.current) {
             setIsConnected(true);
             setStatus('connected');
             return true;
@@ -150,7 +157,6 @@ export const useBluetoothPrinter = () => {
                 if (!silentOnly) throw e;
                 return false;
             }
-            // getAvailability tidak tersedia di semua browser, lanjutkan
         }
 
         setStatus('connecting');
@@ -159,34 +165,34 @@ export const useBluetoothPrinter = () => {
         try {
             let device: any = null;
 
-            // Langkah 1: Cek apakah ada deviceRef yang tersimpan di memory
-            if (deviceRef.current) {
+            // Langkah 1: Cek deviceRef jika tidak sedang force select
+            if (!forceSelect && deviceRef.current) {
                 device = deviceRef.current;
             }
 
-            // Langkah 2: Coba ambil perangkat yang sudah dipilih sebelumnya (tanpa dialog)
-            if (!device && getBluetooth().getDevices) {
-                const savedId = localStorage.getItem(STORAGE_KEY);
+            // Langkah 2: Coba ambil perangkat yang sudah tersimpan sebelumnya
+            if (!device && !forceSelect && getBluetooth().getDevices) {
+                const savedId = localStorage.getItem(STORAGE_ID_KEY);
                 const pairedDevices: any[] = await getBluetooth().getDevices();
                 if (savedId) {
                     device = pairedDevices.find((d: any) => d.id === savedId) || null;
                 }
                 if (!device && pairedDevices.length > 0) {
-                    device = pairedDevices.find((d: any) => d.name === TARGET_PRINTER_NAME) || pairedDevices[0];
+                    device = pairedDevices[0];
                 }
             }
 
-            // Langkah 3: Kalau belum ada dan BUKAN mode silent, tampilkan dialog pemilihan printer
+            // Langkah 3: Tampilkan dialog pemilihan printer (Universal - semua device Bluetooth)
             if (!device && !silentOnly) {
-                // Gunakan acceptAllDevices agar SEMUA printer bluetooth muncul di dialog
+                // acceptAllDevices: true agar SEMUA merk printer Bluetooth muncul di dialog
                 device = await getBluetooth().requestDevice({
                     acceptAllDevices: true,
                     optionalServices: PRINTER_SERVICE_UUIDS,
                 });
 
                 if (device) {
-                    // Simpan ID device agar bisa reconnect otomatis berikutnya
-                    localStorage.setItem(STORAGE_KEY, device.id);
+                    localStorage.setItem(STORAGE_ID_KEY, device.id);
+                    localStorage.setItem(STORAGE_NAME_KEY, device.name || 'Printer Bluetooth');
                 }
             }
 
@@ -196,20 +202,26 @@ export const useBluetoothPrinter = () => {
                 return false;
             }
 
+            // Putuskan koneksi sebelumnya jika ada
+            if (deviceRef.current && deviceRef.current !== device && deviceRef.current.gatt?.connected) {
+                deviceRef.current.gatt.disconnect();
+            }
+
             // Koneksi ke GATT
             device.removeEventListener('gattserverdisconnected', handleDisconnected);
             device.addEventListener('gattserverdisconnected', handleDisconnected);
             const server = await device.gatt?.connect();
             if (!server) throw new Error('Gagal terhubung ke GATT Server printer.');
 
-            // Beri jeda 300ms agar GATT server RPP02N stabil sebelum setup characteristic
+            // Beri jeda 300ms agar GATT server printer stabil sebelum setup characteristic
             await new Promise(resolve => setTimeout(resolve, 300));
 
             const characteristic = await setupCharacteristic(server);
 
             deviceRef.current = device;
             characteristicRef.current = characteristic;
-            setDeviceName(device.name || TARGET_PRINTER_NAME);
+            const finalName = device.name || localStorage.getItem(STORAGE_NAME_KEY) || 'Printer Bluetooth';
+            setDeviceName(finalName);
             setIsConnected(true);
             setStatus('connected');
             setErrorMessage(null);
@@ -230,19 +242,24 @@ export const useBluetoothPrinter = () => {
         }
     }, [handleDisconnected]);
 
+    // --- Pilih perangkat printer baru (Dialog Picker) ---
+    const selectNewDevice = useCallback(async () => {
+        disconnect();
+        return await connect({ forceSelect: true });
+    }, [disconnect, connect]);
+
     // --- Auto-connect saat hook pertama kali dimuat ---
-    // Coba reconnect ke printer yang sudah pernah dipilih (tanpa dialog)
     useEffect(() => {
         const tryAutoConnect = async () => {
             if (!isBluetoothSupported()) return;
             if (!getBluetooth().getDevices) return;
 
-            const savedId = localStorage.getItem(STORAGE_KEY);
+            const savedId = localStorage.getItem(STORAGE_ID_KEY);
             if (!savedId) return;
 
             try {
                 const pairedDevices: any[] = await getBluetooth().getDevices();
-                const device = pairedDevices.find((d: any) => d.id === savedId || d.name === TARGET_PRINTER_NAME);
+                const device = pairedDevices.find((d: any) => d.id === savedId);
                 if (!device) return;
 
                 setStatus('connecting');
@@ -254,12 +271,12 @@ export const useBluetoothPrinter = () => {
                 const characteristic = await setupCharacteristic(server);
                 deviceRef.current = device;
                 characteristicRef.current = characteristic;
-                setDeviceName(device.name || TARGET_PRINTER_NAME);
+                const savedName = localStorage.getItem(STORAGE_NAME_KEY);
+                setDeviceName(device.name || savedName || 'Printer Bluetooth');
                 setIsConnected(true);
                 setStatus('connected');
                 setErrorMessage(null);
             } catch {
-                // Auto-connect gagal, tidak perlu notifikasi — printer mungkin belum menyala
                 setStatus('idle');
             }
         };
@@ -320,6 +337,7 @@ export const useBluetoothPrinter = () => {
         errorMessage,
         connect,
         disconnect,
+        selectNewDevice,
         print,
     };
 };

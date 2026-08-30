@@ -2,12 +2,12 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
-import { Transaction, PaymentStatus, CashFlow, CashFlowType, Purchase, Supplier, PaymentMethod, CashFlow as CashFlowTypeInterface, StoreSettings, BankAccount, User, UserRole, TransactionType, PurchaseType } from '../types';
+import { Transaction, PaymentStatus, CashFlow, CashFlowType, Purchase, Supplier, PaymentMethod, CashFlow as CashFlowTypeInterface, StoreSettings, BankAccount, User, UserRole, TransactionType, PurchaseType, Category } from '../types';
 import { formatIDR, formatDate, formatDateDateOnly, formatTimeOnly, exportToCSV, generateId, exportToExcel } from '../utils';
 import { generatePrintInvoice, generatePrintTransactionDetail, generatePrintPurchaseDetail, generatePrintPurchaseNote } from '../utils/printHelpers';
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
-import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet, Bluetooth, Receipt, UserCheck, Truck, DollarSign, PieChart, BookOpen, RefreshCw } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet, Bluetooth, Receipt, UserCheck, Truck, DollarSign, PieChart, BookOpen, RefreshCw, Tag, Layers, CreditCard } from 'lucide-react';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 
 interface FinanceProps {
@@ -26,6 +26,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     const customers = useData(() => StorageService.getCustomers(), [], 'customers') || [];
     const banks = useData(() => StorageService.getBanks(), [], 'banks') || [];
     const divisions = useData(() => StorageService.getDivisions(), [], 'divisions') || [];
+    const categories = useData(() => StorageService.getCategories(), [], 'categories') || [];
     const users = useMemo(() => {
         // 1. Group by ID first to merge "username" vs "FullName" for the same user ID
         const usersById = new Map<string, string>(); // ID -> Name
@@ -69,6 +70,9 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         setCategoryFilter('');
         setPaymentMethodFilter('');
         setStatusFilter('');
+        setTxPaymentMethodFilter('');
+        setTxCategoryFilter('');
+        setTxGroupMode('none');
     }, [activeTab]);
 
     // Filter State
@@ -80,7 +84,9 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     const [statusFilter, setStatusFilter] = useState(''); // Filter payment status/type for transactions/purchases
     const [userFilter, setUserFilter] = useState(''); // Filter by user/cashier
     const [txPaymentMethodFilter, setTxPaymentMethodFilter] = useState<string>(''); // Filter payment method for transactions
-    const [groupByPaymentMethod, setGroupByPaymentMethod] = useState<boolean>(false); // Group view toggle for transactions
+    const [txCategoryFilter, setTxCategoryFilter] = useState<string>(''); // Filter category for transactions
+    const [txGroupMode, setTxGroupMode] = useState<'none' | 'category' | 'method'>('none'); // Group view mode: none | category | method
+    const [groupByPaymentMethod, setGroupByPaymentMethod] = useState<boolean>(false); // Legacy fallback flag
 
     // Sort State
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -735,6 +741,33 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         });
     };
 
+    // Available categories extracted from store and transactions
+    const availableTxCategories = useMemo(() => {
+        const set = new Set<string>();
+        categories.forEach(c => {
+            if (c.name && c.name.trim()) set.add(c.name.trim());
+        });
+        transactions.forEach(t => {
+            t.items?.forEach(item => {
+                const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : '';
+                if (cat) set.add(cat);
+            });
+        });
+        return Array.from(set).sort((a, b) => a.localeCompare(b));
+    }, [categories, transactions]);
+
+    const applyTxCategoryFilter = (items: Transaction[]) => {
+        if (!txCategoryFilter) return items;
+        return items.filter(t =>
+            t.items?.some(item => {
+                const catName = (item.categoryName && item.categoryName.trim())
+                    ? item.categoryName.trim()
+                    : (categories.find(c => c.id === item.categoryId)?.name || 'Tanpa Kategori');
+                return catName.toLowerCase() === txCategoryFilter.toLowerCase() || item.categoryId === txCategoryFilter;
+            })
+        );
+    };
+
     const applyTxPaymentMethodFilter = (items: Transaction[]) => {
         if (!txPaymentMethodFilter) return items;
         return items.filter(t => {
@@ -745,7 +778,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         });
     };
 
-    const filteredTransactions = useMemo(() => sortItems(applySearch(applyTxPaymentMethodFilter(applyDateFilter(applyUserFilter(applyStatusFilter(applyCashierFilter(transactions, 'transaction'), 'transaction'), 'transaction'))), 'transaction')), [transactions, searchQuery, startDate, endDate, sortConfig, currentUser, userFilter, statusFilter, txPaymentMethodFilter]);
+    const filteredTransactions = useMemo(() => sortItems(applySearch(applyTxCategoryFilter(applyTxPaymentMethodFilter(applyDateFilter(applyUserFilter(applyStatusFilter(applyCashierFilter(transactions, 'transaction'), 'transaction'), 'transaction')))), 'transaction')), [transactions, searchQuery, startDate, endDate, sortConfig, currentUser, userFilter, statusFilter, txPaymentMethodFilter, txCategoryFilter, categories]);
 
     const txMethodSummary = useMemo(() => {
         let cashTotal = 0, cashCount = 0;
@@ -807,6 +840,65 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
 
         return groups;
     }, [filteredTransactions]);
+
+    // Grouped by Category Calculation for Transactions
+    const groupedTransactionsByCategory = useMemo(() => {
+        const groups: {
+            [catName: string]: {
+                categoryName: string;
+                txCount: number;
+                totalQty: number;
+                totalRevenue: number;
+                items: {
+                    transaction: Transaction;
+                    categoryItems: typeof filteredTransactions[0]['items'];
+                    categorySubtotal: number;
+                }[];
+            }
+        } = {};
+
+        filteredTransactions.forEach(t => {
+            const catMapInTx: { [cat: string]: typeof t.items } = {};
+            t.items?.forEach(item => {
+                const cat = (item.categoryName && item.categoryName.trim())
+                    ? item.categoryName.trim()
+                    : (categories.find(c => c.id === item.categoryId)?.name || 'Tanpa Kategori');
+                if (!catMapInTx[cat]) catMapInTx[cat] = [];
+                catMapInTx[cat].push(item);
+            });
+
+            if (!t.items || t.items.length === 0) {
+                const cat = 'Tanpa Kategori';
+                if (!catMapInTx[cat]) catMapInTx[cat] = [];
+            }
+
+            Object.entries(catMapInTx).forEach(([catName, catItems]) => {
+                if (!groups[catName]) {
+                    groups[catName] = {
+                        categoryName: catName,
+                        txCount: 0,
+                        totalQty: 0,
+                        totalRevenue: 0,
+                        items: []
+                    };
+                }
+                const catSubtotal = catItems.reduce((s, it) => s + (it.finalPrice * it.qty), 0);
+                const catQty = catItems.reduce((s, it) => s + (t.type === TransactionType.RETURN ? -it.qty : it.qty), 0);
+
+                groups[catName].txCount += 1;
+                groups[catName].totalQty += catQty;
+                groups[catName].totalRevenue += (t.type === TransactionType.RETURN ? -catSubtotal : (catSubtotal || t.totalAmount));
+                groups[catName].items.push({
+                    transaction: t,
+                    categoryItems: catItems,
+                    categorySubtotal: catSubtotal || t.totalAmount
+                });
+            });
+        });
+
+        return Object.values(groups).sort((a, b) => b.totalRevenue - a.totalRevenue);
+    }, [filteredTransactions, categories]);
+
     const filteredPurchases = useMemo(() => sortItems(applySearch(applyDateFilter(applyUserFilter(applyStatusFilter(applyCashierFilter(purchases, 'purchase'), 'purchase'), 'purchase')), 'purchase')), [purchases, searchQuery, startDate, endDate, sortConfig, currentUser, userFilter, statusFilter]);
     const filteredCashFlows = useMemo(() => sortItems(applySearch(applyPaymentMethodFilter(applyCategoryFilter(applyDateFilter(applyUserFilter(applyCashierFilter(cashFlows, 'cashflow'), 'cashflow')))), 'cashflow')), [cashFlows, searchQuery, startDate, endDate, categoryFilter, paymentMethodFilter, sortConfig, currentUser, userFilter]);
 
@@ -1225,17 +1317,19 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         let filename = 'export.csv';
 
         if (activeTab === 'history') {
-            headers = ['ID', 'Tanggal', 'Waktu', 'Faktur', 'Pelanggan', 'Keterangan', 'Kasir', 'Total', 'Dibayar', 'Piutang', 'Kembalian', 'Metode'];
+            headers = ['ID', 'Tanggal', 'Waktu', 'Faktur', 'Pelanggan', 'Kategori', 'Item', 'Keterangan', 'Kasir', 'Total', 'Dibayar', 'Piutang', 'Kembalian', 'Status', 'Metode'];
             rows = filteredTransactions.map(t => {
                 const d = new Date(t.date);
                 const remaining = t.totalAmount - t.amountPaid;
                 const piutang = remaining > 0 ? remaining : 0;
                 const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
+                const catSummary = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Kategori') || [])).join(', ');
+                const itemsSummary = t.items?.map(i => `${i.name} (${i.qty}x)`).join(', ') || '-';
                 let status = t.type === TransactionType.RETURN ? 'RETUR' : (t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus);
                 if (t.isReturned && t.type !== TransactionType.RETURN) {
                     status += ' (Ada Retur)';
                 }
-                return [t.id, d.toLocaleDateString('id-ID'), d.toLocaleTimeString('id-ID'), t.invoiceNumber || '-', t.customerName, t.paymentNote || '-', t.cashierName, t.totalAmount, t.amountPaid, piutang, kembalian, status, t.paymentMethod]
+                return [t.id, d.toLocaleDateString('id-ID'), d.toLocaleTimeString('id-ID'), t.invoiceNumber || '-', t.customerName, catSummary, itemsSummary, t.paymentNote || '-', t.cashierName, t.totalAmount, t.amountPaid, piutang, kembalian, status, t.paymentMethod]
             });
             filename = 'laporan-transaksi.csv';
         } else if (activeTab === 'debt_customer') {
@@ -1341,6 +1435,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             sheetName = "Riwayat Transaksi";
             fileNamePrefix = "Laporan_Transaksi";
             data = filteredTransactions.map(t => {
+                const catSummary = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Kategori') || [])).join(', ');
                 const itemsSummary = t.items.map(i => `${i.name} (${i.qty}x)`).join(', ');
                 const remaining = t.totalAmount - t.amountPaid;
                 const piutang = remaining > 0 ? remaining : 0;
@@ -1356,6 +1451,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                     'Faktur': t.invoiceNumber || '-',
                     'Tipe': t.type === TransactionType.RETURN ? 'RETUR' : 'PENJUALAN',
                     'Pelanggan': t.customerName,
+                    'Kategori': catSummary,
                     'Item': itemsSummary,
                     'Total': t.totalAmount,
                     'Dibayar': t.amountPaid,
@@ -1369,7 +1465,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             });
             cols = [
                 { wch: 15 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 20 },
-                { wch: 50 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
+                { wch: 25 }, { wch: 50 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
                 { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }
             ];
         } else if (activeTab === 'debt_customer') {
@@ -1551,31 +1647,63 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                 </div>
             `;
 
-            const rows = filteredTransactions.map(t => {
-                const remaining = t.totalAmount - t.amountPaid;
-                const piutang = remaining > 0 ? remaining : 0;
-                const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
-                let status = t.type === TransactionType.RETURN ? 'RETUR' : (t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus);
-                if (t.isReturned && t.type !== TransactionType.RETURN) {
-                    status += ' (Ada Retur)';
-                }
-                return `
-              <tr>
-                  <td>${t.id.substring(0, 8)}</td>
-                  <td>${formatDate(t.date)}</td>
-                  <td>${t.invoiceNumber || '-'}</td>
-                  <td>${t.customerName}</td>
-                  <td>${t.paymentNote || '-'}</td>
-                  <td>${t.cashierName}</td>
-                  <td style="text-align:right">${formatIDR(t.totalAmount)}</td>
-                  <td style="text-align:right">${formatIDR(t.amountPaid)}</td>
-                  <td style="text-align:right">${piutang > 0 ? formatIDR(piutang) : '-'}</td>
-                  <td style="text-align:right">${kembalian > 0 ? formatIDR(kembalian) : '-'}</td>
-                  <td>${status}</td>
-              </tr>
-          `;
-            }).join('');
-            content = `<thead><tr><th>ID</th><th>Tanggal & Waktu</th><th>Faktur</th><th>Pelanggan</th><th>Keterangan</th><th>Kasir</th><th>Total</th><th>Dibayar</th><th>Piutang</th><th>Kembalian</th><th>Status</th></tr></thead><tbody>${rows}</tbody>`;
+            if (txGroupMode === 'category') {
+                const categoryBlocks = groupedTransactionsByCategory.map(catGroup => {
+                    const groupRows = catGroup.items.map(({ transaction: t, categoryItems, categorySubtotal }) => {
+                        const itemsStr = categoryItems.map(ci => `${ci.qty}x ${ci.name}`).join(', ');
+                        return `
+                            <tr>
+                                <td>${t.id.substring(0, 8)}</td>
+                                <td>${formatDate(t.date)}</td>
+                                <td>${t.invoiceNumber || '-'}</td>
+                                <td>${t.customerName}</td>
+                                <td>${itemsStr}</td>
+                                <td style="text-align:right">${formatIDR(categorySubtotal)}</td>
+                                <td style="text-align:right">${formatIDR(t.totalAmount)}</td>
+                                <td>${t.paymentMethod}</td>
+                                <td>${t.paymentStatus}</td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    return `
+                        <tr style="background:#fef3c7; font-weight:bold;">
+                            <td colspan="9" style="padding:8px;">
+                                🏷️ ${catGroup.categoryName} (${catGroup.txCount} Transaksi, ${catGroup.totalQty} Item) — Subtotal Omzet: ${formatIDR(catGroup.totalRevenue)}
+                            </td>
+                        </tr>
+                        ${groupRows}
+                    `;
+                }).join('');
+
+                content = `<thead><tr><th>ID</th><th>Tanggal & Waktu</th><th>Faktur</th><th>Pelanggan</th><th>Item Kategori</th><th>Subtotal Kategori</th><th>Total Nota</th><th>Metode</th><th>Status</th></tr></thead><tbody>${categoryBlocks}</tbody>`;
+            } else {
+                const rows = filteredTransactions.map(t => {
+                    const remaining = t.totalAmount - t.amountPaid;
+                    const piutang = remaining > 0 ? remaining : 0;
+                    const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
+                    let status = t.type === TransactionType.RETURN ? 'RETUR' : (t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus);
+                    if (t.isReturned && t.type !== TransactionType.RETURN) {
+                        status += ' (Ada Retur)';
+                    }
+                    return `
+                  <tr>
+                      <td>${t.id.substring(0, 8)}</td>
+                      <td>${formatDate(t.date)}</td>
+                      <td>${t.invoiceNumber || '-'}</td>
+                      <td>${t.customerName}</td>
+                      <td>${t.paymentNote || '-'}</td>
+                      <td>${t.cashierName}</td>
+                      <td style="text-align:right">${formatIDR(t.totalAmount)}</td>
+                      <td style="text-align:right">${formatIDR(t.amountPaid)}</td>
+                      <td style="text-align:right">${piutang > 0 ? formatIDR(piutang) : '-'}</td>
+                      <td style="text-align:right">${kembalian > 0 ? formatIDR(kembalian) : '-'}</td>
+                      <td>${status}</td>
+                  </tr>
+              `;
+                }).join('');
+                content = `<thead><tr><th>ID</th><th>Tanggal & Waktu</th><th>Faktur</th><th>Pelanggan</th><th>Keterangan</th><th>Kasir</th><th>Total</th><th>Dibayar</th><th>Piutang</th><th>Kembalian</th><th>Status</th></tr></thead><tbody>${rows}</tbody>`;
+            }
         } else if (activeTab === 'debt_customer') {
             title = 'Laporan Piutang Pelanggan';
 
@@ -1873,7 +2001,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                 const escposData = generateESCPOSReceipt(tx, settings);
                 await bluetooth.print(escposData);
             } else {
-                alert("Printer Bluetooth RPP02N tidak terhubung. Pastikan Bluetooth & printer sudah dinyalakan.");
+                alert("Printer Bluetooth tidak terhubung. Pastikan Bluetooth & printer sudah dinyalakan.");
             }
         } catch (error: any) {
             if (error.name !== 'NotFoundError') {
@@ -2316,6 +2444,28 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
 
                         {activeTab === 'history' && (
                             <>
+                                {/* Category Filter for Transactions */}
+                                <div className="relative min-w-[170px]">
+                                    <label htmlFor="txCategoryFilter" className="sr-only">Filter Kategori Produk</label>
+                                    <select
+                                        id="txCategoryFilter"
+                                        name="txCategoryFilter"
+                                        className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-700 pr-8 appearance-none cursor-pointer font-bold"
+                                        value={txCategoryFilter}
+                                        onChange={e => setTxCategoryFilter(e.target.value)}
+                                    >
+                                        <option value="">🏷️ Semua Kategori</option>
+                                        {availableTxCategories.map(cat => (
+                                            <option key={cat} value={cat}>{cat}</option>
+                                        ))}
+                                    </select>
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                        <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </div>
+
                                 <div className="relative min-w-[170px]">
                                     <label htmlFor="txPaymentMethodFilter" className="sr-only">Filter Metode Pembayaran</label>
                                     <select
@@ -2341,19 +2491,27 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
                                     <button
                                         type="button"
-                                        onClick={() => setGroupByPaymentMethod(false)}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${!groupByPaymentMethod ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                        onClick={() => { setTxGroupMode('none'); setGroupByPaymentMethod(false); }}
+                                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${txGroupMode === 'none' && !groupByPaymentMethod ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
                                         title="Tampilan Tabel Standar"
                                     >
-                                        📋 Tabel
+                                        <Layers size={13} /> Tabel
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setGroupByPaymentMethod(true)}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${groupByPaymentMethod ? 'bg-amber-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                        onClick={() => { setTxGroupMode('category'); setGroupByPaymentMethod(false); }}
+                                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${txGroupMode === 'category' ? 'bg-amber-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                        title="Kelompokkan Berdasarkan Kategori Produk"
+                                    >
+                                        <Tag size={13} /> Per Kategori
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setTxGroupMode('method'); setGroupByPaymentMethod(true); }}
+                                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${txGroupMode === 'method' || groupByPaymentMethod ? 'bg-amber-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
                                         title="Kelompokkan Berdasarkan Metode Pembayaran"
                                     >
-                                        📁 Kelompokkan Metode
+                                        <CreditCard size={13} /> Per Metode
                                     </button>
                                 </div>
                             </>
@@ -2584,8 +2742,12 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                         <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200">
                             <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 text-xs flex justify-between items-center">
                                 <span className="flex items-center gap-2 font-bold text-slate-800 text-sm">
-                                    <Receipt className="text-amber-600" size={18} />
+                                    {txGroupMode === 'category' && <Tag className="text-amber-600" size={18} />}
+                                    {txGroupMode === 'method' && <CreditCard className="text-amber-600" size={18} />}
+                                    {txGroupMode === 'none' && <Receipt className="text-amber-600" size={18} />}
                                     Riwayat Transaksi Penjualan ({filteredTransactions.length})
+                                    {txGroupMode === 'category' && <span className="bg-amber-100 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-bold">Dikelompokkan per Kategori Produk</span>}
+                                    {txGroupMode === 'method' && <span className="bg-amber-100 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-bold">Dikelompokkan per Metode</span>}
                                 </span>
                                 <span className="text-amber-700 font-extrabold text-sm">
                                     Total: {formatIDR(filteredTransactions.reduce((s, t) => s + t.totalAmount, 0))}
@@ -2611,9 +2773,12 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                             </th>
                                             <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('invoiceNumber')}>No Faktur & Ref <SortIcon column="invoiceNumber" /></th>
                                             <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('customerName')}>Pelanggan <SortIcon column="customerName" /></th>
+                                            {txGroupMode === 'category' && <th className="p-3.5 whitespace-nowrap">Item Kategori Ini</th>}
                                             <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentMethod')}>Metode <SortIcon column="paymentMethod" /></th>
                                             <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentNote')}>Keterangan <SortIcon column="paymentNote" /></th>
-                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('totalAmount')}>Total <SortIcon column="totalAmount" /></th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('totalAmount')}>
+                                                {txGroupMode === 'category' ? 'Subtotal Kategori / Nota' : 'Total'} <SortIcon column="totalAmount" />
+                                            </th>
                                             <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('discountAmount')}>Diskon <SortIcon column="discountAmount" /></th>
                                             <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentStatus')}>Status <SortIcon column="paymentStatus" /></th>
                                             <th className="p-3.5 text-center whitespace-nowrap">Aksi Cetak & Opsi</th>
@@ -2622,10 +2787,139 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                     <tbody className="divide-y divide-slate-100">
                                         {filteredTransactions.length === 0 && (
                                             <tr>
-                                                <td colSpan={10} className="p-8 text-center text-slate-400">Tidak ada riwayat transaksi penjualan ditemukan.</td>
+                                                <td colSpan={txGroupMode === 'category' ? 11 : 10} className="p-8 text-center text-slate-400">Tidak ada riwayat transaksi penjualan ditemukan.</td>
                                             </tr>
                                         )}
-                                        {groupByPaymentMethod ? (
+
+                                        {/* --- CATEGORY GROUPED VIEW --- */}
+                                        {txGroupMode === 'category' && (
+                                            groupedTransactionsByCategory.map((catGroup) => {
+                                                if (catGroup.items.length === 0) return null;
+                                                return (
+                                                    <React.Fragment key={catGroup.categoryName}>
+                                                        <tr className="bg-amber-50/80 border-y-2 border-amber-300">
+                                                            <td colSpan={11} className="p-3 text-xs font-extrabold text-slate-800">
+                                                                <div className="flex flex-wrap justify-between items-center gap-2">
+                                                                    <span className="flex items-center gap-2 uppercase tracking-wider text-amber-950 font-black text-xs sm:text-sm">
+                                                                        🏷️ {catGroup.categoryName}
+                                                                        <span className="bg-white border border-amber-300 text-amber-900 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold shadow-2xs">
+                                                                            {catGroup.txCount} Transaksi
+                                                                        </span>
+                                                                        <span className="bg-amber-200/80 border border-amber-400 text-amber-950 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold shadow-2xs">
+                                                                            {catGroup.totalQty} Item Terjual
+                                                                        </span>
+                                                                    </span>
+                                                                    <span className="text-amber-950 font-mono text-xs font-black bg-amber-200/90 border border-amber-400 px-3 py-1 rounded-lg shadow-2xs">
+                                                                        Subtotal Omzet: {formatIDR(catGroup.totalRevenue)}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                        {catGroup.items.map(({ transaction: t, categoryItems, categorySubtotal }) => (
+                                                            <tr key={`${catGroup.categoryName}-${t.id}`} onClick={() => setDetailTransaction(t)} className="hover:bg-amber-50/30 cursor-pointer transition-colors group">
+                                                                <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
+                                                                    {formatDateDateOnly(t.date)}
+                                                                </td>
+                                                                <td className="p-3.5 whitespace-nowrap bg-amber-50/20">
+                                                                    <span className="font-mono text-xs font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded border border-amber-200 inline-block shadow-2xs">
+                                                                        {formatTimeOnly(t.createdAt || t.date)}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-3.5 whitespace-nowrap">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="font-mono text-xs font-bold text-slate-800">{t.invoiceNumber || '-'}</span>
+                                                                        {t.is_manual_entry && (
+                                                                            <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-extrabold px-1.5 py-0.2 rounded shadow-2xs">
+                                                                                ⏱️ SUSULAN
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="text-[10px] font-mono text-slate-400">#{t.id.substring(0, 8)}</div>
+                                                                </td>
+                                                                <td className="p-3.5 whitespace-nowrap">
+                                                                    <div className="font-semibold text-slate-800">{t.customerName}</div>
+                                                                    {t.customerPhone && <div className="text-[10px] text-slate-400 font-mono">{t.customerPhone}</div>}
+                                                                </td>
+                                                                <td className="p-3.5 max-w-[220px]">
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {categoryItems.map((ci, idx) => (
+                                                                            <span key={idx} className="bg-amber-100/90 text-amber-900 border border-amber-300 text-[10px] font-semibold px-1.5 py-0.5 rounded-md">
+                                                                                {ci.qty}x {ci.name}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-3.5 text-slate-700 font-medium whitespace-nowrap">
+                                                                    <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-bold">
+                                                                        {t.paymentMethod} {t.bankName ? `(${t.bankName})` : ''}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-3.5 text-slate-600 max-w-[200px] truncate">
+                                                                    {t.type === TransactionType.RETURN && t.originalTransactionId
+                                                                        ? (() => {
+                                                                            const original = transactions.find(orig => orig.id === t.originalTransactionId);
+                                                                            return original?.invoiceNumber
+                                                                                ? `Retur dari ${original.invoiceNumber}`
+                                                                                : (t.paymentNote || '-');
+                                                                        })()
+                                                                        : (t.paymentNote || '-')
+                                                                    }
+                                                                    {t.is_manual_entry && t.manual_entry_reason && (
+                                                                        <div className="text-[10px] text-amber-800 italic font-medium truncate" title={t.manual_entry_reason}>
+                                                                            Alasan: {t.manual_entry_reason}
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+                                                                <td className="p-3.5 whitespace-nowrap">
+                                                                    <div className="font-black text-amber-900 font-mono text-xs">
+                                                                        {formatIDR(categorySubtotal)}
+                                                                    </div>
+                                                                    <div className="text-[10px] text-slate-400 font-normal">
+                                                                        Total Nota: {formatIDR(t.totalAmount)}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-3.5 text-rose-600 font-bold whitespace-nowrap">
+                                                                    {t.discountAmount ? `-${formatIDR(t.discountAmount)}` : '-'}
+                                                                </td>
+                                                                <td className="p-3.5 whitespace-nowrap">
+                                                                    <span className={`px-2.5 py-0.5 rounded text-[10px] font-extrabold border ${
+                                                                        t.type === TransactionType.RETURN
+                                                                            ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                                            : t.paymentStatus === 'LUNAS'
+                                                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                                : t.paymentStatus === 'BELUM_LUNAS'
+                                                                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                                                                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                                                                    }`}>
+                                                                        {t.type === TransactionType.RETURN ? 'RETUR' : t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus}
+                                                                        {t.isReturned && t.type !== TransactionType.RETURN ? ' (Ada Retur)' : ''}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-3.5 text-center whitespace-nowrap">
+                                                                    <div className="flex items-center justify-center gap-1.5">
+                                                                        <button onClick={(e) => { e.stopPropagation(); printInvoice(t); }} className="px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-semibold border border-amber-200 transition-colors flex items-center gap-1" title="Cetak Nota">
+                                                                            <Printer size={12} /> Nota
+                                                                        </button>
+                                                                        <button onClick={(e) => { e.stopPropagation(); printBluetoothInvoice(t); }} className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold border border-emerald-200 transition-colors flex items-center gap-1" title="Cetak Struk Bluetooth">
+                                                                            <Bluetooth size={12} /> BT
+                                                                        </button>
+                                                                        <button onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }} className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition-colors" title="Detail Transaksi">
+                                                                            <Eye size={14} />
+                                                                        </button>
+                                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }} className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition-colors" title="Hapus Transaksi">
+                                                                            <Trash2 size={14} />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </React.Fragment>
+                                                );
+                                            })
+                                        )}
+
+                                        {/* --- PAYMENT METHOD GROUPED VIEW --- */}
+                                        {(txGroupMode === 'method' || (txGroupMode === 'none' && groupByPaymentMethod)) && (
                                             Object.entries(groupedTransactionsByMethod).map(([groupName, groupTxs]) => {
                                                 if (groupTxs.length === 0) return null;
                                                 const groupSubtotal = groupTxs.reduce((sum, t) => sum + t.totalAmount, 0);
@@ -2734,7 +3028,10 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                     </React.Fragment>
                                                 );
                                             })
-                                        ) : (
+                                        )}
+
+                                        {/* --- STANDARD FLAT VIEW --- */}
+                                        {txGroupMode === 'none' && !groupByPaymentMethod && (
                                             visibleTransactions.map(t => (
                                                 <tr key={t.id} onClick={() => setDetailTransaction(t)} className="hover:bg-slate-50 cursor-pointer transition-colors group">
                                                     <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
@@ -2820,7 +3117,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                 </tr>
                                             ))
                                         )}
-                                        {visibleTransactions.length < filteredTransactions.length && (
+                                        {txGroupMode === 'none' && !groupByPaymentMethod && visibleTransactions.length < filteredTransactions.length && (
                                             <tr>
                                                 <td colSpan={10} className="p-4 text-center text-slate-400">
                                                     <div ref={loadMoreRef}>Memuat transaksi berikutnya...</div>

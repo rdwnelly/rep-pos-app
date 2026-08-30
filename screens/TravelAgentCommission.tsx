@@ -4,11 +4,13 @@ import { StorageService } from '../services/storage';
 import { TravelAgent, TravelBookingCommission, CommissionMethod, CommissionStatus, PaymentMethod, User, StoreSettings, BankAccount } from '../types';
 import { formatIDR, formatDate, formatDateDateOnly, formatTimeOnly, exportToCSV, exportToExcel, generateId } from '../utils';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
-import { 
-  BadgePercent, Users, Plus, Search, Filter, RotateCcw, X, Eye, Printer, 
-  FileSpreadsheet, Download, Calendar, DollarSign, CheckCircle2, Clock, 
-  XCircle, Phone, Mail, Building2, CreditCard, Edit3, Trash2, ChevronRight, 
-  Briefcase, AlertCircle, ExternalLink, Sparkles
+import {
+  BadgePercent, Users, Plus, Search, Filter, RotateCcw, X, Eye, Printer,
+  FileSpreadsheet, Download, Calendar, DollarSign, CheckCircle2, Clock,
+  XCircle, Phone, Mail, Building2, CreditCard, Edit3, Trash2, ChevronRight,
+  Briefcase, AlertCircle, ExternalLink, Sparkles, Target, Trophy, Award,
+  ArrowUpRight, Calculator, Check, MessageCircle, ChevronDown, CheckCircle,
+  Percent
 } from 'lucide-react';
 
 interface TravelAgentCommissionProps {
@@ -21,9 +23,61 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
   const commissions = useData(() => StorageService.getTravelCommissions(), [], 'travel_commissions') || [];
   const customers = useData(() => StorageService.getCustomers(), [], 'customers') || [];
   const banks = useData(() => StorageService.getBanks(), [], 'banks') || [];
+  const categories = useData(() => StorageService.getCategories(), [], 'categories') || [];
+  const products = useData(() => StorageService.getProducts(), [], 'products') || [];
 
-  // State Tabs: 'commissions' | 'agents'
-  const [activeTab, setActiveTab] = useState<'commissions' | 'agents'>('commissions');
+  // Available Package & Product Categories from Master Data
+  const availablePackageCategories = useMemo(() => {
+    const list: string[] = [];
+
+    // 1. Kategori dari Master Data Kategori
+    categories.forEach(c => {
+      if (c && c.name && !list.includes(c.name)) {
+        list.push(c.name);
+      }
+    });
+
+    // 2. Kategori Produk & Produk Paket Wisata
+    products.forEach(p => {
+      if (p.categoryName && !list.includes(p.categoryName)) {
+        list.push(p.categoryName);
+      }
+      if (p.name && p.name.toLowerCase().includes('paket') && !list.includes(p.name)) {
+        list.push(p.name);
+      }
+    });
+
+    // Fallbacks
+    const defaults = [
+      'Paket Sopendo / Saswar / Edukasi',
+      'Tiket Masuk',
+      'Sewa Kostum',
+      'Toko / Souvenir',
+      'Kafe & Resto',
+      'Kios',
+      'Jasa Fotografer',
+      'Sewa kostum keluar',
+      'Belanja Oleh-oleh Wisatawan'
+    ];
+    defaults.forEach(d => {
+      if (!list.includes(d)) list.push(d);
+    });
+
+    return list;
+  }, [categories, products]);
+
+  // State Tabs: 'targets' | 'commissions' | 'agents'
+  const [activeTab, setActiveTab] = useState<'targets' | 'commissions' | 'agents'>('targets');
+
+  // Month & Year Filter for Targets Tab
+  const today = new Date();
+  const [targetMonth, setTargetMonth] = useState(today.getMonth());
+  const [targetYear, setTargetYear] = useState(today.getFullYear());
+
+  const months = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+  ];
 
   // Filter States - Commissions
   const [startDate, setStartDate] = useState('');
@@ -32,7 +86,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
   const [agentFilter, setAgentFilter] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Filter States - Agents
+  // Filter States - Agents & Targets
   const [agentCategoryFilter, setAgentCategoryFilter] = useState('');
   const [agentSearchQuery, setAgentSearchQuery] = useState('');
 
@@ -45,6 +99,11 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
 
   const [disbursingCommission, setDisbursingCommission] = useState<TravelBookingCommission | null>(null);
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
+
+  // Live Commission Calculator Simulator State
+  const [calcAgentId, setCalcAgentId] = useState<string>('');
+  const [calcSalesAmount, setCalcSalesAmount] = useState<string>('1500000');
+  const [calcPaxCount, setCalcPaxCount] = useState<string>('2');
 
   // Pagination & Confirmation
   const [visibleCount, setVisibleCount] = useState(20);
@@ -62,19 +121,24 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
     message: '',
     confirmLabel: 'Ya',
     cancelLabel: 'Batal',
-    onConfirm: () => {},
+    onConfirm: () => { },
   });
 
-  // Agent Form State
+  // Agent Form State with Target & Commission settings
   const [agentForm, setAgentForm] = useState<Partial<TravelAgent>>({
     name: '',
     phone: '',
     email: '',
-    category: 'Driver / Guide',
+    category: 'Driver',
     bankName: '',
     accountNumber: '',
     holderName: '',
-    notes: ''
+    notes: '',
+    commissionMethod: CommissionMethod.PERCENTAGE,
+    commissionRate: 10,
+    monthlyTargetRevenue: 5000000,
+    monthlyTargetPax: 20,
+    targetBonusRate: 200000
   });
 
   // Commission Form State
@@ -111,7 +175,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
     return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Jayapura' });
   };
 
-  // Automated Commission Calculator
+  // Automated Commission Calculator for Form
   const calculatedCommissionValue = useMemo(() => {
     const sales = Number(commissionForm.totalSales) || 0;
     const rate = Number(commissionForm.commissionRate) || 0;
@@ -126,6 +190,137 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
     }
     return 0;
   }, [commissionForm.totalSales, commissionForm.commissionRate, commissionForm.paxCount, commissionForm.commissionMethod]);
+
+  // ========================================================
+  // 1. DRIVER & GUIDE TARGET & PERFORMANCE METRICS
+  // ========================================================
+  const driverTargetMetrics = useMemo(() => {
+    return agents.map(agent => {
+      // Filter commissions for this agent in the selected targetMonth & targetYear
+      const agentCommissions = commissions.filter(c => {
+        if (c.agentId !== agent.id) return false;
+        if (!c.departureDate) return false;
+        const d = new Date(c.departureDate);
+        return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
+      });
+
+      const totalSalesBrought = agentCommissions.reduce((sum, c) => sum + (c.totalSales || 0), 0);
+      const totalPaxBrought = agentCommissions.reduce((sum, c) => sum + (c.paxCount || 0), 0);
+      const totalCommissionEarned = agentCommissions.reduce((sum, c) => sum + (c.totalCommission || 0), 0);
+
+      const paidCommission = agentCommissions
+        .filter(c => c.status === CommissionStatus.PAID)
+        .reduce((sum, c) => sum + (c.totalCommission || 0), 0);
+
+      const pendingCommission = agentCommissions
+        .filter(c => c.status === CommissionStatus.PENDING)
+        .reduce((sum, c) => sum + (c.totalCommission || 0), 0);
+
+      // Target calculations
+      const targetRevenue = agent.monthlyTargetRevenue || 5000000;
+      const targetPax = agent.monthlyTargetPax || 20;
+
+      const revenueProgress = targetRevenue > 0 ? (totalSalesBrought / targetRevenue) * 100 : 0;
+      const paxProgress = targetPax > 0 ? (totalPaxBrought / targetPax) * 100 : 0;
+
+      const isTargetReached = totalSalesBrought >= targetRevenue && targetRevenue > 0;
+      const targetBonus = isTargetReached ? (agent.targetBonusRate || 0) : 0;
+
+      const totalReceivableByDriver = totalCommissionEarned + targetBonus;
+
+      return {
+        agent,
+        totalSalesBrought,
+        totalPaxBrought,
+        totalCommissionEarned,
+        paidCommission,
+        pendingCommission,
+        targetRevenue,
+        targetPax,
+        revenueProgress,
+        paxProgress,
+        isTargetReached,
+        targetBonus,
+        totalReceivableByDriver,
+        bookingsCount: agentCommissions.length
+      };
+    }).sort((a, b) => b.totalSalesBrought - a.totalSalesBrought);
+  }, [agents, commissions, targetMonth, targetYear]);
+
+  // Overall Target Summary
+  const overallTargetSummary = useMemo(() => {
+    const totalEarned = driverTargetMetrics.reduce((sum, d) => sum + d.totalReceivableByDriver, 0);
+    const totalPending = driverTargetMetrics.reduce((sum, d) => sum + d.pendingCommission, 0);
+    const totalPaid = driverTargetMetrics.reduce((sum, d) => sum + d.paidCommission, 0);
+    const totalSales = driverTargetMetrics.reduce((sum, d) => sum + d.totalSalesBrought, 0);
+    const achieversCount = driverTargetMetrics.filter(d => d.isTargetReached).length;
+
+    return {
+      totalEarned,
+      totalPending,
+      totalPaid,
+      totalSales,
+      achieversCount,
+      totalDrivers: agents.length
+    };
+  }, [driverTargetMetrics, agents.length]);
+
+  // Live Simulator Calculation
+  const simulatorResult = useMemo(() => {
+    const selectedAgent = agents.find(a => a.id === calcAgentId) || agents[0];
+    const sales = Number(calcSalesAmount) || 0;
+    const pax = Number(calcPaxCount) || 1;
+
+    if (!selectedAgent) {
+      return {
+        agentName: 'Pilih Driver / Guide',
+        schemeText: '10%',
+        commissionAmt: Math.round(sales * 0.1),
+        currentSales: 0,
+        targetSales: 5000000,
+        projectedSales: sales,
+        projectedProgress: (sales / 5000000) * 100,
+        willHitTarget: sales >= 5000000,
+        bonusAmt: 200000
+      };
+    }
+
+    const method = selectedAgent.commissionMethod || CommissionMethod.PERCENTAGE;
+    const rate = selectedAgent.commissionRate !== undefined && selectedAgent.commissionRate !== null ? selectedAgent.commissionRate : 10;
+    const targetRev = selectedAgent.monthlyTargetRevenue || 5000000;
+    const bonus = selectedAgent.targetBonusRate || 0;
+
+    let commissionAmt = 0;
+    let schemeText = `${rate}% dari Belanja`;
+    if (method === CommissionMethod.PERCENTAGE) {
+      commissionAmt = Math.round((sales * rate) / 100);
+      schemeText = `${rate}% dari Total Belanja`;
+    } else if (method === CommissionMethod.FLAT_PER_PAX) {
+      commissionAmt = Math.round(rate * pax);
+      schemeText = `${formatIDR(rate)} / Pax`;
+    } else if (method === CommissionMethod.FLAT_PER_GROUP) {
+      commissionAmt = Math.round(rate);
+      schemeText = `${formatIDR(rate)} / Rombongan`;
+    }
+
+    const driverStats = driverTargetMetrics.find(d => d.agent.id === selectedAgent.id);
+    const currentSales = driverStats ? driverStats.totalSalesBrought : 0;
+    const projectedSales = currentSales + sales;
+    const projectedProgress = targetRev > 0 ? (projectedSales / targetRev) * 100 : 0;
+    const willHitTarget = projectedSales >= targetRev && targetRev > 0;
+
+    return {
+      agentName: selectedAgent.name,
+      schemeText,
+      commissionAmt,
+      currentSales,
+      targetSales: targetRev,
+      projectedSales,
+      projectedProgress,
+      willHitTarget,
+      bonusAmt: bonus
+    };
+  }, [agents, calcAgentId, calcSalesAmount, calcPaxCount, driverTargetMetrics]);
 
   // Filtered Commissions List
   const filteredCommissions = useMemo(() => {
@@ -162,7 +357,6 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
       );
     }
 
-    // Sort by Departure Date descending
     return items.sort((a, b) => new Date(b.departureDate).getTime() - new Date(a.departureDate).getTime());
   }, [commissions, startDate, endDate, statusFilter, agentFilter, searchQuery]);
 
@@ -188,29 +382,6 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
     return items.sort((a, b) => a.name.localeCompare(b.name));
   }, [agents, agentCategoryFilter, agentSearchQuery]);
 
-  // Metric Summaries
-  const metrics = useMemo(() => {
-    const totalPaid = commissions
-      .filter(c => c.status === CommissionStatus.PAID)
-      .reduce((sum, c) => sum + c.totalCommission, 0);
-
-    const totalPending = commissions
-      .filter(c => c.status === CommissionStatus.PENDING)
-      .reduce((sum, c) => sum + c.totalCommission, 0);
-
-    const totalSalesAmount = commissions.reduce((sum, c) => sum + c.totalSales, 0);
-    const totalPax = commissions.reduce((sum, c) => sum + c.paxCount, 0);
-
-    return {
-      totalPaid,
-      totalPending,
-      totalSalesAmount,
-      totalPax,
-      activeAgentsCount: agents.length,
-      totalBookingsCount: commissions.length
-    };
-  }, [commissions, agents]);
-
   // Handlers Agent Modal
   const handleOpenAgentModal = (agent?: TravelAgent) => {
     if (agent) {
@@ -222,11 +393,16 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
         name: '',
         phone: '',
         email: '',
-        category: 'Driver / Guide',
-        bankName: '',
+        category: 'Driver',
+        bankName: 'BCA',
         accountNumber: '',
         holderName: '',
-        notes: ''
+        notes: '',
+        commissionMethod: CommissionMethod.PERCENTAGE,
+        commissionRate: 10,
+        monthlyTargetRevenue: 5000000,
+        monthlyTargetPax: 20,
+        targetBonusRate: 200000
       });
     }
     setIsAgentModalOpen(true);
@@ -235,7 +411,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
   const handleSaveAgent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!agentForm.name || !agentForm.phone || !agentForm.bankName || !agentForm.accountNumber) {
-      alert("Mohon lengkapi Nama Agen, Kontak WhatsApp, Nama Bank, dan Nomor Rekening.");
+      alert("Mohon lengkapi Nama Driver/Guide, Kontak WhatsApp, Nama Bank, dan Nomor Rekening.");
       return;
     }
 
@@ -244,11 +420,16 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
       name: agentForm.name.trim(),
       phone: agentForm.phone.trim(),
       email: agentForm.email?.trim() || '',
-      category: agentForm.category || 'Lainnya',
+      category: agentForm.category || 'Driver',
       bankName: agentForm.bankName.trim(),
       accountNumber: agentForm.accountNumber.trim(),
       holderName: agentForm.holderName?.trim() || agentForm.name.trim(),
       notes: agentForm.notes || '',
+      commissionMethod: agentForm.commissionMethod || CommissionMethod.PERCENTAGE,
+      commissionRate: Number(agentForm.commissionRate) || 10,
+      monthlyTargetRevenue: Number(agentForm.monthlyTargetRevenue) || 5000000,
+      monthlyTargetPax: Number(agentForm.monthlyTargetPax) || 20,
+      targetBonusRate: Number(agentForm.targetBonusRate) || 0,
       createdAt: editingAgent?.createdAt || new Date().toISOString()
     };
 
@@ -259,8 +440,8 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
   const handleDeleteAgent = (id: string, name: string) => {
     setConfirmation({
       isOpen: true,
-      title: 'Hapus Data Agen',
-      message: `Apakah Anda yakin ingin menghapus agen mitra "${name}"? Data pemesanan terkait agen ini akan tetap tersimpan.`,
+      title: 'Hapus Data Driver / Guide',
+      message: `Apakah Anda yakin ingin menghapus mitra "${name}"? Data pemesanan terkait mitra ini akan tetap tersimpan.`,
       confirmLabel: 'Hapus',
       cancelLabel: 'Batal',
       type: 'danger',
@@ -279,16 +460,17 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
     } else {
       setEditingCommission(null);
       const generatedCode = `TRV-${Math.floor(100000 + Math.random() * 900000)}`;
+      const firstAgent = agents.length > 0 ? agents[0] : null;
       setCommissionForm({
         bookingCode: generatedCode,
-        agentId: agents.length > 0 ? agents[0].id : '',
+        agentId: firstAgent ? firstAgent.id : '',
         touristName: '',
         paxCount: 1,
-        tourPackage: '',
+        tourPackage: 'Belanja Oleh-oleh Wisatawan',
         departureDate: new Date().toISOString().split('T')[0],
         totalSales: 0,
-        commissionMethod: CommissionMethod.PERCENTAGE,
-        commissionRate: 10,
+        commissionMethod: firstAgent?.commissionMethod || CommissionMethod.PERCENTAGE,
+        commissionRate: firstAgent?.commissionRate || 10,
         status: CommissionStatus.PENDING,
         notes: ''
       });
@@ -299,7 +481,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
   const handleSaveCommission = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!commissionForm.bookingCode || !commissionForm.agentId || !commissionForm.touristName || !commissionForm.tourPackage) {
-      alert("Mohon lengkapi Kode Pemesanan, Pilih Agen, Nama Turis/Grup, dan Jenis Paket Wisata.");
+      alert("Mohon lengkapi Kode Pemesanan, Pilih Driver/Guide, Nama Tamu/Rombongan, dan Jenis Paket Belanja.");
       return;
     }
 
@@ -309,7 +491,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
       id: editingCommission?.id || generateId(),
       bookingCode: commissionForm.bookingCode.trim(),
       agentId: commissionForm.agentId,
-      agentName: selectedAgent?.name || commissionForm.agentName || 'Agen Unregistered',
+      agentName: selectedAgent?.name || commissionForm.agentName || 'Driver / Guide',
       agentCategory: selectedAgent?.category || '',
       customerId: commissionForm.customerId || '',
       touristName: commissionForm.touristName.trim(),
@@ -335,8 +517,8 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
   const handleDeleteCommission = (id: string, code: string) => {
     setConfirmation({
       isOpen: true,
-      title: 'Hapus Pemesanan Komisi',
-      message: `Hapus catatan pemesanan "${code}"? Tindakan ini tidak dapat dibatalkan.`,
+      title: 'Hapus Catatan Komisi',
+      message: `Hapus catatan komisi "${code}"? Tindakan ini tidak dapat dibatalkan.`,
       confirmLabel: 'Hapus',
       cancelLabel: 'Batal',
       type: 'danger',
@@ -348,171 +530,135 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
   };
 
   // Handler Disbursement / Process Payment
+  const handleOpenDisbursementModal = (commission: TravelBookingCommission) => {
+    setDisbursingCommission(commission);
+    setDisbursementForm({
+      paymentDate: new Date().toISOString().split('T')[0],
+      paymentMethod: PaymentMethod.CASH,
+      bankId: banks.length > 0 ? banks[0].id : '',
+      notes: ''
+    });
+  };
+
   const handleProcessDisbursement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!disbursingCommission) return;
 
     const selectedBank = banks.find(b => b.id === disbursementForm.bankId);
 
-    const updated: TravelBookingCommission = {
+    const updatedCommission: TravelBookingCommission = {
       ...disbursingCommission,
       status: CommissionStatus.PAID,
       paymentDate: disbursementForm.paymentDate,
       paymentMethod: disbursementForm.paymentMethod,
-      bankId: disbursementForm.bankId,
-      bankName: selectedBank ? `${selectedBank.bankName} - ${selectedBank.accountNumber}` : '',
-      notes: disbursementForm.notes ? `${disbursingCommission.notes ? disbursingCommission.notes + ' | ' : ''}Pencairan: ${disbursementForm.notes}` : disbursingCommission.notes
+      bankId: disbursementForm.paymentMethod === PaymentMethod.TRANSFER ? disbursementForm.bankId : undefined,
+      bankName: disbursementForm.paymentMethod === PaymentMethod.TRANSFER ? selectedBank?.bankName : undefined,
+      notes: disbursementForm.notes
+        ? `${disbursingCommission.notes ? disbursingCommission.notes + ' | ' : ''}Pencairan: ${disbursementForm.notes}`
+        : disbursingCommission.notes
     };
 
-    await StorageService.saveTravelCommission(updated);
+    await StorageService.saveTravelCommission(updatedCommission);
     setDisbursingCommission(null);
   };
 
-  // Export Excel & CSV
-  const handleExportCommissionsCSV = () => {
-    const headers = [
-      'Kode Booking',
-      'Tanggal Keberangkatan',
-      'Nama Turis / Grup',
-      'Jumlah Pax',
-      'Paket Wisata',
-      'Nama Agen',
-      'Kategori Agen',
-      'Total Penjualan (Rp)',
-      'Skema Komisi',
-      'Total Komisi (Rp)',
-      'Status',
-      'Tanggal Pencairan'
-    ];
-
-    const rows = filteredCommissions.map(c => [
-      c.bookingCode,
-      c.departureDate,
-      c.touristName,
-      c.paxCount,
-      c.tourPackage,
-      c.agentName,
-      c.agentCategory || '-',
-      c.totalSales,
-      c.commissionMethod === CommissionMethod.PERCENTAGE ? `${c.commissionRate}%` : c.commissionMethod === CommissionMethod.FLAT_PER_PAX ? `Rp ${c.commissionRate}/pax` : `Rp ${c.commissionRate}/grup`,
-      c.totalCommission,
-      c.status,
-      c.paymentDate || '-'
-    ]);
-
-    exportToCSV(`Laporan_Komisi_Agen_${new Date().toISOString().split('T')[0]}.csv`, headers, rows);
-  };
-
-  const handleExportCommissionsExcel = () => {
-    const data = filteredCommissions.map(c => ({
-      'Kode Booking': c.bookingCode,
-      'Tanggal Keberangkatan': c.departureDate,
-      'Nama Turis / Grup': c.touristName,
-      'Jumlah Pax': c.paxCount,
-      'Paket Wisata': c.tourPackage,
-      'Nama Agen': c.agentName,
-      'Kategori Agen': c.agentCategory || '-',
-      'Total Penjualan (Rp)': c.totalSales,
-      'Skema Komisi': c.commissionMethod === CommissionMethod.PERCENTAGE ? `${c.commissionRate}%` : c.commissionMethod === CommissionMethod.FLAT_PER_PAX ? `Rp ${c.commissionRate}/pax` : `Rp ${c.commissionRate}/grup`,
-      'Total Komisi (Rp)': c.totalCommission,
-      'Status': c.status,
-      'Tanggal Pencairan': c.paymentDate || '-'
-    }));
-
-    exportToExcel(data, `Laporan_Komisi_Agen_${new Date().toISOString().split('T')[0]}`, 'Komisi Agen');
-  };
-
-  // Print Receipt Voucher Komisi
+  // Print Official Voucher / Receipt for Driver Commission
   const handlePrintVoucher = (c: TravelBookingCommission) => {
-    const settings = storeSettings || ({ name: 'Kasir REP' } as StoreSettings);
-    const agent = agents.find(a => a.id === c.agentId);
-
-    const w = window.open('', '', 'width=800,height=600');
+    const settings = storeSettings || { name: 'RUMAH ETNIK PAPUA', address: '', phone: '' };
+    const w = window.open('', '_blank');
     if (!w) return;
+
+    const agentObj = agents.find(a => a.id === c.agentId);
 
     const html = `
       <html>
         <head>
-          <title>Voucher Komisi ${c.bookingCode}</title>
+          <title>Voucher Komisi Driver / Guide - ${c.bookingCode}</title>
           <style>
-            body { font-family: 'Inter', sans-serif; padding: 20px; color: #1e293b; max-width: 190mm; margin: 0 auto; }
-            .header { text-align: center; border-b: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px; }
-            .title { font-size: 16pt; font-weight: bold; color: #d97706; text-transform: uppercase; margin: 0; }
-            .subtitle { font-size: 10pt; color: #64748b; margin-top: 4px; }
-            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; font-size: 10pt; }
-            .box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; rounded: 8px; }
-            .box-title { font-weight: bold; color: #475569; border-b: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 8px; font-size: 9pt; uppercase; }
-            table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 10pt; }
-            th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
-            th { background-color: #f1f5f9; font-weight: bold; }
-            .text-right { text-align: right; }
-            .total-row { background-color: #fef3c7; font-weight: bold; font-size: 11pt; }
-            .sig-section { display: flex; justify-content: space-between; margin-top: 40px; text-align: center; font-size: 9pt; }
-            .sig-box { width: 150px; }
-            .sig-space { height: 50px; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; font-size: 11pt; color: #1e293b; }
+            .header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 16px; }
+            .header h1 { margin: 0; font-size: 16pt; font-weight: 800; text-transform: uppercase; }
+            .header p { margin: 2px 0 0; font-size: 9pt; color: #64748b; }
+            .title { text-align: center; font-size: 13pt; font-weight: 800; margin-bottom: 16px; text-decoration: underline; }
+            .info-table { width: 100%; margin-bottom: 16px; font-size: 10pt; }
+            .info-table td { padding: 4px 6px; }
+            .table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 10pt; }
+            .table th, .table td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
+            .table th { background: #f8fafc; font-weight: bold; }
+            .total-row { font-weight: 800; background: #ecfdf5; }
+            .sig-section { display: flex; justify-content: space-between; margin-top: 40px; text-align: center; font-size: 10pt; }
+            .sig-box { width: 40%; }
+            .sig-space { height: 60px; }
           </style>
         </head>
         <body>
           <div class="header">
-            <h1 class="title">BUKTI PENCAIRAN KOMISI AGEN</h1>
-            <div class="subtitle">${settings.name} ${settings.phone ? '• ' + settings.phone : ''}</div>
+            <h1>${settings.name}</h1>
+            <p>${settings.address || ''} • Telp: ${settings.phone || ''}</p>
           </div>
+          <div class="title">SLIP BUKTI PEMBAYARAN KOMISI MITRA</div>
+          <table class="info-table">
+            <tr>
+              <td width="20%"><strong>Kode Voucher:</strong></td>
+              <td width="30%">${c.bookingCode}</td>
+              <td width="20%"><strong>Tanggal:</strong></td>
+              <td width="30%">${formatDate(c.departureDate)}</td>
+            </tr>
+            <tr>
+              <td><strong>Driver / Guide:</strong></td>
+              <td>${c.agentName} (${c.agentCategory || 'Driver'})</td>
+              <td><strong>Kontak WA:</strong></td>
+              <td>${agentObj?.phone || '-'}</td>
+            </tr>
+            <tr>
+              <td><strong>Rekening Bank:</strong></td>
+              <td colspan="3">${agentObj ? `${agentObj.bankName} - ${agentObj.accountNumber} (a.n ${agentObj.holderName})` : '-'}</td>
+            </tr>
+          </table>
 
-          <div class="grid">
-            <div class="box">
-              <div class="box-title">INFORMASI AGEN MITRA</div>
-              <div><strong>Nama Agen:</strong> ${c.agentName}</div>
-              <div><strong>Kategori:</strong> ${c.agentCategory || '-'}</div>
-              <div><strong>No. WA:</strong> ${agent?.phone || '-'}</div>
-              <div><strong>Rekening:</strong> ${agent?.bankName || '-'} ${agent?.accountNumber || ''} (a.n ${agent?.holderName || '-'})</div>
-            </div>
-            <div class="box">
-              <div class="box-title">Rincian PEMESANAN</div>
-              <div><strong>Kode Booking:</strong> ${c.bookingCode}</div>
-              <div><strong>Nama Turis/Grup:</strong> ${c.touristName} (${c.paxCount} Pax)</div>
-              <div><strong>Paket Wisata:</strong> ${c.tourPackage}</div>
-              <div><strong>Tgl Keberangkatan:</strong> ${formatDate(c.departureDate)}</div>
-            </div>
-          </div>
-
-          <table>
+          <table class="table">
             <thead>
               <tr>
-                <th>Deskripsi Skema Komisi</th>
-                <th class="text-right">Total Nilai Penjualan</th>
-                <th class="text-right">Komisi Terhitung</th>
+                <th>Keterangan Transaksi / Wisatawan</th>
+                <th>Pax</th>
+                <th style="text-align: right;">Total Belanja Toko</th>
+                <th style="text-align: center;">Skema Komisi</th>
+                <th style="text-align: right;">Komisi Diperoleh</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td>
-                  ${c.tourPackage} (${c.paxCount} Pax)<br/>
-                  <small style="color: #64748b;">Skema: ${c.commissionMethod === CommissionMethod.PERCENTAGE ? `${c.commissionRate}% dari Nilai Penjualan` : c.commissionMethod === CommissionMethod.FLAT_PER_PAX ? `Rp ${c.commissionRate.toLocaleString('id-ID')}/pax` : `Rp ${c.commissionRate.toLocaleString('id-ID')}/grup`}</small>
+                  <strong>${c.touristName}</strong><br/>
+                  <span style="font-size: 9pt; color: #64748b;">${c.tourPackage}</span>
                 </td>
-                <td class="text-right">${formatIDR(c.totalSales)}</td>
-                <td class="text-right" style="font-weight: bold; color: #d97706;">${formatIDR(c.totalCommission)}</td>
+                <td>${c.paxCount} Pax</td>
+                <td style="text-align: right;">${formatIDR(c.totalSales)}</td>
+                <td style="text-align: center;">
+                  ${c.commissionMethod === CommissionMethod.PERCENTAGE ? `${c.commissionRate}%` : formatIDR(c.commissionRate)}
+                </td>
+                <td style="text-align: right; font-weight: bold; color: #059669;">${formatIDR(c.totalCommission)}</td>
               </tr>
               <tr class="total-row">
-                <td colspan="2">TOTAL KOMISI DICAIRKAN</td>
-                <td class="text-right" style="color: #b45309;">${formatIDR(c.totalCommission)}</td>
+                <td colspan="4" style="text-align: right;">TOTAL KOMISI DITERIMA:</td>
+                <td style="text-align: right; font-size: 11pt; color: #047857;">${formatIDR(c.totalCommission)}</td>
               </tr>
             </tbody>
           </table>
 
-          <div style="margin-top: 16px; font-size: 9pt; color: #475569;">
-            <strong>Status Pembayaran:</strong> ${c.status === 'PAID' ? 'LUNAS (SUDAH DICAIRKAN)' : 'PENDING'}<br/>
-            ${c.paymentDate ? `<strong>Tanggal Pencairan:</strong> ${formatDate(c.paymentDate)}<br/>` : ''}
-            ${c.bankName ? `<strong>Sumber Pembayaran:</strong> ${c.bankName}<br/>` : ''}
+          <div style="font-size: 9pt; color: #64748b;">
+            <strong>Status:</strong> ${c.status === 'PAID' ? 'LUNAS (SUDAH DIBAYAR)' : 'PENDING'}<br/>
+            ${c.paymentDate ? `<strong>Tanggal Bayar:</strong> ${formatDate(c.paymentDate)}<br/>` : ''}
           </div>
 
           <div class="sig-section">
             <div class="sig-box">
-              <div>Penerima (Agen)</div>
+              <div>Penerima (Driver / Guide)</div>
               <div class="sig-space"></div>
               <div>( ${c.agentName} )</div>
             </div>
             <div class="sig-box">
-              <div>Kasir / Admin</div>
+              <div>Kasir / Manajemen</div>
               <div class="sig-space"></div>
               <div>( ${currentUser?.name || settings.name} )</div>
             </div>
@@ -528,24 +674,53 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
   };
 
   return (
-    <div className="space-y-6 animate-fade-in min-h-[101vh]">
-      {/* Header & Controls Bar */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap justify-between items-center gap-4 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-          {/* Navigation Tabs */}
-          <div className="flex gap-2 p-1 bg-slate-100/80 rounded-xl">
+    <div className="space-y-6 animate-fade-in p-2 md:p-0">
+      {/* Header Bar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-4 print:hidden">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-amber-600 text-white rounded-xl shadow-md shadow-amber-600/20">
+              <BadgePercent size={22} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                Manajemen Target & Komisi Driver / Guide
+                <span className="text-[11px] font-extrabold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Partner System
+                </span>
+              </h1>
+              <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+                Hitung otomatis komisi yang didapatkan Driver & Guide, pantau target bulanan, dan kelola bonus insentif
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Switcher & Top Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-0.5 border border-slate-200 shadow-2xs">
+            <button
+              onClick={() => setActiveTab('targets')}
+              className={`flex items-center gap-1.5 px-3.5 py-2 font-black text-xs rounded-lg transition-all ${activeTab === 'targets'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+            >
+              <Target size={14} />
+              <span>1. Target & Komisi Driver</span>
+            </button>
+
             <button
               onClick={() => setActiveTab('commissions')}
-              className={`flex items-center gap-2 px-4 py-2 font-semibold text-xs rounded-lg transition-all ${
-                activeTab === 'commissions'
-                  ? 'bg-amber-600 text-white shadow-md'
+              className={`flex items-center gap-1.5 px-3.5 py-2 font-black text-xs rounded-lg transition-all ${activeTab === 'commissions'
+                  ? 'bg-amber-600 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-              }`}
+                }`}
             >
-              <BadgePercent size={16} />
-              <span>Transaksi & Komisi</span>
+              <BadgePercent size={14} />
+              <span>2. Riwayat Booking</span>
               {commissions.length > 0 && (
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${activeTab === 'commissions' ? 'bg-amber-700 text-amber-100' : 'bg-slate-200 text-slate-700'}`}>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${activeTab === 'commissions' ? 'bg-amber-700 text-amber-100' : 'bg-slate-200 text-slate-700'}`}>
                   {commissions.length}
                 </span>
               )}
@@ -553,111 +728,388 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
 
             <button
               onClick={() => setActiveTab('agents')}
-              className={`flex items-center gap-2 px-4 py-2 font-semibold text-xs rounded-lg transition-all ${
-                activeTab === 'agents'
-                  ? 'bg-amber-600 text-white shadow-md'
+              className={`flex items-center gap-1.5 px-3.5 py-2 font-black text-xs rounded-lg transition-all ${activeTab === 'agents'
+                  ? 'bg-amber-600 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-              }`}
+                }`}
             >
-              <Users size={16} />
-              <span>Profil Agen Mitra</span>
+              <Users size={14} />
+              <span>3. Data Mitra</span>
               {agents.length > 0 && (
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${activeTab === 'agents' ? 'bg-amber-700 text-amber-100' : 'bg-slate-200 text-slate-700'}`}>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${activeTab === 'agents' ? 'bg-amber-700 text-amber-100' : 'bg-slate-200 text-slate-700'}`}>
                   {agents.length}
                 </span>
               )}
             </button>
           </div>
 
-          {/* Top Right Actions */}
-          <div className="flex items-center gap-2">
-            {activeTab === 'commissions' ? (
-              <>
-                <button
-                  onClick={handleExportCommissionsExcel}
-                  className="text-xs flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl text-emerald-700 hover:bg-emerald-100 font-medium transition-colors shadow-sm"
-                >
-                  <FileSpreadsheet size={15} /> Excel
-                </button>
-                <button
-                  onClick={handleExportCommissionsCSV}
-                  className="text-xs flex items-center gap-1.5 bg-white border border-slate-300 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 font-medium transition-colors shadow-sm"
-                >
-                  <Download size={15} /> CSV
-                </button>
-                <button
-                  onClick={() => handleOpenCommissionModal()}
-                  className="text-xs flex items-center gap-1.5 bg-amber-600 text-white px-4 py-2 rounded-xl shadow-md hover:bg-amber-700 font-bold transition-colors"
-                >
-                  <Plus size={16} /> Catat Booking & Komisi
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => handleOpenAgentModal()}
-                className="text-xs flex items-center gap-1.5 bg-amber-600 text-white px-4 py-2 rounded-xl shadow-md hover:bg-amber-700 font-bold transition-colors"
-              >
-                <Plus size={16} /> Tambah Agen Baru
-              </button>
-            )}
+          <button
+            onClick={() => handleOpenAgentModal()}
+            className="flex items-center gap-1.5 bg-slate-900 text-white px-3.5 py-2 rounded-xl hover:bg-slate-800 transition-all text-xs font-bold shadow-2xs"
+          >
+            <Plus size={15} /> Tambah Mitra
+          </button>
+          <button
+            onClick={() => handleOpenCommissionModal()}
+            className="flex items-center gap-1.5 bg-amber-600 text-white px-3.5 py-2 rounded-xl hover:bg-amber-700 transition-all text-xs font-black shadow-md shadow-amber-600/20 active:scale-95"
+          >
+            <Plus size={15} /> Catat Komisi Manual
+          </button>
+        </div>
+      </div>
+
+      {/* Summary KPI Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Total Komisi Berjalan</p>
+            <h3 className="text-xl font-black text-emerald-600 font-mono mt-1">{formatIDR(overallTargetSummary.totalEarned)}</h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">Komisi pokok & bonus bulan {months[targetMonth]}</p>
+          </div>
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+            <Trophy size={24} />
           </div>
         </div>
 
-        {/* Dashboard Metric Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Komisi Terbayar</p>
-              <h3 className="text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(metrics.totalPaid)}</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">Sudah Dicairkan</p>
-            </div>
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-              <CheckCircle2 size={24} />
-            </div>
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Komisi Siap Cair (Pending)</p>
+            <h3 className="text-xl font-black text-amber-600 font-mono mt-1">{formatIDR(overallTargetSummary.totalPending)}</h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">Menunggu pencairan kasir</p>
           </div>
-
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Komisi Pending</p>
-              <h3 className="text-lg font-extrabold text-amber-600 mt-1">{formatIDR(metrics.totalPending)}</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">Belum Dicairkan</p>
-            </div>
-            <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
-              <Clock size={24} />
-            </div>
+          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+            <Clock size={24} />
           </div>
+        </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Penjualan Tur</p>
-              <h3 className="text-lg font-extrabold text-blue-600 mt-1">{formatIDR(metrics.totalSalesAmount)}</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">{metrics.totalBookingsCount} Booking ({metrics.totalPax} Pax)</p>
-            </div>
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-              <Briefcase size={24} />
-            </div>
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Omzet Belanja Tamu</p>
+            <h3 className="text-xl font-black text-blue-600 font-mono mt-1">{formatIDR(overallTargetSummary.totalSales)}</h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">Dibawa oleh Driver & Guide</p>
           </div>
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+            <DollarSign size={24} />
+          </div>
+        </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Agen Mitra Aktif</p>
-              <h3 className="text-lg font-extrabold text-indigo-600 mt-1">{metrics.activeAgentsCount} Agen</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">Driver, Guide & Biro Travel</p>
-            </div>
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
-              <Users size={24} />
-            </div>
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Mitra Tembus Target</p>
+            <h3 className="text-xl font-black text-purple-700 font-mono mt-1">
+              {overallTargetSummary.achieversCount} / {overallTargetSummary.totalDrivers} <span className="text-xs font-normal text-slate-500">Driver</span>
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">Mencapai target omzet bulanan</p>
+          </div>
+          <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
+            <Award size={24} />
           </div>
         </div>
       </div>
 
-      {/* --- TAB 1: TRANSAKSI & KOMISI PEMESANAN --- */}
+      {/* ======================================================== */}
+      {/* TAB 1: TARGET & ESTIMASI KOMISI PER DRIVER / GUIDE */}
+      {/* ======================================================== */}
+      {activeTab === 'targets' && (
+        <div className="space-y-6">
+          {/* Top Month Filter & Simulator Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left 2 Cols: Target Table Header & Filter */}
+            <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                    <Target size={16} className="text-amber-600" />
+                    Pencapaian Target & Estimasi Komisi Driver / Guide
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Evaluasi omzet belanja yang dibawa oleh Driver & Guide beserta bonus target
+                  </p>
+                </div>
+
+                {/* Month & Year Filter */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl p-1 text-xs">
+                  <Calendar size={13} className="text-amber-600 ml-1" />
+                  <select
+                    value={targetMonth}
+                    onChange={e => setTargetMonth(Number(e.target.value))}
+                    className="bg-transparent font-extrabold text-slate-800 outline-none cursor-pointer"
+                  >
+                    {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                  </select>
+                  <span className="text-slate-300">/</span>
+                  <select
+                    value={targetYear}
+                    onChange={e => setTargetYear(Number(e.target.value))}
+                    className="bg-transparent font-extrabold text-slate-800 outline-none cursor-pointer"
+                  >
+                    {[targetYear - 1, targetYear, targetYear + 1].map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Progress Highlights */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Periode Evaluasi</span>
+                  <p className="font-extrabold text-slate-800 font-mono mt-0.5">{months[targetMonth]} {targetYear}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Total Booking Tamu</span>
+                  <p className="font-extrabold text-blue-700 font-mono mt-0.5">
+                    {driverTargetMetrics.reduce((s, d) => s + d.bookingsCount, 0)} Kedatangan
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Total Tamu (Pax)</span>
+                  <p className="font-extrabold text-purple-700 font-mono mt-0.5">
+                    {driverTargetMetrics.reduce((s, d) => s + d.totalPaxBrought, 0)} Wisatawan
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Right 1 Col: Live Commission Calculator Simulator */}
+            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-2xl shadow-md flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-black text-xs text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Calculator size={14} /> Kalkulator Cepat Komisi
+                  </h4>
+                  <span className="text-[10px] bg-white/10 text-white px-2 py-0.5 rounded-full font-mono">
+                    Live Simulator
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 mb-3">
+                  Hitung komisi instan yang akan diperoleh Driver saat membawa rombongan belanja
+                </p>
+
+                <div className="space-y-2.5 text-xs">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Pilih Driver / Guide:</label>
+                    <select
+                      value={calcAgentId}
+                      onChange={e => setCalcAgentId(e.target.value)}
+                      className="w-full mt-1 px-2.5 py-1.5 rounded-lg bg-slate-700/80 border border-slate-600 text-white outline-none font-medium"
+                    >
+                      {agents.map(a => (
+                        <option key={a.id} value={a.id}>{a.name} ({a.category})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Belanja Toko (Rp):</label>
+                      <input
+                        type="number"
+                        value={calcSalesAmount}
+                        onChange={e => setCalcSalesAmount(e.target.value)}
+                        className="w-full mt-1 px-2.5 py-1.5 rounded-lg bg-slate-700/80 border border-slate-600 text-white outline-none font-mono font-bold"
+                        placeholder="1500000"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Jumlah Pax:</label>
+                      <input
+                        type="number"
+                        value={calcPaxCount}
+                        onChange={e => setCalcPaxCount(e.target.value)}
+                        className="w-full mt-1 px-2.5 py-1.5 rounded-lg bg-slate-700/80 border border-slate-600 text-white outline-none font-mono font-bold"
+                        placeholder="2"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Result Preview Box */}
+              <div className="mt-3 pt-3 border-t border-slate-700">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-300">Skema: <strong>{simulatorResult.schemeText}</strong></span>
+                  <span className="text-[10px] text-amber-400 font-mono font-bold">
+                    {simulatorResult.willHitTarget ? '🎉 Tembus Target + Bonus' : 'Target Aktif'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-baseline mt-1">
+                  <span className="text-xs text-slate-400">Komisi Didapat:</span>
+                  <span className="text-lg font-black text-emerald-400 font-mono">
+                    {formatIDR(simulatorResult.commissionAmt)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Driver Target Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3">
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-800">
+                  Daftar Target & Komisi Seluruh Driver & Guide ({driverTargetMetrics.length} Mitra)
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">Status pencapaian target, komisi pokok, dan bonus insentif</p>
+              </div>
+
+              <div className="text-xs font-bold font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl">
+                Periode: {months[targetMonth]} {targetYear}
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-100 text-slate-600 font-extrabold uppercase tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="p-3.5 text-center w-12">No</th>
+                    <th className="p-3.5 min-w-[200px]">Driver / Guide</th>
+                    <th className="p-3.5 w-32">Skema Komisi</th>
+                    <th className="p-3.5 min-w-[180px]">Realisasi vs Target Omzet</th>
+                    <th className="p-3.5 text-center w-28">Pencapaian</th>
+                    <th className="p-3.5 text-right w-36">Komisi Berjalan</th>
+                    <th className="p-3.5 text-right w-32">Bonus Target</th>
+                    <th className="p-3.5 text-right w-36 text-emerald-800">Total Didapatkan</th>
+                    <th className="p-3.5 text-center w-36">Aksi Cepat</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {driverTargetMetrics.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="p-8 text-center text-slate-400 italic">
+                        Belum ada data driver/guide terdaftar. Silakan tambahkan mitra baru.
+                      </td>
+                    </tr>
+                  ) : driverTargetMetrics.map((item, idx) => (
+                    <tr key={item.agent.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="p-3 text-center font-mono font-bold text-slate-400">{idx + 1}</td>
+                      <td className="p-3">
+                        <div className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                          <Users size={14} className="text-amber-600 shrink-0" />
+                          {item.agent.name}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-bold">
+                            {item.agent.category || 'Driver'}
+                          </span>
+                          <a
+                            href={`https://wa.me/${item.agent.phone.replace(/^0/, '62').replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5"
+                          >
+                            <Phone size={10} /> {item.agent.phone}
+                          </a>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                          {item.agent.bankName} - {item.agent.accountNumber}
+                        </div>
+                      </td>
+
+                      <td className="p-3 text-slate-700">
+                        <span className="font-bold text-slate-800">
+                          {item.agent.commissionMethod === CommissionMethod.PERCENTAGE
+                            ? `${item.agent.commissionRate || 10}% Belanja`
+                            : item.agent.commissionMethod === CommissionMethod.FLAT_PER_PAX
+                              ? `${formatIDR(item.agent.commissionRate || 25000)} / Pax`
+                              : `${formatIDR(item.agent.commissionRate || 100000)} / Grup`
+                          }
+                        </span>
+                      </td>
+
+                      <td className="p-3">
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[10px] font-mono">
+                            <span className="font-bold text-slate-900">{formatIDR(item.totalSalesBrought)}</span>
+                            <span className="text-slate-400">Target: {formatIDR(item.targetRevenue)}</span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden flex">
+                            <div
+                              className={`h-full rounded-full transition-all ${item.revenueProgress >= 100 ? 'bg-emerald-500' : item.revenueProgress >= 50 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                              style={{ width: `${Math.min(100, item.revenueProgress)}%` }}
+                            />
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            {item.bookingsCount} booking • {item.totalPaxBrought} pax
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="p-3 text-center font-mono">
+                        {item.revenueProgress >= 100 ? (
+                          <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                            <CheckCircle2 size={11} /> {item.revenueProgress.toFixed(0)}% (Capai)
+                          </span>
+                        ) : item.revenueProgress > 0 ? (
+                          <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                            {item.revenueProgress.toFixed(0)}%
+                          </span>
+                        ) : (
+                          <span className="bg-slate-100 text-slate-500 text-[10px] px-2 py-0.5 rounded-full">
+                            0%
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="p-3 text-right font-mono font-bold text-slate-800">
+                        {formatIDR(item.totalCommissionEarned)}
+                        <div className="text-[10px] text-slate-400">
+                          {item.pendingCommission > 0 ? `Pending: ${formatIDR(item.pendingCommission)}` : 'Lunas'}
+                        </div>
+                      </td>
+
+                      <td className="p-3 text-right font-mono">
+                        {item.targetBonus > 0 ? (
+                          <span className="font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            +{formatIDR(item.targetBonus)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
+                      </td>
+
+                      <td className="p-3 text-right font-mono font-black text-emerald-700 text-sm">
+                        {formatIDR(item.totalReceivableByDriver)}
+                      </td>
+
+                      <td className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAgentModal(item.agent)}
+                            className="p-1.5 text-slate-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                            title="Atur Target & Skema Komisi"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleOpenCommissionModal();
+                              setCommissionForm(prev => ({ ...prev, agentId: item.agent.id }));
+                            }}
+                            className="px-2 py-1 bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 rounded-lg text-[10px] font-bold transition-colors"
+                            title="Catat Transaksi Belanja untuk Driver ini"
+                          >
+                            + Transaksi
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 2: RIWAYAT TRANSAKSI & KOMISI */}
+      {/* ======================================================== */}
       {activeTab === 'commissions' && (
         <div className="space-y-4">
           {/* Filters Bar */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3 flex-1">
-              {/* Departure Date Filter */}
               <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200 text-xs">
                 <Calendar size={14} className="text-slate-400 ml-1" />
                 <input
@@ -665,7 +1117,6 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
                   className="bg-transparent border-0 outline-none text-slate-700 text-xs"
                   value={startDate}
                   onChange={e => setStartDate(e.target.value)}
-                  placeholder="Awal"
                 />
                 <span className="text-slate-400">-</span>
                 <input
@@ -673,11 +1124,9 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
                   className="bg-transparent border-0 outline-none text-slate-700 text-xs"
                   value={endDate}
                   onChange={e => setEndDate(e.target.value)}
-                  placeholder="Akhir"
                 />
               </div>
 
-              {/* Status Filter Dropdown */}
               <select
                 className="px-3.5 py-2 bg-white border border-slate-300 rounded-xl outline-none text-xs text-slate-700 font-medium"
                 value={statusFilter}
@@ -689,425 +1138,427 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
                 <option value={CommissionStatus.CANCELLED}>Dibatalkan</option>
               </select>
 
-              {/* Agent Filter Dropdown */}
               <select
                 className="px-3.5 py-2 bg-white border border-slate-300 rounded-xl outline-none text-xs text-slate-700 font-medium max-w-[200px]"
                 value={agentFilter}
                 onChange={e => setAgentFilter(e.target.value)}
               >
-                <option value="">Semua Agen</option>
+                <option value="">Semua Driver / Guide</option>
                 {agents.map(a => (
                   <option key={a.id} value={a.id}>{a.name} ({a.category})</option>
                 ))}
               </select>
 
-              {/* Search Box */}
               <div className="relative flex-1 min-w-[200px]">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Cari Kode Booking, Turis, Paket, Agen..."
-                  className="w-full pl-9 pr-8 py-2 bg-white border border-slate-300 rounded-xl outline-none text-xs text-slate-700"
+                  placeholder="Cari kode booking, nama tamu, atau driver..."
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
-                {searchQuery && (
-                  <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    <X size={14} />
-                  </button>
-                )}
               </div>
             </div>
-
-            {(startDate || endDate || statusFilter || agentFilter || searchQuery) && (
-              <button
-                onClick={() => {
-                  setStartDate('');
-                  setEndDate('');
-                  setStatusFilter('');
-                  setAgentFilter('');
-                  setSearchQuery('');
-                }}
-                className="text-xs text-amber-700 hover:text-amber-900 flex items-center gap-1 font-semibold"
-              >
-                <RotateCcw size={13} /> Reset Filter
-              </button>
-            )}
           </div>
 
           {/* Commissions Table */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 text-xs flex justify-between items-center">
-              <span className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                <BadgePercent className="text-amber-600" size={18} />
-                Daftar Transaksi & Komisi Agen ({filteredCommissions.length})
-              </span>
-              <span className="text-amber-700 font-extrabold text-sm">
-                Total Komisi: {formatIDR(filteredCommissions.reduce((s, c) => s + c.totalCommission, 0))}
-              </span>
-            </div>
-
-            <div className="overflow-x-auto touch-scroll">
-              <table className="w-full text-left text-xs min-w-[640px]">
-                <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-100 text-slate-600 font-extrabold uppercase tracking-wider border-b border-slate-200">
                   <tr>
-                    <th className="p-3.5 whitespace-nowrap">Kode & Keberangkatan</th>
-                    <th className="p-3.5 whitespace-nowrap">Wisatawan / Grup</th>
-                    <th className="p-3.5 whitespace-nowrap">Paket Wisata</th>
-                    <th className="p-3.5 whitespace-nowrap">Agen Referensi</th>
-                    <th className="p-3.5 whitespace-nowrap">Total Penjualan</th>
-                    <th className="p-3.5 whitespace-nowrap">Skema Komisi</th>
-                    <th className="p-3.5 bg-amber-50/50 text-amber-900 whitespace-nowrap">Total Komisi</th>
-                    <th className="p-3.5 whitespace-nowrap">Status</th>
-                    <th className="p-3.5 text-center whitespace-nowrap">Aksi & Pencairan</th>
+                    <th className="p-3.5 w-12 text-center">No</th>
+                    <th className="p-3.5 w-32">Kode Booking</th>
+                    <th className="p-3.5 min-w-[160px]">Driver / Guide</th>
+                    <th className="p-3.5 min-w-[160px]">Nama Tamu / Rombongan</th>
+                    <th className="p-3.5 w-28">Tanggal</th>
+                    <th className="p-3.5 text-right w-32">Belanja Toko</th>
+                    <th className="p-3.5 text-right w-32 text-emerald-700">Komisi</th>
+                    <th className="p-3.5 text-center w-28">Status</th>
+                    <th className="p-3.5 text-center w-36">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredCommissions.length === 0 && (
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {filteredCommissions.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="p-8 text-center text-slate-400">Tidak ada data pemesanan atau komisi agen ditemukan.</td>
+                      <td colSpan={9} className="p-8 text-center text-slate-400 italic">
+                        Tidak ada riwayat komisi yang sesuai dengan filter.
+                      </td>
                     </tr>
-                  )}
-                  {filteredCommissions.slice(0, visibleCount).map(c => {
-                    const agent = agents.find(a => a.id === c.agentId);
-                    return (
-                      <tr key={c.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-3.5 whitespace-nowrap">
-                          <div className="font-mono font-bold text-slate-900">{c.bookingCode}</div>
-                          <div className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
-                            <Calendar size={11} /> {formatDateDateOnly(c.departureDate)}
-                          </div>
-                        </td>
-                        <td className="p-3.5 whitespace-nowrap">
-                          <div className="font-bold text-slate-800">{c.touristName}</div>
-                          <div className="text-[10px] text-slate-500 font-mono">{c.paxCount} Pax / Peserta</div>
-                        </td>
-                        <td className="p-3.5 whitespace-nowrap max-w-[180px] truncate">
-                          <div className="font-semibold text-slate-700">{c.tourPackage}</div>
-                        </td>
-                        <td className="p-3.5 whitespace-nowrap">
-                          <div className="font-semibold text-amber-900">{c.agentName}</div>
-                          <div className="text-[10px] text-slate-400 font-medium">{c.agentCategory || agent?.category || 'Agen'}</div>
-                        </td>
-                        <td className="p-3.5 font-bold text-slate-800 whitespace-nowrap">
-                          {formatIDR(c.totalSales)}
-                        </td>
-                        <td className="p-3.5 text-slate-600 whitespace-nowrap">
-                          <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded font-mono text-[10px] font-bold">
-                            {c.commissionMethod === CommissionMethod.PERCENTAGE ? `${c.commissionRate}%` : c.commissionMethod === CommissionMethod.FLAT_PER_PAX ? `Rp ${c.commissionRate.toLocaleString('id-ID')}/pax` : `Rp ${c.commissionRate.toLocaleString('id-ID')}/grup`}
+                  ) : filteredCommissions.slice(0, visibleCount).map((c, idx) => (
+                    <tr key={c.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="p-3 text-center font-mono font-bold text-slate-400">{idx + 1}</td>
+                      <td className="p-3 font-mono font-extrabold text-slate-900">{c.bookingCode}</td>
+                      <td className="p-3">
+                        <div className="font-bold text-slate-900">{c.agentName}</div>
+                        <div className="text-[10px] text-slate-400">{c.agentCategory || 'Driver'}</div>
+                      </td>
+                      <td className="p-3">
+                        <div className="font-bold text-slate-800">{c.touristName}</div>
+                        <div className="text-[10px] text-slate-400">{c.paxCount} Pax • {c.tourPackage}</div>
+                      </td>
+                      <td className="p-3 font-mono text-slate-600">{formatDate(c.departureDate)}</td>
+                      <td className="p-3 text-right font-mono font-bold text-slate-800">{formatIDR(c.totalSales)}</td>
+                      <td className="p-3 text-right font-mono font-extrabold text-emerald-700">{formatIDR(c.totalCommission)}</td>
+                      <td className="p-3 text-center">
+                        {c.status === CommissionStatus.PAID ? (
+                          <span className="bg-emerald-100 text-emerald-800 font-extrabold text-[10px] px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                            <CheckCircle2 size={10} /> Lunas
                           </span>
-                        </td>
-                        <td className="p-3.5 bg-amber-50/20 whitespace-nowrap">
-                          <span className="font-extrabold text-amber-700 text-xs">
-                            {formatIDR(c.totalCommission)}
+                        ) : c.status === CommissionStatus.PENDING ? (
+                          <span className="bg-amber-100 text-amber-800 font-extrabold text-[10px] px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                            <Clock size={10} /> Pending
                           </span>
-                        </td>
-                        <td className="p-3.5 whitespace-nowrap">
-                          <span className={`px-2.5 py-0.5 rounded text-[10px] font-extrabold border ${
-                            c.status === CommissionStatus.PAID
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : c.status === CommissionStatus.PENDING
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-rose-50 text-rose-700 border-rose-200'
-                          }`}>
-                            {c.status === CommissionStatus.PAID ? 'LUNAS' : c.status === CommissionStatus.PENDING ? 'PENDING' : 'BATAL'}
+                        ) : (
+                          <span className="bg-rose-100 text-rose-800 font-extrabold text-[10px] px-2 py-0.5 rounded-full">
+                            Batal
                           </span>
-                        </td>
-                        <td className="p-3.5 text-center whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-1.5">
-                            {c.status === CommissionStatus.PENDING && (
-                              <button
-                                onClick={() => {
-                                  setDisbursingCommission(c);
-                                  setDisbursementForm({
-                                    paymentDate: new Date().toISOString().split('T')[0],
-                                    paymentMethod: PaymentMethod.CASH,
-                                    bankId: '',
-                                    notes: ''
-                                  });
-                                }}
-                                className="px-2 py-1 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-[11px] font-bold shadow-xs transition-colors flex items-center gap-1"
-                              >
-                                <DollarSign size={12} /> Cairkan
-                              </button>
-                            )}
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {c.status === CommissionStatus.PENDING && (
                             <button
-                              onClick={() => handlePrintVoucher(c)}
-                              className="px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-semibold border border-amber-200 transition-colors flex items-center gap-1"
-                              title="Cetak Bukti Voucher"
+                              type="button"
+                              onClick={() => handleOpenDisbursementModal(c)}
+                              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition-colors shadow-2xs"
+                              title="Cairkan Komisi"
                             >
-                              <Printer size={12} /> Bukti
+                              Bayar
                             </button>
-                            <button
-                              onClick={() => handleOpenCommissionModal(c)}
-                              className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
-                              title="Edit Transaksi"
-                            >
-                              <Edit3 size={13} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteCommission(c.id, c.bookingCode)}
-                              className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition-colors"
-                              title="Hapus Transaksi"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handlePrintVoucher(c)}
+                            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Cetak Slip Bukti Komisi"
+                          >
+                            <Printer size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCommissionModal(c)}
+                            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Edit Komisi"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCommission(c.id, c.bookingCode)}
+                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Hapus Komisi"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
+
+            {filteredCommissions.length > visibleCount && (
+              <div className="p-4 border-t border-slate-100 text-center">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount(prev => prev + 20)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
+                >
+                  Muat Lebih Banyak ({filteredCommissions.length - visibleCount} tersisa)
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* --- TAB 2: PROFIL & MASTER AGEN MITRA --- */}
+      {/* ======================================================== */}
+      {/* TAB 3: PROFIL MITRA DRIVER & GUIDE */}
+      {/* ======================================================== */}
       {activeTab === 'agents' && (
         <div className="space-y-4">
-          {/* Agent Filters Bar */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+            <div className="flex items-center gap-3 flex-1">
               <select
-                className="px-3.5 py-2 bg-white border border-slate-300 rounded-xl outline-none text-xs text-slate-700 font-medium"
                 value={agentCategoryFilter}
                 onChange={e => setAgentCategoryFilter(e.target.value)}
+                className="px-3.5 py-2 bg-white border border-slate-300 rounded-xl outline-none text-xs text-slate-700 font-medium"
               >
-                <option value="">Semua Kategori Agen</option>
-                <option value="Driver / Guide">Driver / Guide</option>
-                <option value="Biro Travel">Biro Travel / Agency</option>
-                <option value="Freelancer">Freelancer / Sales</option>
-                <option value="Hotel Mitra">Hotel / Homestay Mitra</option>
-                <option value="Lainnya">Lainnya</option>
+                <option value="">Semua Kategori</option>
+                <option value="Driver">Driver</option>
+                <option value="Tour Guide">Tour Guide</option>
+                <option value="Driver & Guide">Driver & Guide</option>
+                <option value="Biro Travel / Agency">Biro Travel / Agency</option>
               </select>
 
-              <div className="relative flex-1 min-w-[200px]">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <div className="relative flex-1 max-w-[300px]">
+                <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Cari nama agen, WhatsApp, bank, no rekening..."
-                  className="w-full pl-9 pr-8 py-2 bg-white border border-slate-300 rounded-xl outline-none text-xs text-slate-700"
+                  placeholder="Cari nama, no WA, atau no rekening..."
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
                   value={agentSearchQuery}
                   onChange={e => setAgentSearchQuery(e.target.value)}
                 />
-                {agentSearchQuery && (
-                  <button onClick={() => setAgentSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    <X size={14} />
-                  </button>
-                )}
               </div>
             </div>
+
+            <button
+              onClick={() => handleOpenAgentModal()}
+              className="px-4 py-2 bg-amber-600 text-white rounded-xl font-bold text-xs hover:bg-amber-700 transition-colors shadow-sm flex items-center gap-1.5"
+            >
+              <Plus size={15} /> Tambah Mitra Baru
+            </button>
           </div>
 
-          {/* Agents Grid Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAgents.length === 0 && (
-              <div className="col-span-full bg-white p-12 rounded-2xl border border-slate-200 text-center text-slate-400">
-                Belum ada data profil agen mitra ditemukan. Klik "Tambah Agen Baru" untuk mendaftarkan mitra.
-              </div>
-            )}
-            {filteredAgents.map(a => {
-              const agentCommissions = commissions.filter(c => c.agentId === a.id);
-              const totalEarned = agentCommissions
-                .filter(c => c.status === CommissionStatus.PAID)
-                .reduce((s, c) => s + c.totalCommission, 0);
-
-              const waPhone = a.phone.replace(/[^0-9]/g, '');
-              const waLink = waPhone ? `https://wa.me/${waPhone.startsWith('0') ? '62' + waPhone.substring(1) : waPhone}` : '#';
-
-              return (
-                <div key={a.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4">
-                  <div>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold uppercase tracking-wider">
-                          {a.category}
-                        </span>
-                        <h3 className="font-extrabold text-base text-slate-900 mt-1.5">{a.name}</h3>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleOpenAgentModal(a)}
-                          className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                        >
-                          <Edit3 size={15} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteAgent(a.id, a.name)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
+            {filteredAgents.map(agent => (
+              <div key={agent.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:border-amber-300 transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-slate-900">{agent.name}</h4>
+                      <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md font-bold mt-1 inline-block">
+                        {agent.category || 'Driver'}
+                      </span>
                     </div>
-
-                    <div className="space-y-2 mt-3 text-xs text-slate-600">
-                      <div className="flex items-center gap-2">
-                        <Phone size={14} className="text-slate-400 flex-shrink-0" />
-                        <span className="font-mono">{a.phone}</span>
-                        {waLink !== '#' && (
-                          <a href={waLink} target="_blank" rel="noreferrer" className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded font-bold hover:bg-emerald-100">
-                            WA
-                          </a>
-                        )}
-                      </div>
-                      {a.email && (
-                        <div className="flex items-center gap-2">
-                          <Mail size={14} className="text-slate-400 flex-shrink-0" />
-                          <span className="truncate">{a.email}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Bank Info Container */}
-                    <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs">
-                      <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5 mb-1">
-                        <CreditCard size={12} /> Rekening Pencairan
-                      </div>
-                      <div className="font-bold text-slate-800">{a.bankName} - <span className="font-mono">{a.accountNumber}</span></div>
-                      <div className="text-slate-500 text-[11px]">a.n. {a.holderName}</div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleOpenAgentModal(agent)}
+                        className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg"
+                        title="Edit Data Mitra"
+                      >
+                        <Edit3 size={13} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAgent(agent.id, agent.name)}
+                        className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                        title="Hapus Mitra"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Summary Footer */}
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <div>
-                      <div className="text-[10px] text-slate-400 font-medium">Total Booking</div>
-                      <div className="font-bold text-slate-800">{agentCommissions.length} Transaksi</div>
+                  <div className="mt-4 space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-3">
+                    <div className="flex items-center gap-2">
+                      <Phone size={13} className="text-slate-400" />
+                      <a href={`https://wa.me/${agent.phone.replace(/^0/, '62').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="hover:text-emerald-600 font-mono font-medium">
+                        {agent.phone}
+                      </a>
                     </div>
-                    <div className="text-right">
-                      <div className="text-[10px] text-slate-400 font-medium">Komisi Diterima</div>
-                      <div className="font-extrabold text-emerald-600">{formatIDR(totalEarned)}</div>
+                    <div className="flex items-center gap-2">
+                      <CreditCard size={13} className="text-slate-400" />
+                      <span className="font-mono">{agent.bankName} - {agent.accountNumber} ({agent.holderName})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Percent size={13} className="text-slate-400" />
+                      <span>
+                        Skema: <strong>{agent.commissionMethod === CommissionMethod.PERCENTAGE ? `${agent.commissionRate || 10}% Belanja` : formatIDR(agent.commissionRate || 0)}</strong>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Target size={13} className="text-slate-400" />
+                      <span>Target: <strong>{formatIDR(agent.monthlyTargetRevenue || 5000000)}/bln</strong></span>
                     </div>
                   </div>
                 </div>
-              );
-            })}
+
+                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Bonus Target: {agent.targetBonusRate ? formatIDR(agent.targetBonusRate) : '-'}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setActiveTab('targets');
+                      setCalcAgentId(agent.id);
+                    }}
+                    className="text-amber-700 hover:text-amber-800 font-bold text-[11px] flex items-center gap-1"
+                  >
+                    Lihat Kinerja <ChevronRight size={13} />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* --- MODAL FORM PROFIL AGEN --- */}
+      {/* Modal: Tambah / Edit Driver & Guide */}
       {isAgentModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-slate-100">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-scale-up">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                 <Users size={18} className="text-amber-600" />
-                {editingAgent ? 'Edit Profil Agen Mitra' : 'Tambah Profil Agen Mitra'}
+                {editingAgent ? 'Edit Data Driver / Guide' : 'Tambah Mitra Driver / Guide Baru'}
               </h3>
               <button onClick={() => setIsAgentModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveAgent} className="p-5 space-y-4 text-xs">
+            <form onSubmit={handleSaveAgent} className="space-y-3.5 text-xs">
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Nama Agen / Instansi / Pemandu *</label>
+                <label className="block font-bold text-slate-700 mb-1">Nama Lengkap Driver / Guide *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Misal: Budi Driver, Pak Komang Guide"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-amber-500"
-                  value={agentForm.name}
+                  placeholder="Contoh: Bpk. Yonas Tabuni"
+                  value={agentForm.name || ''}
                   onChange={e => setAgentForm({ ...agentForm, name: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 outline-none text-xs font-semibold focus:border-amber-600"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Kontak WhatsApp *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Kategori / Peran *</label>
+                  <select
+                    value={agentForm.category || 'Driver'}
+                    onChange={e => setAgentForm({ ...agentForm, category: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none text-xs font-semibold"
+                  >
+                    <option value="Driver">Driver (Sopir)</option>
+                    <option value="Tour Guide">Tour Guide (Pemandu)</option>
+                    <option value="Driver & Guide">Driver & Guide</option>
+                    <option value="Biro Travel / Agency">Biro Travel / Agency</option>
+                    <option value="Tour Leader">Tour Leader (TL)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">No. WhatsApp / HP *</label>
                   <input
                     type="text"
                     required
                     placeholder="08123456789"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-amber-500"
-                    value={agentForm.phone}
+                    value={agentForm.phone || ''}
                     onChange={e => setAgentForm({ ...agentForm, phone: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Email (Opsional)</label>
-                  <input
-                    type="email"
-                    placeholder="agen@gmail.com"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-amber-500"
-                    value={agentForm.email}
-                    onChange={e => setAgentForm({ ...agentForm, email: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none text-xs font-mono"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Kategori Agen *</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-amber-500"
-                  value={agentForm.category}
-                  onChange={e => setAgentForm({ ...agentForm, category: e.target.value })}
-                >
-                  <option value="Driver / Guide">Driver / Pemandu Wisata</option>
-                  <option value="Biro Travel">Biro Travel / Tour Agency</option>
-                  <option value="Freelancer">Freelancer / Sales Freelance</option>
-                  <option value="Hotel Mitra">Hotel / Homestay Mitra</option>
-                  <option value="Lainnya">Lainnya</option>
-                </select>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-                <div className="font-bold text-slate-700 flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
-                  <CreditCard size={14} className="text-amber-600" /> Detail Rekening Bank Pencairan
-                </div>
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Nama Bank / E-Wallet *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="BCA, Mandiri, BRI, GoPay, Dana"
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg outline-none focus:border-amber-500"
-                    value={agentForm.bankName}
-                    onChange={e => setAgentForm({ ...agentForm, bankName: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
+              {/* Bank Details */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+                <span className="font-extrabold text-[11px] text-slate-700 uppercase tracking-wider block">
+                  Informasi Rekening Bank untuk Pencairan Komisi
+                </span>
+                <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Nomor Rekening *</label>
+                    <label className="text-[10px] text-slate-500 font-bold block mb-1">Nama Bank *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="BCA / BRI / Mandiri"
+                      value={agentForm.bankName || ''}
+                      onChange={e => setAgentForm({ ...agentForm, bankName: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 outline-none text-xs font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-bold block mb-1">No. Rekening *</label>
                     <input
                       type="text"
                       required
                       placeholder="1234567890"
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg outline-none focus:border-amber-500 font-mono"
-                      value={agentForm.accountNumber}
+                      value={agentForm.accountNumber || ''}
                       onChange={e => setAgentForm({ ...agentForm, accountNumber: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 outline-none text-xs font-mono"
                     />
                   </div>
                   <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Atas Nama (Pemilik)</label>
+                    <label className="text-[10px] text-slate-500 font-bold block mb-1">Atas Nama *</label>
                     <input
                       type="text"
-                      placeholder="Nama di buku tabungan"
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg outline-none focus:border-amber-500"
-                      value={agentForm.holderName}
+                      required
+                      placeholder="Nama Pemilik"
+                      value={agentForm.holderName || ''}
                       onChange={e => setAgentForm({ ...agentForm, holderName: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 outline-none text-xs"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end gap-2">
+              {/* Commission Scheme & Target */}
+              <div className="p-3 bg-amber-50/70 rounded-2xl border border-amber-200 space-y-2.5">
+                <span className="font-extrabold text-[11px] text-amber-900 uppercase tracking-wider block">
+                  Skema Komisi & Target Bulanan
+                </span>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-slate-600 font-bold block mb-1">Metode Komisi</label>
+                    <select
+                      value={agentForm.commissionMethod || CommissionMethod.PERCENTAGE}
+                      onChange={e => setAgentForm({ ...agentForm, commissionMethod: e.target.value as CommissionMethod })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 outline-none text-xs bg-white"
+                    >
+                      <option value={CommissionMethod.PERCENTAGE}>% Persentase dari Belanja</option>
+                      <option value={CommissionMethod.FLAT_PER_PAX}>Flat per Orang (Pax)</option>
+                      <option value={CommissionMethod.FLAT_PER_GROUP}>Flat per Rombongan</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-600 font-bold block mb-1">Nilai Komisi (% atau Rp)</label>
+                    <input
+                      type="number"
+                      value={agentForm.commissionRate !== undefined ? agentForm.commissionRate : 10}
+                      onChange={e => setAgentForm({ ...agentForm, commissionRate: Number(e.target.value) })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 outline-none text-xs font-mono font-bold bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] text-slate-600 font-bold block mb-1">Target Omzet (Rp)</label>
+                    <input
+                      type="number"
+                      value={agentForm.monthlyTargetRevenue || 5000000}
+                      onChange={e => setAgentForm({ ...agentForm, monthlyTargetRevenue: Number(e.target.value) })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 outline-none text-xs font-mono bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-600 font-bold block mb-1">Target Pax (Tamu)</label>
+                    <input
+                      type="number"
+                      value={agentForm.monthlyTargetPax || 20}
+                      onChange={e => setAgentForm({ ...agentForm, monthlyTargetPax: Number(e.target.value) })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 outline-none text-xs font-mono bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-600 font-bold block mb-1">Bonus Tembus Target (Rp)</label>
+                    <input
+                      type="number"
+                      value={agentForm.targetBonusRate || 0}
+                      onChange={e => setAgentForm({ ...agentForm, targetBonusRate: Number(e.target.value) })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 outline-none text-xs font-mono bg-white text-emerald-700 font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsAgentModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 text-slate-600 rounded-xl font-medium hover:bg-slate-50"
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 shadow-md"
+                  className="px-5 py-2 rounded-xl bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 shadow-sm"
                 >
-                  Simpan Profil
+                  Simpan Data Mitra
                 </button>
               </div>
             </form>
@@ -1115,214 +1566,216 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
         </div>
       )}
 
-      {/* --- MODAL FORM BOOKING & KOMISI --- */}
+      {/* Modal: Catat / Edit Komisi Booking */}
       {isCommissionModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden border border-slate-100">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-scale-up">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                 <BadgePercent size={18} className="text-amber-600" />
-                {editingCommission ? 'Edit Catatan Pemesanan & Komisi' : 'Input Catatan Pemesanan & Komisi'}
+                {editingCommission ? 'Edit Komisi Pemesanan' : 'Catat Komisi Driver / Guide Baru'}
               </h3>
               <button onClick={() => setIsCommissionModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveCommission} className="p-5 space-y-4 text-xs max-h-[85vh] overflow-y-auto">
-              {/* Agent Picker */}
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Pilih Agen Mitra *</label>
-                {agents.length === 0 ? (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs">
-                    Belum ada agen mitra. Silakan tambah Profil Agen lebih dulu di tab "Profil Agen Mitra".
-                  </div>
-                ) : (
-                  <select
+            <form onSubmit={handleSaveCommission} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Kode Booking *</label>
+                  <input
+                    type="text"
                     required
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-amber-500 font-medium"
-                    value={commissionForm.agentId}
-                    onChange={e => setCommissionForm({ ...commissionForm, agentId: e.target.value })}
-                  >
-                    {agents.map(a => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} ({a.category}) - Rek: {a.bankName} {a.accountNumber}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                    value={commissionForm.bookingCode || ''}
+                    onChange={e => setCommissionForm({ ...commissionForm, bookingCode: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none text-xs font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Tanggal Kedatangan *</label>
+                  <input
+                    type="date"
+                    required
+                    value={commissionForm.departureDate || ''}
+                    onChange={e => setCommissionForm({ ...commissionForm, departureDate: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Pilih Driver / Guide *</label>
+                <select
+                  required
+                  value={commissionForm.agentId || ''}
+                  onChange={e => {
+                    const agentId = e.target.value;
+                    const found = agents.find(a => a.id === agentId);
+                    setCommissionForm({
+                      ...commissionForm,
+                      agentId,
+                      agentName: found?.name,
+                      agentCategory: found?.category,
+                      commissionMethod: found?.commissionMethod || CommissionMethod.PERCENTAGE,
+                      commissionRate: found?.commissionRate !== undefined ? found.commissionRate : 10
+                    });
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none text-xs font-semibold"
+                >
+                  <option value="">-- Pilih Driver / Guide Mitra --</option>
+                  {agents.map(a => (
+                    <option key={a.id} value={a.id}>{a.name} ({a.category || 'Driver'}) - Rek: {a.bankName}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Kode / No. Pemesanan *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Nama Tamu / Rombongan *</label>
                   <input
                     type="text"
                     required
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-amber-500 font-mono font-bold"
-                    value={commissionForm.bookingCode}
-                    onChange={e => setCommissionForm({ ...commissionForm, bookingCode: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Tanggal Keberangkatan *</label>
-                  <input
-                    type="date"
-                    required
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-amber-500"
-                    value={commissionForm.departureDate}
-                    onChange={e => setCommissionForm({ ...commissionForm, departureDate: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              {/* Customer Auto-Fill Dropdown */}
-              {customers.length > 0 && (
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">
-                    Pilih Pelanggan Terdaftar (Auto-Fill Wisatawan/Grup)
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-amber-500 font-medium bg-slate-50 text-slate-700"
-                    value={commissionForm.customerId || ''}
-                    onChange={e => {
-                      const custId = e.target.value;
-                      const selectedCust = customers.find(c => c.id === custId);
-                      setCommissionForm(prev => ({
-                        ...prev,
-                        customerId: custId,
-                        touristName: selectedCust ? selectedCust.name : prev.touristName || ''
-                      }));
-                    }}
-                  >
-                    <option value="">-- Mode Manual / Pelanggan Baru --</option>
-                    {customers.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.phone ? `(${c.phone})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
-                  <label className="font-semibold text-slate-700 block mb-1">Nama Turis / Grup Wisatawan *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Bpk. Made & Rombongan"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-amber-500"
-                    value={commissionForm.touristName}
+                    placeholder="Contoh: Rombongan PT ABC"
+                    value={commissionForm.touristName || ''}
                     onChange={e => setCommissionForm({ ...commissionForm, touristName: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none text-xs"
                   />
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Jumlah Pax *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Jumlah Pax (Orang) *</label>
                   <input
                     type="number"
                     min="1"
                     required
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-amber-500 font-bold"
-                    value={commissionForm.paxCount}
+                    value={commissionForm.paxCount || 1}
                     onChange={e => setCommissionForm({ ...commissionForm, paxCount: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none text-xs font-mono font-bold"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Produk / Paket Wisata *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="One Day Trip Labuan Bajo / Paket Bali 3D2N"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-amber-500"
-                  value={commissionForm.tourPackage}
-                  onChange={e => setCommissionForm({ ...commissionForm, tourPackage: e.target.value })}
-                />
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block font-bold text-slate-700">Keterangan Belanja / Kategori Paket *</label>
+                  <span className="text-[10px] text-amber-800 font-bold bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                    Produk & Inventaris
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {/* Dropdown Kategori / Paket dari Master Data Produk & Inventaris */}
+                  <select
+                    value={availablePackageCategories.includes(commissionForm.tourPackage || '') ? commissionForm.tourPackage : '__CUSTOM__'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '__CUSTOM__') {
+                        // User will type custom in the text input below
+                      } else {
+                        const matchingProd = products.find(p => p.name === val || p.categoryName === val);
+                        const currentSales = Number(commissionForm.totalSales) || 0;
+                        const pax = Number(commissionForm.paxCount) || 1;
+                        const newSales = (currentSales === 0 && matchingProd && matchingProd.price > 0)
+                          ? matchingProd.price * pax
+                          : commissionForm.totalSales;
+
+                        setCommissionForm({
+                          ...commissionForm,
+                          tourPackage: val,
+                          totalSales: newSales
+                        });
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none text-xs font-semibold bg-white text-slate-800 focus:border-amber-600 shadow-2xs cursor-pointer"
+                  >
+                    <option value="">-- Pilih Kategori / Paket Terdaftar --</option>
+                    <optgroup label="📦 Kategori Master Produk & Inventaris">
+                      {availablePackageCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </optgroup>
+                    <option value="__CUSTOM__">✏️ Tulis Keterangan Kustom Lainnya...</option>
+                  </select>
+
+                  {/* Input Teks Manual / Custom Input dengan Datalist */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      list="package-categories-datalist"
+                      required
+                      placeholder="Ketik atau sesuaikan nama paket belanja..."
+                      value={commissionForm.tourPackage || ''}
+                      onChange={e => setCommissionForm({ ...commissionForm, tourPackage: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none text-xs text-slate-800 bg-slate-50/70 focus:bg-white focus:border-amber-600"
+                    />
+                    <datalist id="package-categories-datalist">
+                      {availablePackageCategories.map(cat => (
+                        <option key={cat} value={cat} />
+                      ))}
+                    </datalist>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Total Nilai Penjualan (Rp) *</label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  placeholder="5000000"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-amber-500 font-extrabold text-sm text-slate-900"
-                  value={commissionForm.totalSales || ''}
-                  onChange={e => setCommissionForm({ ...commissionForm, totalSales: Number(e.target.value) })}
-                />
-              </div>
-
-              {/* Formula Commission Calculation */}
-              <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-xl space-y-3">
-                <div className="font-bold text-amber-900 flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
-                  <Sparkles size={14} className="text-amber-600" /> Skema & Perhitungan Komisi
+              {/* Financials */}
+              <div className="p-3 bg-emerald-50/80 rounded-2xl border border-emerald-200 space-y-3">
+                <div>
+                  <label className="block font-bold text-slate-800 mb-1">Total Nilai Belanja Toko (Rp) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={commissionForm.totalSales || ''}
+                    onChange={e => setCommissionForm({ ...commissionForm, totalSales: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border border-emerald-300 bg-white outline-none text-sm font-mono font-black text-slate-900"
+                    placeholder="0"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Metode Komisi *</label>
+                    <label className="block font-bold text-slate-700 mb-1">Skema Komisi</label>
                     <select
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg outline-none focus:border-amber-500"
-                      value={commissionForm.commissionMethod}
+                      value={commissionForm.commissionMethod || CommissionMethod.PERCENTAGE}
                       onChange={e => setCommissionForm({ ...commissionForm, commissionMethod: e.target.value as CommissionMethod })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 outline-none text-xs bg-white"
                     >
-                      <option value={CommissionMethod.PERCENTAGE}>Persentase (%)</option>
-                      <option value={CommissionMethod.FLAT_PER_PAX}>Flat Nominal (Per Pax)</option>
-                      <option value={CommissionMethod.FLAT_PER_GROUP}>Flat Nominal (Per Grup)</option>
+                      <option value={CommissionMethod.PERCENTAGE}>% Persentase</option>
+                      <option value={CommissionMethod.FLAT_PER_PAX}>Flat per Pax</option>
+                      <option value={CommissionMethod.FLAT_PER_GROUP}>Flat per Rombongan</option>
                     </select>
                   </div>
-
                   <div>
-                    <label className="font-semibold text-slate-700 block mb-1">
-                      {commissionForm.commissionMethod === CommissionMethod.PERCENTAGE ? 'Persentase (%) *' : 'Nominal Flat (Rp) *'}
-                    </label>
+                    <label className="block font-bold text-slate-700 mb-1">Tarif Komisi</label>
                     <input
                       type="number"
-                      min="0"
-                      required
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg outline-none focus:border-amber-500 font-bold"
-                      value={commissionForm.commissionRate || ''}
+                      value={commissionForm.commissionRate || 10}
                       onChange={e => setCommissionForm({ ...commissionForm, commissionRate: Number(e.target.value) })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 outline-none text-xs font-mono font-bold bg-white"
                     />
                   </div>
                 </div>
 
-                {/* Calculation Output Preview */}
-                <div className="pt-2 border-t border-amber-200/80 flex justify-between items-center">
-                  <span className="text-xs text-amber-900 font-semibold">Total Komisi Terhitung:</span>
-                  <span className="text-base font-extrabold text-amber-800">{formatIDR(calculatedCommissionValue)}</span>
+                <div className="pt-2 border-t border-emerald-200 flex justify-between items-center">
+                  <span className="font-extrabold text-slate-800 text-xs">Total Komisi Driver:</span>
+                  <span className="text-base font-black text-emerald-700 font-mono">
+                    {formatIDR(calculatedCommissionValue)}
+                  </span>
                 </div>
               </div>
 
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Status Pembayaran Komisi</label>
-                <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-amber-500 font-bold"
-                  value={commissionForm.status}
-                  onChange={e => setCommissionForm({ ...commissionForm, status: e.target.value as CommissionStatus })}
-                >
-                  <option value={CommissionStatus.PENDING}>PENDING (Belum Dicairkan)</option>
-                  <option value={CommissionStatus.PAID}>LUNAS (Sudah Dicairkan)</option>
-                  <option value={CommissionStatus.CANCELLED}>DIBATALKAN</option>
-                </select>
-              </div>
-
-              <div className="pt-2 flex justify-end gap-2">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsCommissionModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 text-slate-600 rounded-xl font-medium hover:bg-slate-50"
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 shadow-md"
+                  className="px-5 py-2 rounded-xl bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 shadow-sm"
                 >
-                  Simpan Transaksi
+                  Simpan Komisi
                 </button>
               </div>
             </form>
@@ -1330,108 +1783,89 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
         </div>
       )}
 
-      {/* --- MODAL PROSES PENCAIRAN KOMISI (DISBURSEMENT) --- */}
+      {/* Modal: Cairkan / Bayar Komisi Driver */}
       {disbursingCommission && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-slate-100">
-            <div className="p-4 bg-emerald-700 text-white flex justify-between items-center">
-              <h3 className="font-bold flex items-center gap-2 text-sm">
-                <DollarSign size={18} />
-                Proses Pencairan Komisi Agen
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-scale-up">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <DollarSign size={18} className="text-emerald-600" />
+                Pencairan Komisi Driver / Guide
               </h3>
-              <button onClick={() => setDisbursingCommission(null)} className="text-emerald-200 hover:text-white">
+              <button onClick={() => setDisbursingCommission(null)} className="text-slate-400 hover:text-slate-600">
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleProcessDisbursement} className="p-5 space-y-4 text-xs">
-              {/* Agent & Booking Info Box */}
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-                <div className="text-[10px] text-slate-400 font-bold uppercase">Penerima Komisi</div>
-                <div className="font-extrabold text-slate-900 text-sm">{disbursingCommission.agentName}</div>
-                <div className="text-slate-600">Kode Booking: <span className="font-mono font-bold">{disbursingCommission.bookingCode}</span> ({disbursingCommission.touristName})</div>
-                
-                {(() => {
-                  const agent = agents.find(a => a.id === disbursingCommission.agentId);
-                  return agent ? (
-                    <div className="mt-2 pt-2 border-t border-slate-200 text-[11px] text-slate-700 font-mono">
-                      Rekening: <strong>{agent.bankName} - {agent.accountNumber}</strong> (a.n {agent.holderName})
-                    </div>
-                  ) : null;
-                })()}
-              </div>
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1 text-xs">
+              <p>Driver / Guide: <strong className="text-slate-900">{disbursingCommission.agentName}</strong></p>
+              <p>Kode Booking: <strong className="font-mono">{disbursingCommission.bookingCode}</strong></p>
+              <p>Nominal Komisi: <strong className="text-emerald-700 font-mono text-sm">{formatIDR(disbursingCommission.totalCommission)}</strong></p>
+            </div>
 
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex justify-between items-center">
-                <span className="font-bold text-emerald-900 text-xs">Nominal Komisi Dicairkan:</span>
-                <span className="text-lg font-extrabold text-emerald-700">{formatIDR(disbursingCommission.totalCommission)}</span>
-              </div>
-
+            <form onSubmit={handleProcessDisbursement} className="space-y-3 text-xs">
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Tanggal Pencairan *</label>
+                <label className="block font-bold text-slate-700 mb-1">Tanggal Pencairan *</label>
                 <input
                   type="date"
                   required
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-emerald-500"
                   value={disbursementForm.paymentDate}
                   onChange={e => setDisbursementForm({ ...disbursementForm, paymentDate: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none text-xs font-mono font-bold"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Metode Pembayaran *</label>
+                <label className="block font-bold text-slate-700 mb-1">Metode Pembayaran *</label>
                 <select
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-emerald-500 font-bold"
                   value={disbursementForm.paymentMethod}
                   onChange={e => setDisbursementForm({ ...disbursementForm, paymentMethod: e.target.value as PaymentMethod })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none text-xs font-bold"
                 >
-                  <option value={PaymentMethod.CASH}>Tunai (Kas)</option>
+                  <option value={PaymentMethod.CASH}>Tunai (Cash Fisik Kasir)</option>
                   <option value={PaymentMethod.TRANSFER}>Transfer Bank</option>
                 </select>
               </div>
 
               {disbursementForm.paymentMethod === PaymentMethod.TRANSFER && (
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Sumber Rekening Bank *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Rekening Kas Toko</label>
                   <select
-                    required
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-emerald-500"
                     value={disbursementForm.bankId}
                     onChange={e => setDisbursementForm({ ...disbursementForm, bankId: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none text-xs"
                   >
-                    <option value="">-- Pilih Rekening Sumber --</option>
                     {banks.map(b => (
-                      <option key={b.id} value={b.id}>
-                        {b.bankName} - {b.accountNumber} (a.n {b.holderName})
-                      </option>
+                      <option key={b.id} value={b.id}>{b.bankName} - {b.accountNumber} ({b.holderName})</option>
                     ))}
                   </select>
                 </div>
               )}
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Catatan / No Referensi Transfer</label>
+                <label className="block font-bold text-slate-700 mb-1">Catatan Tambahan (Opsional)</label>
                 <input
                   type="text"
-                  placeholder="Misal: Ref Transfer 882103"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none focus:border-emerald-500"
+                  placeholder="Contoh: Ditransfer via BCA ke rekening Driver"
                   value={disbursementForm.notes}
                   onChange={e => setDisbursementForm({ ...disbursementForm, notes: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none text-xs"
                 />
               </div>
 
-              <div className="pt-2 flex justify-end gap-2">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setDisbursingCommission(null)}
-                  className="px-4 py-2 border border-slate-300 text-slate-600 rounded-xl font-medium hover:bg-slate-50"
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-md flex items-center gap-1.5"
+                  className="px-5 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 shadow-sm"
                 >
-                  <CheckCircle2 size={16} /> Cairkan Komisi
+                  Konfirmasi Pembayaran Lunas
                 </button>
               </div>
             </form>
@@ -1446,9 +1880,9 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
         message={confirmation.message}
         confirmLabel={confirmation.confirmLabel}
         cancelLabel={confirmation.cancelLabel}
+        type={confirmation.type}
         onConfirm={confirmation.onConfirm}
         onClose={() => setConfirmation(prev => ({ ...prev, isOpen: false }))}
-        type={confirmation.type}
       />
     </div>
   );
