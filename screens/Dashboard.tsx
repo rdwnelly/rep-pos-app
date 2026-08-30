@@ -852,8 +852,8 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex-1 w-full min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="flex-1 w-full min-h-0 min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
               <AreaChart data={revenueTrendData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorOmzet" x1="0" y1="0" x2="0" y2="1">
@@ -894,11 +894,11 @@ export const Dashboard: React.FC = () => {
             <p className="text-[11px] text-slate-400 mt-0.5">Proporsi penerimaan kas & non-tunai</p>
           </div>
 
-          <div className="flex-1 w-full min-h-0 flex items-center justify-center">
+          <div className="flex-1 w-full min-h-0 min-w-0 flex items-center justify-center">
             {paymentMethodData.length === 0 ? (
               <div className="text-center text-slate-400 text-xs py-8">Belum ada transaksi</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
                 <PieChart>
                   <Pie
                     data={paymentMethodData}
@@ -938,8 +938,8 @@ export const Dashboard: React.FC = () => {
               <p className="text-[11px] text-slate-400 mt-0.5">Jumlah transaksi berdasarkan jam dalam periode terpilih</p>
             </div>
           </div>
-          <div className="flex-1 w-full min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="flex-1 w-full min-h-0 min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
               <BarChart data={hourlyTrafficData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
