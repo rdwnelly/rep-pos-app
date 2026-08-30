@@ -2,12 +2,12 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
-import { Transaction, PaymentStatus, Customer, UserRole, User, PaymentMethod, StoreSettings, TransactionType } from '../types';
+import { Transaction, PaymentStatus, Customer, UserRole, User, PaymentMethod, StoreSettings, TransactionType, Category } from '../types';
 import { formatIDR, formatDate, formatDateDateOnly, formatTimeOnly, exportToCSV, exportToExcel } from '../utils';
 import { generatePrintTransactionDetail, generatePrintInvoice } from '../utils/printHelpers';
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
-import { Download, Search, Filter, RotateCcw, X, Eye, FileText, Printer, FileSpreadsheet, UserCheck, Calendar, Trash2, Bluetooth, RefreshCw } from 'lucide-react';
+import { Download, Search, Filter, RotateCcw, X, Eye, FileText, Printer, FileSpreadsheet, UserCheck, Calendar, Trash2, Bluetooth, RefreshCw, Tag, Layers, CreditCard } from 'lucide-react';
 
 interface CustomerHistoryProps {
     currentUser: User | null;
@@ -18,9 +18,12 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
     const transactions = useData(() => StorageService.getTransactions(), [], 'transactions') || [];
     const customers = useData(() => StorageService.getCustomers(), [], 'customers') || [];
     const banks = useData(() => StorageService.getBanks(), [], 'banks') || [];
+    const categories = useData(() => StorageService.getCategories(), [], 'categories') || [];
 
     // State
     const [selectedCustomerId, setSelectedCustomerId] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [groupMode, setGroupMode] = useState<'none' | 'category' | 'method'>('none');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
@@ -35,7 +38,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
     // Reset pagination on filter change
     useEffect(() => {
         setVisibleCount(20);
-    }, [selectedCustomerId, startDate, endDate, searchQuery]);
+    }, [selectedCustomerId, selectedCategory, groupMode, startDate, endDate, searchQuery]);
 
     // Load store settings
     useEffect(() => {
@@ -52,6 +55,21 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
     const selectedCustomer = useMemo(() => {
         return customers.find(c => c.id === selectedCustomerId) || null;
     }, [customers, selectedCustomerId]);
+
+    // Extract available distinct categories
+    const availableCategories = useMemo(() => {
+        const set = new Set<string>();
+        categories.forEach(c => {
+            if (c.name && c.name.trim()) set.add(c.name.trim());
+        });
+        transactions.forEach(t => {
+            t.items?.forEach(item => {
+                const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : '';
+                if (cat) set.add(cat);
+            });
+        });
+        return Array.from(set).sort((a, b) => a.localeCompare(b));
+    }, [categories, transactions]);
 
     // Helper for exact timestamp parsing (hour, minute, second)
     const getExactTimestamp = (item: any): number => {
@@ -81,6 +99,18 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             items = items.filter(t => t.customerId === selectedCustomerId);
         }
 
+        // Filter by category
+        if (selectedCategory) {
+            items = items.filter(t =>
+                t.items?.some(item => {
+                    const catName = (item.categoryName && item.categoryName.trim())
+                        ? item.categoryName.trim()
+                        : (categories.find(c => c.id === item.categoryId)?.name || 'Tanpa Kategori');
+                    return catName.toLowerCase() === selectedCategory.toLowerCase() || item.categoryId === selectedCategory;
+                })
+            );
+        }
+
         // Date Filter
         if (startDate || endDate) {
             items = items.filter(item => {
@@ -98,7 +128,8 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                 t.id.toLowerCase().includes(query) ||
                 (t.invoiceNumber && t.invoiceNumber.toLowerCase().includes(query)) ||
                 t.customerName.toLowerCase().includes(query) ||
-                t.cashierName.toLowerCase().includes(query)
+                t.cashierName.toLowerCase().includes(query) ||
+                t.items?.some(i => i.name.toLowerCase().includes(query) || (i.categoryName && i.categoryName.toLowerCase().includes(query)))
             );
         }
 
@@ -115,31 +146,97 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
         });
 
         return items;
-    }, [transactions, selectedCustomerId, startDate, endDate, searchQuery, currentUser]);
+    }, [transactions, selectedCustomerId, selectedCategory, startDate, endDate, searchQuery, currentUser, categories]);
 
     const visibleTransactions = useMemo(() => filteredTransactions.slice(0, visibleCount), [filteredTransactions, visibleCount]);
 
-    // Infinite Scroll Observer
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting) {
-                    setVisibleCount((prev) => prev + 20);
-                }
-            },
-            { threshold: 0.5 }
-        );
-
-        if (loadMoreRef.current) {
-            observer.observe(loadMoreRef.current);
-        }
-
-        return () => {
-            if (loadMoreRef.current) {
-                observer.unobserve(loadMoreRef.current);
+    // Grouped by Category Calculation
+    const groupedTransactionsByCategory = useMemo(() => {
+        const groups: {
+            [catName: string]: {
+                categoryName: string;
+                txCount: number;
+                totalQty: number;
+                totalRevenue: number;
+                items: {
+                    transaction: Transaction;
+                    categoryItems: typeof filteredTransactions[0]['items'];
+                    categorySubtotal: number;
+                }[];
             }
+        } = {};
+
+        filteredTransactions.forEach(t => {
+            // Group items inside this transaction by category
+            const catMapInTx: { [cat: string]: typeof t.items } = {};
+            t.items?.forEach(item => {
+                const cat = (item.categoryName && item.categoryName.trim())
+                    ? item.categoryName.trim()
+                    : (categories.find(c => c.id === item.categoryId)?.name || 'Tanpa Kategori');
+                if (!catMapInTx[cat]) catMapInTx[cat] = [];
+                catMapInTx[cat].push(item);
+            });
+
+            // If transaction has no items, treat as Tanpa Kategori
+            if (!t.items || t.items.length === 0) {
+                const cat = 'Tanpa Kategori';
+                if (!catMapInTx[cat]) catMapInTx[cat] = [];
+            }
+
+            Object.entries(catMapInTx).forEach(([catName, catItems]) => {
+                if (!groups[catName]) {
+                    groups[catName] = {
+                        categoryName: catName,
+                        txCount: 0,
+                        totalQty: 0,
+                        totalRevenue: 0,
+                        items: []
+                    };
+                }
+                const catSubtotal = catItems.reduce((s, it) => s + (it.finalPrice * it.qty), 0);
+                const catQty = catItems.reduce((s, it) => s + (t.type === TransactionType.RETURN ? -it.qty : it.qty), 0);
+
+                groups[catName].txCount += 1;
+                groups[catName].totalQty += catQty;
+                groups[catName].totalRevenue += (t.type === TransactionType.RETURN ? -catSubtotal : (catSubtotal || t.totalAmount));
+                groups[catName].items.push({
+                    transaction: t,
+                    categoryItems: catItems,
+                    categorySubtotal: catSubtotal || t.totalAmount
+                });
+            });
+        });
+
+        return Object.values(groups).sort((a, b) => b.totalRevenue - a.totalRevenue);
+    }, [filteredTransactions, categories]);
+
+    // Grouped by Payment Method Calculation
+    const groupedTransactionsByMethod = useMemo(() => {
+        const groups: Record<string, Transaction[]> = {
+            'TUNAI (CASH)': [],
+            'TRANSFER BANK': [],
+            'BON / HUTANG (TEMPO)': [],
+            'QRIS / DIGITAL': [],
+            'LAINNYA': []
         };
-    }, [loadMoreRef.current, filteredTransactions]);
+
+        filteredTransactions.forEach(t => {
+            const m = (t.paymentMethod || '').toString().toUpperCase();
+            if (m === 'CASH' || m === 'TUNAI') {
+                groups['TUNAI (CASH)'].push(t);
+            } else if (m === 'TRANSFER' || m === 'BANK') {
+                groups['TRANSFER BANK'].push(t);
+            } else if (m === 'TEMPO' || m === 'BON' || m === 'HUTANG') {
+                groups['BON / HUTANG (TEMPO)'].push(t);
+            } else if (m === 'QRIS' || m === 'E-WALLET' || m === 'EWALLET') {
+                groups['QRIS / DIGITAL'].push(t);
+            } else {
+                groups['LAINNYA'].push(t);
+            }
+        });
+
+        return groups;
+    }, [filteredTransactions]);
 
     // Calculate totals
     const totals = useMemo(() => {
@@ -168,20 +265,22 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
         }
     };
 
-
-
     const handleExport = () => {
-        const headers = ['ID Transaksi', 'No Faktur', 'Tanggal', 'Waktu / Jam', 'Pelanggan', 'Total', 'Dibayar', 'Piutang', 'Kembalian', 'Status', 'Metode', 'Kasir'];
+        const headers = ['ID Transaksi', 'No Faktur', 'Tanggal', 'Waktu / Jam', 'Pelanggan', 'Kategori Item', 'Rincian Item', 'Total', 'Dibayar', 'Piutang', 'Kembalian', 'Status', 'Metode', 'Kasir'];
         const rows = filteredTransactions.map(t => {
             const remaining = t.totalAmount - t.amountPaid;
             const piutang = remaining > 0 ? remaining : 0;
             const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
+            const catList = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Kategori') || [])).join(', ');
+            const itemsList = t.items?.map(i => `${i.name} (${i.qty}x)`).join('; ') || '-';
             return [
                 t.id,
                 t.invoiceNumber || '-',
                 formatDateDateOnly(t.date),
                 formatTimeOnly(t.date),
                 t.customerName,
+                catList || '-',
+                itemsList,
                 t.totalAmount,
                 t.amountPaid,
                 piutang,
@@ -191,7 +290,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                 t.cashierName
             ];
         });
-        exportToCSV(`riwayat-pelanggan-${selectedCustomer?.name || 'all'}.csv`, headers, rows);
+        exportToCSV(`riwayat-pelanggan-${selectedCustomer?.name || 'all'}${selectedCategory ? `-${selectedCategory}` : ''}.csv`, headers, rows);
     };
 
     const handleExportExcel = () => {
@@ -199,12 +298,16 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             const remaining = t.totalAmount - t.amountPaid;
             const piutang = remaining > 0 ? remaining : 0;
             const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
+            const catList = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Kategori') || [])).join(', ');
+            const itemsList = t.items?.map(i => `${i.name} (${i.qty}x)`).join('; ') || '-';
             return {
                 'ID Transaksi': t.id,
                 'No Faktur': t.invoiceNumber || '-',
                 'Tanggal': formatDateDateOnly(t.date),
                 'Waktu / Jam': formatTimeOnly(t.date),
                 'Pelanggan': t.customerName,
+                'Kategori Item': catList || '-',
+                'Rincian Item': itemsList,
                 'Total': t.totalAmount,
                 'Dibayar': t.amountPaid,
                 'Piutang': piutang,
@@ -221,6 +324,8 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             { wch: 15 }, // Tanggal
             { wch: 15 }, // Waktu Jam
             { wch: 20 }, // Pelanggan
+            { wch: 20 }, // Kategori
+            { wch: 30 }, // Item
             { wch: 15 }, // Total
             { wch: 15 }, // Dibayar
             { wch: 15 }, // Piutang
@@ -230,7 +335,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             { wch: 15 }  // Kasir
         ];
 
-        exportToExcel(data, `Riwayat_Pelanggan_${selectedCustomer?.name || 'All'}`, "Riwayat Pelanggan", cols);
+        exportToExcel(data, `Riwayat_Pelanggan_${selectedCustomer?.name || 'All'}${selectedCategory ? `_${selectedCategory}` : ''}`, "Riwayat Pelanggan", cols);
     };
 
     const handlePrint = () => {
@@ -241,6 +346,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             const remaining = t.totalAmount - t.amountPaid;
             const piutang = remaining > 0 ? remaining : 0;
             const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
+            const catList = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Kategori') || [])).join(', ');
             return `
             <tr>
                 <td>${idx + 1}</td>
@@ -249,6 +355,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                 <td>${t.id.substring(0, 8)}</td>
                 <td>${t.invoiceNumber || '-'}</td>
                 <td>${t.customerName}</td>
+                <td>${catList || '-'}</td>
                 <td style="text-align:right">${formatIDR(t.totalAmount)}</td>
                 <td style="text-align:right">${formatIDR(t.amountPaid)}</td>
                 <td style="text-align:right">${piutang > 0 ? formatIDR(piutang) : '-'}</td>
@@ -355,7 +462,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                 }
 
                 // Step 4: Fallback prompt if bluetooth thermal print failed
-                if (confirm("Gagal mencetak via Bluetooth RPP02N. Apakah Anda ingin mencetak menggunakan dialog printer browser?")) {
+                if (confirm("Gagal mencetak via Bluetooth. Apakah Anda ingin mencetak menggunakan dialog printer browser?")) {
                     const w = window.open('', '', 'width=800,height=600');
                     if (w) {
                         const html = generatePrintInvoice(tx, settings, formatIDR, formatDate);
@@ -460,7 +567,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             {/* Filter Controls Card */}
             <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-3">
                 {/* Customer Selector Dropdown */}
-                <div className="relative min-w-[220px]">
+                <div className="relative min-w-[200px]">
                     <select
                         id="customerFilter"
                         name="customerFilter"
@@ -468,9 +575,30 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                         value={selectedCustomerId}
                         onChange={e => setSelectedCustomerId(e.target.value)}
                     >
-                        <option value="">-- Semua Pelanggan --</option>
+                        <option value="">👤 Semua Pelanggan</option>
                         {customers.sort((a, b) => a.name.localeCompare(b.name)).map(c => (
                             <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>
+                        ))}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                </div>
+
+                {/* Category Filter Dropdown */}
+                <div className="relative min-w-[170px]">
+                    <select
+                        id="categoryFilter"
+                        name="categoryFilter"
+                        className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-xs font-semibold text-slate-800 pr-8 appearance-none cursor-pointer"
+                        value={selectedCategory}
+                        onChange={e => setSelectedCategory(e.target.value)}
+                    >
+                        <option value="">🏷️ Semua Kategori</option>
+                        {availableCategories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
                         ))}
                     </select>
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -531,7 +659,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                         id="searchTransaction"
                         name="searchTransaction"
                         type="text"
-                        placeholder="Cari ID transaksi, no faktur, pelanggan, kasir..."
+                        placeholder="Cari transaksi, item, kasir, no faktur..."
                         className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-800"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
@@ -545,12 +673,47 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                         </button>
                     )}
                 </div>
+
+                {/* Grouping Mode Segment Switcher */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
+                    <button
+                        type="button"
+                        onClick={() => setGroupMode('none')}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${groupMode === 'none' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                        title="Tampilan Tabel Standar"
+                    >
+                        <Layers size={13} /> Tabel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setGroupMode('category')}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${groupMode === 'category' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                        title="Kelompokkan Berdasarkan Kategori Produk"
+                    >
+                        <Tag size={13} /> Per Kategori
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setGroupMode('method')}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${groupMode === 'method' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                        title="Kelompokkan Berdasarkan Metode Pembayaran"
+                    >
+                        <CreditCard size={13} /> Per Metode
+                    </button>
+                </div>
             </div>
 
             {/* Table Container */}
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200">
                 <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 text-xs flex justify-between items-center">
-                    <span>Daftar Transaksi Pelanggan ({filteredTransactions.length})</span>
+                    <span className="flex items-center gap-2">
+                        {groupMode === 'category' && <Tag size={16} className="text-amber-600" />}
+                        {groupMode === 'method' && <CreditCard size={16} className="text-amber-600" />}
+                        {groupMode === 'none' && <Layers size={16} className="text-amber-600" />}
+                        Daftar Transaksi Pelanggan ({filteredTransactions.length})
+                        {groupMode === 'category' && <span className="bg-amber-100 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-bold">Dikelompokkan per Kategori Produk</span>}
+                        {groupMode === 'method' && <span className="bg-amber-100 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-bold">Dikelompokkan per Metode Pembayaran</span>}
+                    </span>
                     <span className="text-rose-700 font-bold">Total Piutang: {formatIDR(totals.totalDebt)}</span>
                 </div>
                 <div className="overflow-x-auto touch-scroll">
@@ -568,7 +731,8 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                                 </th>
                                 <th className="p-3.5">No Faktur & Ref</th>
                                 <th className="p-3.5">Pelanggan</th>
-                                <th className="p-3.5">Total Belanja</th>
+                                {groupMode === 'category' && <th className="p-3.5">Item Kategori Ini</th>}
+                                <th className="p-3.5">{groupMode === 'category' ? 'Subtotal Kategori / Nota' : 'Total Belanja'}</th>
                                 <th className="p-3.5">Dibayar</th>
                                 <th className="p-3.5">Sisa Piutang</th>
                                 <th className="p-3.5">Kembalian</th>
@@ -581,89 +745,323 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                         <tbody className="divide-y divide-slate-100">
                             {filteredTransactions.length === 0 && (
                                 <tr>
-                                    <td colSpan={12} className="p-8 text-center text-slate-400">Tidak ada riwayat transaksi pelanggan yang ditemukan.</td>
+                                    <td colSpan={groupMode === 'category' ? 13 : 12} className="p-8 text-center text-slate-400">Tidak ada riwayat transaksi pelanggan yang ditemukan.</td>
                                 </tr>
                             )}
-                            {visibleTransactions.map(t => {
-                                const remaining = t.totalAmount - t.amountPaid;
-                                const piutang = remaining > 0 ? remaining : 0;
-                                const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
 
-                                return (
-                                    <tr key={t.id} onClick={() => setDetailTransaction(t)} className="hover:bg-slate-50 cursor-pointer transition-colors group">
-                                        <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
-                                            {formatDateDateOnly(t.date)}
-                                        </td>
-                                        <td className="p-3.5 whitespace-nowrap bg-amber-50/20">
-                                            <span className="font-mono text-xs font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded border border-amber-200 inline-block shadow-2xs">
-                                                {formatTimeOnly(t.createdAt || t.date)}
-                                            </span>
-                                        </td>
-                                        <td className="p-3.5 whitespace-nowrap">
-                                            <div className="font-mono text-xs font-bold text-slate-800">{t.invoiceNumber || '-'}</div>
-                                            <div className="text-[10px] font-mono text-slate-400">#{t.id.substring(0, 8)}</div>
-                                        </td>
-                                        <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
-                                            {t.customerName}
-                                        </td>
-                                        <td className="p-3.5 font-extrabold text-slate-900 whitespace-nowrap">
-                                            {formatIDR(t.totalAmount)}
-                                        </td>
-                                        <td className="p-3.5 text-emerald-600 font-bold whitespace-nowrap">
-                                            {formatIDR(t.amountPaid)}
-                                        </td>
-                                        <td className="p-3.5 text-rose-600 font-bold whitespace-nowrap">
-                                            {piutang > 0 ? formatIDR(piutang) : '-'}
-                                        </td>
-                                        <td className="p-3.5 text-emerald-600 font-medium whitespace-nowrap">
-                                            {kembalian > 0 ? formatIDR(kembalian) : '-'}
-                                        </td>
-                                        <td className="p-3.5 whitespace-nowrap">
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${
-                                                t.type === TransactionType.RETURN
-                                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                                    : t.paymentStatus === PaymentStatus.PAID
-                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                                        : t.paymentStatus === PaymentStatus.PARTIAL
-                                                            ? 'bg-amber-50 text-amber-800 border-amber-200'
-                                                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                                            }`}>
-                                                {t.type === TransactionType.RETURN
-                                                    ? 'RETUR'
-                                                    : (t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus) + (t.isReturned ? ' (Ada Retur)' : '')}
-                                            </span>
-                                        </td>
-                                        <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{((t.paymentMethod as string) === 'TEMPO' || t.paymentMethod === PaymentMethod.BON) ? 'BON (Hutang)' : t.paymentMethod}</td>
-                                        <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{t.cashierName}</td>
-                                        <td className="p-3.5 text-center whitespace-nowrap">
-                                            <div className="flex items-center justify-center gap-1.5">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handlePrintReceipt(t); }}
-                                                    className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-emerald-200"
-                                                    title="Cetak Struk Thermal Bluetooth (Langsung Otomatis Tanpa Popup)"
-                                                >
-                                                    <Bluetooth size={12} /> Struk
-                                                </button>
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }}
-                                                    className="px-2.5 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-amber-200"
-                                                    title="Lihat Detail Transaksi"
-                                                >
-                                                    <Eye size={12} /> Detail
-                                                </button>
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }}
-                                                    className="px-2.5 py-1 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-rose-200"
-                                                    title="Hapus Transaksi"
-                                                >
-                                                    <Trash2 size={12} /> Hapus
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                            {visibleTransactions.length < filteredTransactions.length && (
+                            {/* --- CATEGORY GROUPED VIEW --- */}
+                            {groupMode === 'category' && (
+                                groupedTransactionsByCategory.map((catGroup) => {
+                                    if (catGroup.items.length === 0) return null;
+                                    return (
+                                        <React.Fragment key={catGroup.categoryName}>
+                                            <tr className="bg-amber-50/80 border-y-2 border-amber-300">
+                                                <td colSpan={13} className="p-3 text-xs font-extrabold text-slate-800">
+                                                    <div className="flex flex-wrap justify-between items-center gap-2">
+                                                        <span className="flex items-center gap-2 uppercase tracking-wider text-amber-950 font-black text-xs sm:text-sm">
+                                                            🏷️ {catGroup.categoryName}
+                                                            <span className="bg-white border border-amber-300 text-amber-900 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold shadow-2xs">
+                                                                {catGroup.txCount} Transaksi
+                                                            </span>
+                                                            <span className="bg-amber-200/80 border border-amber-400 text-amber-950 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold shadow-2xs">
+                                                                {catGroup.totalQty} Item Terjual
+                                                            </span>
+                                                        </span>
+                                                        <span className="text-amber-950 font-mono text-xs font-black bg-amber-200/90 border border-amber-400 px-3 py-1 rounded-lg shadow-2xs">
+                                                            Subtotal Omzet: {formatIDR(catGroup.totalRevenue)}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {catGroup.items.map(({ transaction: t, categoryItems, categorySubtotal }) => {
+                                                const remaining = t.totalAmount - t.amountPaid;
+                                                const piutang = remaining > 0 ? remaining : 0;
+                                                const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
+
+                                                return (
+                                                    <tr key={`${catGroup.categoryName}-${t.id}`} onClick={() => setDetailTransaction(t)} className="hover:bg-amber-50/30 cursor-pointer transition-colors group">
+                                                        <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
+                                                            {formatDateDateOnly(t.date)}
+                                                        </td>
+                                                        <td className="p-3.5 whitespace-nowrap bg-amber-50/20">
+                                                            <span className="font-mono text-xs font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded border border-amber-200 inline-block shadow-2xs">
+                                                                {formatTimeOnly(t.createdAt || t.date)}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3.5 whitespace-nowrap">
+                                                            <div className="font-mono text-xs font-bold text-slate-800">{t.invoiceNumber || '-'}</div>
+                                                            <div className="text-[10px] font-mono text-slate-400">#{t.id.substring(0, 8)}</div>
+                                                        </td>
+                                                        <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
+                                                            {t.customerName}
+                                                        </td>
+                                                        <td className="p-3.5 max-w-[220px]">
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {categoryItems.map((ci, idx) => (
+                                                                    <span key={idx} className="bg-amber-100/90 text-amber-900 border border-amber-300 text-[10px] font-semibold px-1.5 py-0.5 rounded-md">
+                                                                        {ci.qty}x {ci.name}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-3.5 whitespace-nowrap">
+                                                            <div className="font-black text-amber-900 font-mono text-xs">
+                                                                {formatIDR(categorySubtotal)}
+                                                            </div>
+                                                            <div className="text-[10px] text-slate-400 font-normal">
+                                                                Total Nota: {formatIDR(t.totalAmount)}
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-3.5 text-emerald-600 font-bold whitespace-nowrap">
+                                                            {formatIDR(t.amountPaid)}
+                                                        </td>
+                                                        <td className="p-3.5 text-rose-600 font-bold whitespace-nowrap">
+                                                            {piutang > 0 ? formatIDR(piutang) : '-'}
+                                                        </td>
+                                                        <td className="p-3.5 text-emerald-600 font-medium whitespace-nowrap">
+                                                            {kembalian > 0 ? formatIDR(kembalian) : '-'}
+                                                        </td>
+                                                        <td className="p-3.5 whitespace-nowrap">
+                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${
+                                                                t.type === TransactionType.RETURN
+                                                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                                    : t.paymentStatus === PaymentStatus.PAID
+                                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                        : t.paymentStatus === PaymentStatus.PARTIAL
+                                                                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                                                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                                                            }`}>
+                                                                {t.type === TransactionType.RETURN
+                                                                    ? 'RETUR'
+                                                                    : (t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus) + (t.isReturned ? ' (Ada Retur)' : '')}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{((t.paymentMethod as string) === 'TEMPO' || t.paymentMethod === PaymentMethod.BON) ? 'BON (Hutang)' : t.paymentMethod}</td>
+                                                        <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{t.cashierName}</td>
+                                                        <td className="p-3.5 text-center whitespace-nowrap">
+                                                            <div className="flex items-center justify-center gap-1.5">
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handlePrintReceipt(t); }}
+                                                                    className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-emerald-200"
+                                                                    title="Cetak Struk Thermal Bluetooth"
+                                                                >
+                                                                    <Bluetooth size={12} /> Struk
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }}
+                                                                    className="px-2.5 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-amber-200"
+                                                                    title="Lihat Detail Transaksi"
+                                                                >
+                                                                    <Eye size={12} /> Detail
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }}
+                                                                    className="px-2.5 py-1 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-rose-200"
+                                                                    title="Hapus Transaksi"
+                                                                >
+                                                                    <Trash2 size={12} /> Hapus
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </React.Fragment>
+                                    );
+                                })
+                            )}
+
+                            {/* --- PAYMENT METHOD GROUPED VIEW --- */}
+                            {groupMode === 'method' && (
+                                Object.entries(groupedTransactionsByMethod).map(([groupName, groupTxs]) => {
+                                    if (groupTxs.length === 0) return null;
+                                    const groupSubtotal = groupTxs.reduce((sum, t) => sum + t.totalAmount, 0);
+
+                                    return (
+                                        <React.Fragment key={groupName}>
+                                            <tr className="bg-slate-100 border-y border-slate-300">
+                                                <td colSpan={12} className="p-3 text-xs font-extrabold text-slate-800">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="flex items-center gap-2 uppercase tracking-wider text-slate-900 font-black">
+                                                            📁 {groupName}
+                                                            <span className="bg-white border border-slate-300 text-slate-700 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold">
+                                                                {groupTxs.length} Transaksi
+                                                            </span>
+                                                        </span>
+                                                        <span className="text-amber-900 font-mono text-xs font-black bg-amber-100/80 border border-amber-300 px-2.5 py-1 rounded-lg shadow-2xs">
+                                                            Subtotal: {formatIDR(groupSubtotal)}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {groupTxs.map(t => {
+                                                const remaining = t.totalAmount - t.amountPaid;
+                                                const piutang = remaining > 0 ? remaining : 0;
+                                                const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
+
+                                                return (
+                                                    <tr key={t.id} onClick={() => setDetailTransaction(t)} className="hover:bg-slate-50 cursor-pointer transition-colors group">
+                                                        <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
+                                                            {formatDateDateOnly(t.date)}
+                                                        </td>
+                                                        <td className="p-3.5 whitespace-nowrap bg-amber-50/20">
+                                                            <span className="font-mono text-xs font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded border border-amber-200 inline-block shadow-2xs">
+                                                                {formatTimeOnly(t.createdAt || t.date)}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3.5 whitespace-nowrap">
+                                                            <div className="font-mono text-xs font-bold text-slate-800">{t.invoiceNumber || '-'}</div>
+                                                            <div className="text-[10px] font-mono text-slate-400">#{t.id.substring(0, 8)}</div>
+                                                        </td>
+                                                        <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
+                                                            {t.customerName}
+                                                        </td>
+                                                        <td className="p-3.5 font-extrabold text-slate-900 whitespace-nowrap">
+                                                            {formatIDR(t.totalAmount)}
+                                                        </td>
+                                                        <td className="p-3.5 text-emerald-600 font-bold whitespace-nowrap">
+                                                            {formatIDR(t.amountPaid)}
+                                                        </td>
+                                                        <td className="p-3.5 text-rose-600 font-bold whitespace-nowrap">
+                                                            {piutang > 0 ? formatIDR(piutang) : '-'}
+                                                        </td>
+                                                        <td className="p-3.5 text-emerald-600 font-medium whitespace-nowrap">
+                                                            {kembalian > 0 ? formatIDR(kembalian) : '-'}
+                                                        </td>
+                                                        <td className="p-3.5 whitespace-nowrap">
+                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${
+                                                                t.type === TransactionType.RETURN
+                                                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                                    : t.paymentStatus === PaymentStatus.PAID
+                                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                        : t.paymentStatus === PaymentStatus.PARTIAL
+                                                                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                                                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                                                            }`}>
+                                                                {t.type === TransactionType.RETURN
+                                                                    ? 'RETUR'
+                                                                    : (t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus) + (t.isReturned ? ' (Ada Retur)' : '')}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{((t.paymentMethod as string) === 'TEMPO' || t.paymentMethod === PaymentMethod.BON) ? 'BON (Hutang)' : t.paymentMethod}</td>
+                                                        <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{t.cashierName}</td>
+                                                        <td className="p-3.5 text-center whitespace-nowrap">
+                                                            <div className="flex items-center justify-center gap-1.5">
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handlePrintReceipt(t); }}
+                                                                    className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-emerald-200"
+                                                                    title="Cetak Struk Thermal Bluetooth"
+                                                                >
+                                                                    <Bluetooth size={12} /> Struk
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }}
+                                                                    className="px-2.5 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-amber-200"
+                                                                    title="Lihat Detail Transaksi"
+                                                                >
+                                                                    <Eye size={12} /> Detail
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }}
+                                                                    className="px-2.5 py-1 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-rose-200"
+                                                                    title="Hapus Transaksi"
+                                                                >
+                                                                    <Trash2 size={12} /> Hapus
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </React.Fragment>
+                                    );
+                                })
+                            )}
+
+                            {/* --- STANDARD FLAT VIEW --- */}
+                            {groupMode === 'none' && (
+                                visibleTransactions.map(t => {
+                                    const remaining = t.totalAmount - t.amountPaid;
+                                    const piutang = remaining > 0 ? remaining : 0;
+                                    const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
+
+                                    return (
+                                        <tr key={t.id} onClick={() => setDetailTransaction(t)} className="hover:bg-slate-50 cursor-pointer transition-colors group">
+                                            <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
+                                                {formatDateDateOnly(t.date)}
+                                            </td>
+                                            <td className="p-3.5 whitespace-nowrap bg-amber-50/20">
+                                                <span className="font-mono text-xs font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded border border-amber-200 inline-block shadow-2xs">
+                                                    {formatTimeOnly(t.createdAt || t.date)}
+                                                </span>
+                                            </td>
+                                            <td className="p-3.5 whitespace-nowrap">
+                                                <div className="font-mono text-xs font-bold text-slate-800">{t.invoiceNumber || '-'}</div>
+                                                <div className="text-[10px] font-mono text-slate-400">#{t.id.substring(0, 8)}</div>
+                                            </td>
+                                            <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
+                                                {t.customerName}
+                                            </td>
+                                            <td className="p-3.5 font-extrabold text-slate-900 whitespace-nowrap">
+                                                {formatIDR(t.totalAmount)}
+                                            </td>
+                                            <td className="p-3.5 text-emerald-600 font-bold whitespace-nowrap">
+                                                {formatIDR(t.amountPaid)}
+                                            </td>
+                                            <td className="p-3.5 text-rose-600 font-bold whitespace-nowrap">
+                                                {piutang > 0 ? formatIDR(piutang) : '-'}
+                                            </td>
+                                            <td className="p-3.5 text-emerald-600 font-medium whitespace-nowrap">
+                                                {kembalian > 0 ? formatIDR(kembalian) : '-'}
+                                            </td>
+                                            <td className="p-3.5 whitespace-nowrap">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${
+                                                    t.type === TransactionType.RETURN
+                                                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                        : t.paymentStatus === PaymentStatus.PAID
+                                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                            : t.paymentStatus === PaymentStatus.PARTIAL
+                                                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                                                : 'bg-rose-50 text-rose-700 border-rose-200'
+                                                }`}>
+                                                    {t.type === TransactionType.RETURN
+                                                        ? 'RETUR'
+                                                        : (t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus) + (t.isReturned ? ' (Ada Retur)' : '')}
+                                                </span>
+                                            </td>
+                                            <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{((t.paymentMethod as string) === 'TEMPO' || t.paymentMethod === PaymentMethod.BON) ? 'BON (Hutang)' : t.paymentMethod}</td>
+                                            <td className="p-3.5 text-slate-600 font-medium whitespace-nowrap">{t.cashierName}</td>
+                                            <td className="p-3.5 text-center whitespace-nowrap">
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handlePrintReceipt(t); }}
+                                                        className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-emerald-200"
+                                                        title="Cetak Struk Thermal Bluetooth"
+                                                    >
+                                                        <Bluetooth size={12} /> Struk
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }}
+                                                        className="px-2.5 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-amber-200"
+                                                        title="Lihat Detail Transaksi"
+                                                    >
+                                                        <Eye size={12} /> Detail
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }}
+                                                        className="px-2.5 py-1 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg font-semibold transition-colors inline-flex items-center gap-1 text-[11px] border border-rose-200"
+                                                        title="Hapus Transaksi"
+                                                    >
+                                                        <Trash2 size={12} /> Hapus
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+
+                            {groupMode === 'none' && visibleTransactions.length < filteredTransactions.length && (
                                 <tr>
                                     <td colSpan={12} className="p-4 text-center text-slate-400">
                                         <div ref={loadMoreRef}>Loading more...</div>

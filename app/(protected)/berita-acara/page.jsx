@@ -120,10 +120,15 @@ export default function BeritaAcaraPage() {
         allSalesCategories.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" }))
     );
 
-    // Summary Expense Table (Page 1) - disamakan dengan kategori Sumber Pendapatan
-    const [expenseRows, setExpenseRows] = useState(() =>
-        allSalesCategories.map(name => ({ name, amount: "" }))
-    );
+    // Summary Expense Table (Page 1) - Murni input & tulis manual kosong
+    const [expenseRows, setExpenseRows] = useState(() => [
+        { name: "", amount: "" },
+        { name: "", amount: "" },
+        { name: "", amount: "" },
+        { name: "", amount: "" },
+        { name: "", amount: "" },
+        { name: "", amount: "" }
+    ]);
 
     // Modern Dynamic Expenses (Hidden on print)
     const [customExpenses, setCustomExpenses] = useState([
@@ -134,7 +139,6 @@ export default function BeritaAcaraPage() {
 
     // Auto-calculate logic from transactions
     const transactionsStr = JSON.stringify(transactions);
-    const cashflowsStr = JSON.stringify(cashflows);
     const categoriesStr = JSON.stringify(allSalesCategories);
 
     useEffect(() => {
@@ -148,7 +152,6 @@ export default function BeritaAcaraPage() {
         let hasData = false;
 
         const currentTransactions = JSON.parse(transactionsStr);
-        const currentCashflows = JSON.parse(cashflowsStr);
 
         // === LOGIKA PENJUALAN DINAMIS BERBASIS KATEGORI ===
         const salesMap = {};
@@ -199,90 +202,12 @@ export default function BeritaAcaraPage() {
             hppQR: vals.hppQR === 0 ? "" : String(vals.hppQR),
         }));
 
-        // === LOGIKA PENGELUARAN (DISAMAKAN DENGAN KATEGORI SUMBER PENDAPATAN) ===
-        const expenseMap = {};
-        allSalesCategories.forEach(name => {
-            expenseMap[name] = 0;
-        });
-
-        currentCashflows.forEach(cf => {
-            if (!cf || !cf.date) return;
-            const rawCfDateStr = typeof cf.date === 'string' ? cf.date : '';
-            const cfDateOnly = rawCfDateStr.slice(0, 10);
-            const cfDate = new Date(rawCfDateStr.replace(' ', 'T'));
-            const isMatch = cfDateOnly === tanggal || (!isNaN(cfDate.getTime()) && cfDate >= startDate && cfDate <= endDate);
-
-            if (isMatch && cf.type === CashFlowType.OUT) {
-                hasData = true;
-                const desc = (cf.description || '').toLowerCase();
-                const cfCat = (cf.category || '').toLowerCase();
-                const searchStr = cfCat + " " + desc;
-
-                let matchedCategory = null;
-                if (searchStr.includes("tiket")) matchedCategory = "Tiket Masuk";
-                else if (searchStr.includes("sewa kostum") || searchStr.includes("kostum")) matchedCategory = "Sewa Kostum";
-                else if (searchStr.includes("toko") || searchStr.includes("souvenir") || searchStr.includes("sovenir")) matchedCategory = "Toko / Souvenir";
-                else if (searchStr.includes("kafe") || searchStr.includes("cafe") || searchStr.includes("resto")) matchedCategory = "Kafe & Resto";
-                else if (searchStr.includes("kios")) matchedCategory = "Kios";
-                else if (searchStr.includes("sopendo") || searchStr.includes("saswar") || searchStr.includes("edukasi")) matchedCategory = "Paket Sopendo / Saswar / Edukasi";
-                else if (searchStr.includes("fotografer") || searchStr.includes("foto")) matchedCategory = "Jasa Fotografer";
-                else if (searchStr.includes("sewa kostum keluar")) matchedCategory = "Sewa kostum keluar";
-                else {
-                    const found = allSalesCategories.find(c => searchStr.includes(c.toLowerCase()));
-                    matchedCategory = found || (allSalesCategories[0] || "Lainnya");
-                }
-
-                if (expenseMap[matchedCategory] !== undefined) {
-                    expenseMap[matchedCategory] += cf.amount;
-                } else {
-                    expenseMap[matchedCategory] = cf.amount;
-                }
-            }
-        });
-
-        // Tambahkan pengeluaran custom manual
-        customExpenses.forEach(item => {
-            const val = Number(item.total) || 0;
-            if (val > 0) {
-                hasData = true;
-                const itemCat = (item.category || '').toLowerCase();
-                let matchedCategory = null;
-
-                if (itemCat.includes("tiket")) matchedCategory = "Tiket Masuk";
-                else if (itemCat.includes("sewa kostum") || itemCat.includes("kostum")) matchedCategory = "Sewa Kostum";
-                else if (itemCat.includes("toko") || itemCat.includes("souvenir") || itemCat.includes("sovenir")) matchedCategory = "Toko / Souvenir";
-                else if (itemCat.includes("kafe") || itemCat.includes("cafe") || itemCat.includes("resto")) matchedCategory = "Kafe & Resto";
-                else if (itemCat.includes("kios")) matchedCategory = "Kios";
-                else if (itemCat.includes("sopendo") || itemCat.includes("saswar") || itemCat.includes("edukasi")) matchedCategory = "Paket Sopendo / Saswar / Edukasi";
-                else if (itemCat.includes("fotografer") || itemCat.includes("foto")) matchedCategory = "Jasa Fotografer";
-                else if (itemCat.includes("sewa kostum keluar")) matchedCategory = "Sewa kostum keluar";
-                else {
-                    const cleanCat = item.category.replace(/^\d+\)\s*/, '');
-                    const found = allSalesCategories.find(c => cleanCat.toLowerCase().includes(c.toLowerCase()));
-                    matchedCategory = found || cleanCat;
-                }
-
-                if (expenseMap[matchedCategory] !== undefined) {
-                    expenseMap[matchedCategory] += val;
-                } else {
-                    expenseMap[matchedCategory] = val;
-                }
-            }
-        });
-
-        const newExpenseRows = Object.entries(expenseMap).map(([name, val]) => ({
-            name,
-            amount: val === 0 ? "" : String(val)
-        }));
-
         if (hasData) {
             setSalesRows(newSalesRows);
-            setExpenseRows(newExpenseRows);
         } else {
             setSalesRows(allSalesCategories.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" })));
-            setExpenseRows(allSalesCategories.map(name => ({ name, amount: "" })));
         }
-    }, [tanggal, transactionsStr, cashflowsStr, categoriesStr, JSON.stringify(customExpenses)]);
+    }, [tanggal, transactionsStr, categoriesStr]);
 
     const [autoSaveStatus, setAutoSaveStatus] = useState("idle");
 
@@ -588,14 +513,55 @@ export default function BeritaAcaraPage() {
             setSalesRows(prev => prev.filter((_, i) => i !== index));
         }
     };
+
+    const addExpenseRow = () => {
+        setExpenseRows(prev => [...prev, { name: "", amount: "" }]);
+    };
+
+    const deleteExpenseRow = (index) => {
+        setExpenseRows(prev => {
+            if (prev.length <= 1) {
+                return [{ name: "", amount: "" }];
+            }
+            return prev.filter((_, i) => i !== index);
+        });
+    };
+
+    const handleClearExpenses = () => {
+        if (confirm("Kosongkan semua isian pada tabel pengeluaran?")) {
+            setExpenseRows([
+                { name: "", amount: "" },
+                { name: "", amount: "" },
+                { name: "", amount: "" },
+                { name: "", amount: "" },
+                { name: "", amount: "" },
+                { name: "", amount: "" }
+            ]);
+        }
+    };
+
     const currentExpenseRows = viewingArchive
         ? (viewingArchive.expenseRows
             ? viewingArchive.expenseRows
             : (viewingArchive.expenses
                 ? (viewingArchive.expenseNames
                     ? viewingArchive.expenseNames.map((name, idx) => ({ name, amount: viewingArchive.expenses[idx] ?? "" }))
-                    : allSalesCategories.map((name, idx) => ({ name, amount: viewingArchive.expenses[idx] ?? "" })))
-                : allSalesCategories.map(name => ({ name, amount: "" }))))
+                    : [
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" }
+                    ])
+                : [
+                    { name: "", amount: "" },
+                    { name: "", amount: "" },
+                    { name: "", amount: "" },
+                    { name: "", amount: "" },
+                    { name: "", amount: "" },
+                    { name: "", amount: "" }
+                ]))
         : expenseRows;
     const currentCustomExpenses = viewingArchive ? viewingArchive.customExpenses : customExpenses;
     const currentCatatan = viewingArchive ? viewingArchive.catatan : catatan;
@@ -1337,11 +1303,6 @@ export default function BeritaAcaraPage() {
                                         <td className="text-right text-red-700">Rp {totalHppTunai.toLocaleString('id-ID')}</td>
                                         <td className="text-right text-green-700">Rp {totalProfitTunai.toLocaleString('id-ID')}</td>
                                     </tr>
-                                    <tr className="bg-red-50/80 font-semibold text-red-700 text-xs">
-                                        <td colSpan={2} className="text-right">DIPOTONG PENGELUARAN (V)</td>
-                                        <td className="text-right font-bold text-red-700">- Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
-                                        <td colSpan={2} className="text-gray-500 font-normal italic text-[9px] text-center">Terpotong Otomatis</td>
-                                    </tr>
                                     <tr className="bg-emerald-100 font-bold text-emerald-900">
                                         <td colSpan={2} className="text-right">SETORAN TUNAI BERSIH (NETTO)</td>
                                         <td className="text-right text-emerald-800 text-xs font-bold">Rp {netto.toLocaleString('id-ID')}</td>
@@ -1501,13 +1462,36 @@ export default function BeritaAcaraPage() {
 
                         {/* Section V (Pengeluaran) */}
                         <div>
-                            <div className="brown-header">V. LAPORAN PENGELUARAN</div>
+                            <div className="brown-header flex justify-between items-center">
+                                <span>V. LAPORAN PENGELUARAN</span>
+                                {!viewingArchive && (
+                                    <div className="flex items-center gap-1 print:hidden">
+                                        <button 
+                                            type="button" 
+                                            onClick={addExpenseRow}
+                                            className="text-[9px] bg-amber-700 hover:bg-amber-600 text-white px-1.5 py-0.5 rounded font-bold transition-colors shadow-2xs"
+                                            title="Tambah Baris Pengeluaran Manual"
+                                        >
+                                            + Tambah Baris
+                                        </button>
+                                        <button 
+                                            type="button" 
+                                            onClick={handleClearExpenses}
+                                            className="text-[9px] bg-red-800 hover:bg-red-700 text-white px-1.5 py-0.5 rounded font-bold transition-colors shadow-2xs"
+                                            title="Kosongkan Semua Baris Pengeluaran"
+                                        >
+                                            Kosongkan
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                             <table className="report-table">
                                 <thead>
                                     <tr>
-                                        <th style={{ width: '10%' }}>No</th>
-                                        <th style={{ width: '60%' }}>KATEGORI PENGELUARAN</th>
-                                        <th style={{ width: '30%' }}>Jumlah (Rp)</th>
+                                        <th style={{ width: '8%' }}>No</th>
+                                        <th style={{ width: '58%' }}>KATEGORI PENGELUARAN</th>
+                                        <th style={{ width: '28%' }}>Jumlah (Rp)</th>
+                                        {!viewingArchive && <th style={{ width: '6%' }} className="print:hidden">Aksi</th>}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1520,6 +1504,7 @@ export default function BeritaAcaraPage() {
                                                     className="editable-cell" 
                                                     value={row.name} 
                                                     onChange={(e) => handleExpenseRowChange(idx, 'name', e.target.value)} 
+                                                    placeholder="Tulis kategori pengeluaran..."
                                                     readOnly={!!viewingArchive}
                                                 />
                                             </td>
@@ -1533,11 +1518,24 @@ export default function BeritaAcaraPage() {
                                                     readOnly={!!viewingArchive}
                                                 />
                                             </td>
+                                            {!viewingArchive && (
+                                                <td className="text-center print:hidden p-0.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => deleteExpenseRow(idx)}
+                                                        className="text-red-500 hover:text-red-700 p-0.5 rounded hover:bg-red-50"
+                                                        title="Hapus Baris Ini"
+                                                    >
+                                                        <Trash2 size={11} />
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
                                     ))}
                                     <tr className="bg-[#f5e6d3] font-bold">
-                                        <td colSpan={2} className="text-right">TOTAL PENGELUARAN</td>
+                                        <td colSpan={!viewingArchive ? 2 : 2} className="text-right">TOTAL PENGELUARAN</td>
                                         <td className="text-right text-red-700">Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
+                                        {!viewingArchive && <td className="print:hidden"></td>}
                                     </tr>
                                 </tbody>
                             </table>
