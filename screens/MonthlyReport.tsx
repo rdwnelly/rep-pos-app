@@ -117,10 +117,12 @@ export const MonthlyReport: React.FC = () => {
     // Period Mode: 'tutup_buku' (18 s/d 17) | 'calendar' (1 s/d Akhir Bulan)
     const [periodMode, setPeriodMode] = useState<'tutup_buku' | 'calendar'>('tutup_buku');
 
-    // Month & Year State
+    // Month & Year State (Tutup Buku cutoff 18: date 18+ belongs to next month's closing period)
     const today = new Date();
-    const [selectedMonth, setSelectedMonth] = useState(today.getMonth()); // 0-11
-    const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+    const defaultInitialMonth = today.getDate() >= 18 ? (today.getMonth() + 1) % 12 : today.getMonth();
+    const defaultInitialYear = (today.getDate() >= 18 && today.getMonth() === 11) ? today.getFullYear() + 1 : today.getFullYear();
+    const [selectedMonth, setSelectedMonth] = useState(defaultInitialMonth); // 0-11
+    const [selectedYear, setSelectedYear] = useState(defaultInitialYear);
 
     // Active View Tab: 'berita_acara' | 'income_statement' | 'category_breakdown' | 'receivables' | 'cash_flow' | 'daily_trend'
     const [activeTab, setActiveTab] = useState<'berita_acara' | 'income_statement' | 'category_breakdown' | 'receivables' | 'cash_flow' | 'daily_trend'>('berita_acara');
@@ -136,6 +138,11 @@ export const MonthlyReport: React.FC = () => {
     // Manual OPEX & WhatsApp State
     const [isSharingWA, setIsSharingWA] = useState<boolean>(false);
     const [showExpenseModal, setShowExpenseModal] = useState<boolean>(false);
+    const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+    const [categoryDetailsModal, setCategoryDetailsModal] = useState<{
+        categoryName: string;
+        items: CashFlow[];
+    } | null>(null);
     const [expenseForm, setExpenseForm] = useState<{
         date: string;
         category: string;
@@ -145,7 +152,7 @@ export const MonthlyReport: React.FC = () => {
         paymentMethod: PaymentMethod;
         bankId: string;
     }>({
-        date: new Date().toISOString().split('T')[0],
+        date: toMySQLDate(new Date()).slice(0, 10),
         category: 'Beban Operasional Kasir & Toko',
         customCategory: '',
         description: '',
@@ -725,22 +732,29 @@ export const MonthlyReport: React.FC = () => {
             'Beban Operasional Lain-lain': 0,
         };
 
+        const categoryItemsMap: Record<string, CashFlow[]> = {};
+        Object.keys(categoriesMap).forEach(k => {
+            categoryItemsMap[k] = [];
+        });
+
         let cashExpenses = 0;
         let nonCashExpenses = 0;
         const periodExpenseList: CashFlow[] = [];
 
         filteredCashFlows.forEach(c => {
-            if (c.type === CashFlowType.OUT && (!c.referenceId || c.category === 'Beban Gaji' || c.category === 'Operasional' || c.category === 'Dividen' || c.category.toLowerCase().includes('beban') || c.category.toLowerCase().includes('biaya'))) {
-                const catLower = (c.category || '').toLowerCase();
-                const descLower = (c.description || '').toLowerCase();
-                const text = catLower + " " + descLower;
+            if (!c) return;
+            const catStr = (c.category || '').trim();
+            const catLower = catStr.toLowerCase();
+            const descLower = (c.description || '').toLowerCase();
+            const text = catLower + " " + descLower;
 
+            if (c.type === CashFlowType.OUT) {
                 periodExpenseList.push(c);
 
                 let targetCategory = '';
                 if (text.includes('gaji') || text.includes('upah') || text.includes('salary') || text.includes('lembur') || text.includes('bonus')) {
                     targetCategory = 'Beban Gaji & Upah';
-                } else if (text.includes('listrik') || text.includes('pln') || text.includes('pdam') || text.includes('air') || text.includes('internet') || text.includes('wifi') || text.includes('pulsa')) {
+                } else if (text.includes('listrik') || text.includes('pln') || text.includes('pdam') || text.includes('air') || text.includes('internet') || text.includes('wifi') || text.includes('pulsa') || text.includes('token')) {
                     targetCategory = 'Beban Listrik, Air & Internet';
                 } else if (text.includes('makan') || text.includes('lunch') || text.includes('snack') || text.includes('konsumsi')) {
                     targetCategory = 'Beban Konsumsi & Makan Siang Karyawan';
@@ -756,10 +770,10 @@ export const MonthlyReport: React.FC = () => {
                     targetCategory = 'Beban Transportasi & Logistik';
                 } else if (text.includes('iklan') || text.includes('promo') || text.includes('ads') || text.includes('brosur') || text.includes('marketing')) {
                     targetCategory = 'Beban Pemasaran & Promosi';
-                } else if (text.includes('operasional') || text.includes('kebersihan') || text.includes('toko')) {
+                } else if (text.includes('operasional') || text.includes('kebersihan') || text.includes('toko') || text.includes('kasir')) {
                     targetCategory = 'Beban Operasional Kasir & Toko';
-                } else if (c.category && c.category.trim() && c.category !== 'Operasional' && c.category !== 'Lain-lain') {
-                    targetCategory = c.category.trim();
+                } else if (catStr && catStr !== 'Operasional' && catStr !== 'Lain-lain') {
+                    targetCategory = catStr;
                 } else {
                     targetCategory = 'Beban Operasional Lain-lain';
                 }
@@ -767,17 +781,26 @@ export const MonthlyReport: React.FC = () => {
                 if (!categoriesMap[targetCategory]) {
                     categoriesMap[targetCategory] = 0;
                 }
-                categoriesMap[targetCategory] += c.amount;
+                if (!categoryItemsMap[targetCategory]) {
+                    categoryItemsMap[targetCategory] = [];
+                }
+
+                categoriesMap[targetCategory] += (c.amount || 0);
+                categoryItemsMap[targetCategory].push(c);
 
                 if (c.paymentMethod === PaymentMethod.CASH || !c.paymentMethod) {
-                    cashExpenses += c.amount;
+                    cashExpenses += (c.amount || 0);
                 } else {
-                    nonCashExpenses += c.amount;
+                    nonCashExpenses += (c.amount || 0);
                 }
             }
         });
 
-        const list = Object.entries(categoriesMap).map(([name, amount]) => ({ name, amount }));
+        const list = Object.entries(categoriesMap).map(([name, amount]) => ({
+            name,
+            amount,
+            items: categoryItemsMap[name] || []
+        }));
         const activeList = list.filter(item => item.amount > 0);
         const totalOperatingExpenses = list.reduce((sum, item) => sum + item.amount, 0);
 
@@ -787,7 +810,8 @@ export const MonthlyReport: React.FC = () => {
             totalOperatingExpenses,
             cashExpenses,
             nonCashExpenses,
-            periodExpenseList
+            periodExpenseList,
+            categoryItemsMap
         };
     }, [filteredCashFlows]);
 
@@ -979,6 +1003,55 @@ export const MonthlyReport: React.FC = () => {
         return (currentUser?.name || currentUser?.username || 'RIDWAN ELLY').toUpperCase();
     }, [currentUser]);
 
+    // Helper to get default date for form within currently viewed periodRange
+    const getPeriodDefaultDate = (range: typeof periodRange) => {
+        const now = new Date();
+        const nowTime = now.getTime();
+        if (nowTime >= range.startTime && nowTime <= range.endTime) {
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+        const d = range.end;
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+
+    const handleOpenExpenseModal = () => {
+        setEditingExpenseId(null);
+        setExpenseForm(prev => ({
+            ...prev,
+            date: getPeriodDefaultDate(periodRange),
+            amount: '',
+            description: '',
+            category: 'Beban Operasional Kasir & Toko',
+            customCategory: '',
+            paymentMethod: PaymentMethod.CASH,
+            bankId: ''
+        }));
+        setShowExpenseModal(true);
+    };
+
+    const handleEditExpense = (cf: CashFlow) => {
+        setEditingExpenseId(cf.id);
+        const isStandard = OPEX_CATEGORIES.includes(cf.category);
+        const numAmount = cf.amount || 0;
+        setExpenseForm({
+            date: cf.date ? cf.date.slice(0, 10) : getPeriodDefaultDate(periodRange),
+            category: isStandard ? cf.category : 'LAINNYA',
+            customCategory: isStandard ? '' : cf.category,
+            description: cf.description || '',
+            amount: numAmount > 0 ? new Intl.NumberFormat('id-ID').format(numAmount) : '',
+            paymentMethod: (cf.paymentMethod as PaymentMethod) || PaymentMethod.CASH,
+            bankId: cf.bankId || ''
+        });
+        setCategoryDetailsModal(null);
+        setShowExpenseModal(true);
+    };
+
     // ========================================================
     // MANUAL EXPENSE HANDLERS
     // ========================================================
@@ -1001,27 +1074,62 @@ export const MonthlyReport: React.FC = () => {
         setIsSubmittingExpense(true);
         try {
             const selectedBank = banks.find(b => b.id === expenseForm.bankId);
-            const entryDate = expenseForm.date ? `${expenseForm.date} ${new Date().toTimeString().split(' ')[0]}` : toMySQLDate(new Date());
+            const entryTime = new Date().toTimeString().split(' ')[0];
+            const entryDate = expenseForm.date ? `${expenseForm.date} ${entryTime}` : toMySQLDate(new Date());
 
-            const newCf: CashFlow = {
-                id: generateId(),
-                date: entryDate,
-                type: CashFlowType.OUT,
-                category: chosenCategory,
-                description: expenseForm.description.trim(),
-                amount: numAmount,
-                paymentMethod: expenseForm.paymentMethod,
-                bankId: expenseForm.bankId || undefined,
-                bankName: selectedBank?.bankName || undefined,
-                userId: currentUser?.id || undefined,
-                userName: currentUser?.name || currentUser?.username || 'Kasir'
-            };
+            if (editingExpenseId) {
+                const updatedCf: CashFlow = {
+                    id: editingExpenseId,
+                    date: entryDate,
+                    type: CashFlowType.OUT,
+                    category: chosenCategory,
+                    description: expenseForm.description.trim(),
+                    amount: numAmount,
+                    paymentMethod: expenseForm.paymentMethod,
+                    bankId: expenseForm.bankId || undefined,
+                    bankName: selectedBank?.bankName || undefined,
+                    userId: currentUser?.id || undefined,
+                    userName: currentUser?.name || currentUser?.username || 'Kasir'
+                };
+                await StorageService.updateCashFlow(updatedCf);
+            } else {
+                const newCf: CashFlow = {
+                    id: generateId(),
+                    date: entryDate,
+                    type: CashFlowType.OUT,
+                    category: chosenCategory,
+                    description: expenseForm.description.trim(),
+                    amount: numAmount,
+                    paymentMethod: expenseForm.paymentMethod,
+                    bankId: expenseForm.bankId || undefined,
+                    bankName: selectedBank?.bankName || undefined,
+                    userId: currentUser?.id || undefined,
+                    userName: currentUser?.name || currentUser?.username || 'Kasir'
+                };
+                await StorageService.addCashFlow(newCf);
+            }
 
-            await StorageService.addCashFlow(newCf);
+            // Check if the saved expense falls in the current view
+            const expParsed = parseSafeDate(entryDate);
+            const expTime = expParsed.getTime();
+            const isInCurrentPeriod = expTime >= periodRange.startTime && expTime <= periodRange.endTime;
+
+            if (!isInCurrentPeriod) {
+                if (periodMode === 'tutup_buku') {
+                    const targetMonth = expParsed.getDate() >= 18 ? (expParsed.getMonth() + 1) % 12 : expParsed.getMonth();
+                    const targetYear = (expParsed.getDate() >= 18 && expParsed.getMonth() === 11) ? expParsed.getFullYear() + 1 : expParsed.getFullYear();
+                    setSelectedMonth(targetMonth);
+                    setSelectedYear(targetYear);
+                } else {
+                    setSelectedMonth(expParsed.getMonth());
+                    setSelectedYear(expParsed.getFullYear());
+                }
+            }
 
             // Reset form
+            setEditingExpenseId(null);
             setExpenseForm({
-                date: new Date().toISOString().split('T')[0],
+                date: getPeriodDefaultDate(periodRange),
                 category: 'Beban Operasional Kasir & Toko',
                 customCategory: '',
                 description: '',
@@ -1390,7 +1498,7 @@ _Tanggal cetak: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
 
                     {/* Button Input Manual Pengeluaran (OPEX) */}
                     <button
-                        onClick={() => setShowExpenseModal(true)}
+                        onClick={handleOpenExpenseModal}
                         className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
                         title="Input Manual Beban Operasional / Pengeluaran (OPEX)"
                     >
@@ -1489,7 +1597,7 @@ _Tanggal cetak: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
                         <div className="flex items-center justify-between">
                             <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Pengeluaran (Opex)</p>
                             <button
-                                onClick={() => setShowExpenseModal(true)}
+                                onClick={handleOpenExpenseModal}
                                 className="text-[10px] text-rose-600 hover:text-rose-800 font-bold flex items-center gap-0.5 ml-1"
                             >
                                 <Plus size={12} /> Input
@@ -1609,7 +1717,7 @@ _Tanggal cetak: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
 
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => setShowExpenseModal(true)}
+                            onClick={handleOpenExpenseModal}
                             className="px-2.5 py-1 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center gap-1"
                         >
                             <Plus size={13} /> Input Biaya
@@ -1866,7 +1974,7 @@ _Tanggal cetak: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
                                         <span>V. LAPORAN PENGELUARAN OPERASIONAL (BIAYA / OPEX)</span>
                                         <button
                                             type="button"
-                                            onClick={() => setShowExpenseModal(true)}
+                                            onClick={handleOpenExpenseModal}
                                             className="text-[8.5px] bg-white/20 hover:bg-white/30 text-white px-2 py-0.5 rounded font-bold transition-all print:hidden flex items-center gap-1"
                                             title="Input Tambah Beban / Biaya Operasional"
                                         >
@@ -1876,25 +1984,73 @@ _Tanggal cetak: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
                                     <table className="w-full text-left border-collapse ba-table text-[10px] print:text-[6.6pt]">
                                         <thead>
                                             <tr>
-                                                <th style={{ width: '8%' }}>No</th>
-                                                <th style={{ width: '62%' }}>Pos Pengeluaran</th>
-                                                <th style={{ width: '30%' }}>Jumlah (Rp)</th>
+                                                <th style={{ width: '8%' }} className="text-center">No</th>
+                                                <th style={{ width: '56%' }}>Pos Pengeluaran</th>
+                                                <th style={{ width: '24%' }} className="text-right">Jumlah (Rp)</th>
+                                                <th style={{ width: '12%' }} className="text-center print:hidden">Aksi</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {expenseBreakdown.activeList.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={3} className="p-3 text-center text-slate-400 italic text-[9.5px] print:text-[6.2pt]">
+                                                    <td colSpan={4} className="p-3 text-center text-slate-400 italic text-[9.5px] print:text-[6.2pt]">
                                                         Belum ada catatan pengeluaran operasional (biaya) yang terinput pada periode ini.
                                                     </td>
                                                 </tr>
                                             ) : (
                                                 expenseBreakdown.activeList.map((exp, idx) => (
-                                                    <tr key={exp.name} className="hover:bg-slate-50">
+                                                    <tr key={exp.name} className="hover:bg-slate-50 group">
                                                         <td className="text-center font-mono text-slate-600">{idx + 1}</td>
-                                                        <td className="font-medium text-slate-800">{exp.name}</td>
+                                                        <td className="font-medium text-slate-800">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold">{exp.name}</span>
+                                                                {exp.items && exp.items.length === 1 && exp.items[0].description && exp.items[0].description !== exp.name && (
+                                                                    <span className="text-[8.5px] text-slate-500 font-normal italic">
+                                                                        {exp.items[0].description} ({exp.items[0].paymentMethod || 'CASH'})
+                                                                    </span>
+                                                                )}
+                                                                {exp.items && exp.items.length > 1 && (
+                                                                    <span className="text-[8.5px] text-amber-700 font-semibold">
+                                                                        {exp.items.length} transaksi terkelompok
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
                                                         <td className="text-right font-mono font-bold text-red-600">
                                                             {formatIDR(exp.amount)}
+                                                        </td>
+                                                        <td className="text-center print:hidden p-1">
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                {exp.items && exp.items.length === 1 ? (
+                                                                    <>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleEditExpense(exp.items[0])}
+                                                                            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                                                            title="Edit Catatan Pengeluaran"
+                                                                        >
+                                                                            <Edit3 size={12} />
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleDeleteExpense(exp.items[0].id)}
+                                                                            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                                                                            title="Hapus Catatan Pengeluaran"
+                                                                        >
+                                                                            <Trash2 size={12} />
+                                                                        </button>
+                                                                    </>
+                                                                ) : (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setCategoryDetailsModal({ categoryName: exp.name, items: exp.items || [] })}
+                                                                        className="px-1.5 py-0.5 text-[8.5px] bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 font-bold rounded flex items-center gap-1 transition-all"
+                                                                        title="Kelola & Edit Rincian Transaksi"
+                                                                    >
+                                                                        <Edit3 size={10} /> Kelola ({exp.items?.length || 0})
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))
@@ -1902,6 +2058,7 @@ _Tanggal cetak: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
                                             <tr className="bg-[#fee2e2] font-extrabold text-red-950 ba-highlight-pink border-t border-slate-300">
                                                 <td colSpan={2} className="text-right uppercase">TOTAL PENGELUARAN OPERASIONAL</td>
                                                 <td className="text-right font-mono text-red-700 font-black">{formatIDR(expenseBreakdown.totalOperatingExpenses)}</td>
+                                                <td className="print:hidden"></td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -2555,7 +2712,7 @@ _Tanggal cetak: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
                                 <p className="text-xs text-slate-500">Kelola dan input seluruh arus kas masuk serta pengeluaran biaya operasional toko</p>
                             </div>
                             <button
-                                onClick={() => setShowExpenseModal(true)}
+                                onClick={handleOpenExpenseModal}
                                 className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
                             >
                                 <PlusCircle size={15} /> + Input Pengeluaran (OPEX)
@@ -2651,13 +2808,22 @@ _Tanggal cetak: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
                                                         - {formatIDR(exp.amount)}
                                                     </td>
                                                     <td className="p-3 text-center">
-                                                        <button
-                                                            onClick={() => handleDeleteExpense(exp.id)}
-                                                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                                            title="Hapus Catatan Pengeluaran Ini"
-                                                        >
-                                                            <Trash2 size={14} />
-                                                        </button>
+                                                        <div className="flex items-center justify-center gap-1.5">
+                                                            <button
+                                                                onClick={() => handleEditExpense(exp)}
+                                                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                                title="Edit Catatan Pengeluaran Ini"
+                                                            >
+                                                                <Edit3 size={14} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteExpense(exp.id)}
+                                                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                                                title="Hapus Catatan Pengeluaran Ini"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))
@@ -2744,11 +2910,15 @@ _Tanggal cetak: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
                         <div className="px-5 py-4 bg-gradient-to-r from-rose-700 to-rose-900 text-white flex justify-between items-center shrink-0">
                             <div className="flex items-center gap-2.5">
                                 <div className="p-2 bg-white/20 rounded-xl">
-                                    <TrendingDown size={20} />
+                                    {editingExpenseId ? <Edit3 size={20} /> : <TrendingDown size={20} />}
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-black tracking-tight">Input Beban Operasional (OPEX)</h3>
-                                    <p className="text-[11px] text-rose-100">Catat pengeluaran operasional toko untuk Tutup Buku</p>
+                                    <h3 className="text-base font-black tracking-tight">
+                                        {editingExpenseId ? 'Edit Beban Operasional (OPEX)' : 'Input Beban Operasional (OPEX)'}
+                                    </h3>
+                                    <p className="text-[11px] text-rose-100">
+                                        {editingExpenseId ? 'Perbarui data catatan pengeluaran operasional toko' : 'Catat pengeluaran operasional toko untuk Tutup Buku'}
+                                    </p>
                                 </div>
                             </div>
                             <button
@@ -2866,8 +3036,11 @@ _Tanggal cetak: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
                             {/* Tanggal & Metode Pembayaran (Grid 2 Kolom) */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5">
-                                        Tanggal Pengeluaran <span className="text-rose-600">*</span>
+                                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5 flex justify-between items-center">
+                                        <span>Tanggal Pengeluaran <span className="text-rose-600">*</span></span>
+                                        <span className="text-[10px] text-amber-700 font-mono font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200" title="Periode Aktif">
+                                            {periodRange.shortLabel}
+                                        </span>
                                     </label>
                                     <input
                                         type="date"
@@ -2939,10 +3112,99 @@ _Tanggal cetak: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
                                     className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-rose-600/20 active:scale-95 flex items-center gap-1.5 disabled:opacity-50"
                                 >
                                     {isSubmittingExpense ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
-                                    Simpan Pengeluaran
+                                    {editingExpenseId ? 'Simpan Perubahan' : 'Simpan Pengeluaran'}
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Category Details Modal for Multiple Items */}
+            {categoryDetailsModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 animate-fade-in print:hidden">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                        <div className="px-5 py-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
+                                    <Edit3 size={18} />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black tracking-tight">Rincian Pos: {categoryDetailsModal.categoryName}</h3>
+                                    <p className="text-[11px] text-slate-300">Pilih transaksi untuk mengedit atau menghapus data pengeluaran</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setCategoryDetailsModal(null)}
+                                className="p-1 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto flex-1">
+                            <table className="w-full text-left text-xs border-collapse">
+                                <thead className="bg-slate-100 text-slate-700 font-extrabold uppercase tracking-wider border-b border-slate-200">
+                                    <tr>
+                                        <th className="p-2.5 text-center w-10">No</th>
+                                        <th className="p-2.5 w-28">Tanggal</th>
+                                        <th className="p-2.5">Keterangan</th>
+                                        <th className="p-2.5 text-center w-24">Metode</th>
+                                        <th className="p-2.5 text-right w-32 text-rose-700 font-bold">Nominal</th>
+                                        <th className="p-2.5 text-center w-20">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 font-medium">
+                                    {categoryDetailsModal.items.map((item, idx) => (
+                                        <tr key={item.id} className="hover:bg-slate-50">
+                                            <td className="p-2.5 text-center font-mono text-slate-500">{idx + 1}</td>
+                                            <td className="p-2.5 font-mono text-slate-600">{new Date(item.date).toLocaleDateString('id-ID')}</td>
+                                            <td className="p-2.5 text-slate-800">{item.description}</td>
+                                            <td className="p-2.5 text-center">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.paymentMethod === PaymentMethod.CASH ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'}`}>
+                                                    {item.paymentMethod || 'CASH'}
+                                                </span>
+                                            </td>
+                                            <td className="p-2.5 text-right font-mono font-bold text-rose-700">{formatIDR(item.amount)}</td>
+                                            <td className="p-2.5 text-center">
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleEditExpense(item)}
+                                                        className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                                                        title="Edit Pengeluaran Ini"
+                                                    >
+                                                        <Edit3 size={14} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            await handleDeleteExpense(item.id);
+                                                            setCategoryDetailsModal(prev => prev ? {
+                                                                ...prev,
+                                                                items: prev.items.filter(i => i.id !== item.id)
+                                                            } : null);
+                                                        }}
+                                                        className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-colors"
+                                                        title="Hapus Pengeluaran Ini"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs">
+                            <span className="font-bold text-slate-600">Total: {formatIDR(categoryDetailsModal.items.reduce((s, i) => s + (i.amount || 0), 0))}</span>
+                            <button
+                                onClick={() => setCategoryDetailsModal(null)}
+                                className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg text-xs"
+                            >
+                                Tutup
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
