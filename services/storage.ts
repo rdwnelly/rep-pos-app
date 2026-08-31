@@ -72,19 +72,19 @@ export const StorageService = {
   },
   saveCategory: async (category: Category) => {
     if (!category.id) {
-        await ApiService.saveCategory(category);
+      await ApiService.saveCategory(category);
     } else {
-        await ApiService.updateCategory(category);
-        
-        // Cascade the name update to all products that use this category
-        const allProducts = await ApiService.getProducts();
-        const productsToUpdate = allProducts.filter(p => p.categoryId === category.id && p.categoryName !== category.name);
-        
-        if (productsToUpdate.length > 0) {
-            const updatedProducts = productsToUpdate.map(p => ({ ...p, categoryName: category.name }));
-            await ApiService.saveProductsBulk(updatedProducts);
-            notifyListeners('products');
-        }
+      await ApiService.updateCategory(category);
+
+      // Cascade the name update to all products that use this category
+      const allProducts = await ApiService.getProducts();
+      const productsToUpdate = allProducts.filter(p => p.categoryId === category.id && p.categoryName !== category.name);
+
+      if (productsToUpdate.length > 0) {
+        const updatedProducts = productsToUpdate.map(p => ({ ...p, categoryName: category.name }));
+        await ApiService.saveProductsBulk(updatedProducts);
+        notifyListeners('products');
+      }
     }
     notifyListeners('categories');
   },

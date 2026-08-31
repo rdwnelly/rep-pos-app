@@ -44,7 +44,31 @@ const mapCategoryNameToSalesRow = (catName) => {
 
 const FIXED_EXPENSE_CATEGORIES = BASE_SALES_CATEGORIES;
 
-const DEFAULT_CATEGORY_OPTIONS = BASE_SALES_CATEGORIES.map((cat, idx) => `${idx + 1}) ${cat}`);
+const OPEX_STANDARD_CATEGORIES = [
+    "Pembelanjaan Café",
+    "Listrik / PLN",
+    "Transportasi / BBM",
+    "Makan Siang Karyawan",
+    "Perlengkapan & ATK",
+    "REPARASI & Servis",
+    "Panjar / Kasbon",
+    "Beban Sewa & Pemeliharaan",
+    "Beban Gaji & Upah",
+    "Operasional Kasir & Toko",
+    "Operasional Lain-lain"
+];
+
+const buildDefaultCategoryOptions = (salesCategories = BASE_SALES_CATEGORIES) => {
+    const list = salesCategories.map((cat, idx) => `${idx + 1}) ${cat}`);
+    OPEX_STANDARD_CATEGORIES.forEach(opCat => {
+        if (!list.includes(opCat)) {
+            list.push(opCat);
+        }
+    });
+    return list;
+};
+
+const DEFAULT_CATEGORY_OPTIONS = buildDefaultCategoryOptions(BASE_SALES_CATEGORIES);
 
 const DETAILED_EXPENSE_CONFIG = [
     { title: "VI. URAIAN PENGELUARAN (Tiket Masuk)", rows: 10 },
@@ -67,21 +91,22 @@ const DETAILED_EXPENSE_CONFIG = [
 // Helper to map category dropdown to the correct printable table
 const mapCategoryToSection = (cat) => {
     if (!cat) return "VI. URAIAN PENGELUARAN (Lain-lain)";
-    if (cat.includes("Tiket")) return "VI. URAIAN PENGELUARAN (Tiket Masuk)";
-    if (cat.includes("Sewa Kostum") || cat.includes("Kostum")) return "VI. URAIAN PENGELUARAN (Sewa Kostum)";
-    if (cat.includes("Toko") || cat.includes("Souvenir") || cat.includes("Sovenir")) return "VI. URAIAN PENGELUARAN (Toko / Souvenir)";
-    if (cat.includes("CAFÉ") || cat.includes("Kafe") || cat.includes("Resto")) return "VI. URAIAN PENGELUARAN (Pembelanjaan Café)";
-    if (cat.includes("KIOS") || cat.includes("Kios")) return "VI. URAIAN PENGELUARAN (Biaya Kios)";
-    if (cat.includes("Sopendo") || cat.includes("Saswar") || cat.includes("Edukasi")) return "VI. URAIAN PENGELUARAN (Paket Sopendo / Saswar / Edukasi)";
-    if (cat.includes("Fotografer") || cat.includes("Foto")) return "VI. URAIAN PENGELUARAN (Jasa Fotografer)";
-    if (cat.includes("Sewa kostum keluar")) return "VI. URAIAN PENGELUARAN (Sewa kostum keluar)";
-    if (cat.includes("REPARASI") || cat.includes("Reparasi")) return "VI. URAIAN PENGELUARAN (REPARASI)";
-    if (cat.includes("TRANSPORTASI") || cat.includes("Transportasi")) return "VI. URAIAN PENGELUARAN (Transportasi)";
-    if (cat.includes("LISTRIK") || cat.includes("Listrik")) return "VI. URAIAN PENGELUARAN (Listrik)";
-    if (cat.includes("Makan Siang")) return "VI. URAIAN PENGELUARAN (Makan Siang Karyawan)";
-    if (cat.includes("PERLENGKAPAN") || cat.includes("Perlengkapan")) return "VI. URAIAN PENGELUARAN (Perlengkapan)";
-    if (cat.includes("PANJAR") || cat.includes("Panjar")) return "VI. URAIAN PENGELUARAN (Panjar)";
-    if (cat.includes("LAIN-LAIN") || cat.includes("Lain-lain")) return "VI. URAIAN PENGELUARAN (Lain-lain)";
+    const lower = cat.toLowerCase();
+    if (lower.includes("tiket")) return "VI. URAIAN PENGELUARAN (Tiket Masuk)";
+    if (lower.includes("sewa kostum") || lower.includes("kostum")) return "VI. URAIAN PENGELUARAN (Sewa Kostum)";
+    if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "VI. URAIAN PENGELUARAN (Toko / Souvenir)";
+    if (lower.includes("café") || lower.includes("cafe") || lower.includes("kafe") || lower.includes("resto")) return "VI. URAIAN PENGELUARAN (Pembelanjaan Café)";
+    if (lower.includes("kios")) return "VI. URAIAN PENGELUARAN (Biaya Kios)";
+    if (lower.includes("sopendo") || lower.includes("saswar") || lower.includes("edukasi")) return "VI. URAIAN PENGELUARAN (Paket Sopendo / Saswar / Edukasi)";
+    if (lower.includes("fotografer") || lower.includes("foto")) return "VI. URAIAN PENGELUARAN (Jasa Fotografer)";
+    if (lower.includes("sewa kostum keluar")) return "VI. URAIAN PENGELUARAN (Sewa kostum keluar)";
+    if (lower.includes("reparasi") || lower.includes("service") || lower.includes("servis") || lower.includes("bengkel")) return "VI. URAIAN PENGELUARAN (REPARASI)";
+    if (lower.includes("transportasi") || lower.includes("transport") || lower.includes("bbm") || lower.includes("bensin") || lower.includes("ongkir")) return "VI. URAIAN PENGELUARAN (Transportasi)";
+    if (lower.includes("listrik") || lower.includes("pln") || lower.includes("token") || lower.includes("pdam") || lower.includes("air") || lower.includes("internet") || lower.includes("wifi")) return "VI. URAIAN PENGELUARAN (Listrik)";
+    if (lower.includes("makan") || lower.includes("konsumsi") || lower.includes("lunch") || lower.includes("snack")) return "VI. URAIAN PENGELUARAN (Makan Siang Karyawan)";
+    if (lower.includes("perlengkapan") || lower.includes("atk") || lower.includes("kertas") || lower.includes("nota") || lower.includes("kresek") || lower.includes("plastik")) return "VI. URAIAN PENGELUARAN (Perlengkapan)";
+    if (lower.includes("panjar") || lower.includes("kasbon") || lower.includes("pinjaman")) return "VI. URAIAN PENGELUARAN (Panjar)";
+    if (lower.includes("lain-lain") || lower.includes("lainnya")) return "VI. URAIAN PENGELUARAN (Lain-lain)";
     const cleaned = cat.replace(/^\d+\)\s*/, '');
     return `VI. URAIAN PENGELUARAN (${cleaned})`;
 };
@@ -211,7 +236,7 @@ export default function BeritaAcaraPage() {
 
     const cashflowsStr = JSON.stringify(cashflows);
 
-    // Auto-populate expenses from CashFlow if not viewing archive and expenseRows is empty
+    // Auto-populate expenses from CashFlow if not viewing archive and customExpenses is empty
     useEffect(() => {
         if (!tanggal || viewingArchive) return;
         const currentCashflows = JSON.parse(cashflowsStr || '[]');
@@ -222,16 +247,69 @@ export default function BeritaAcaraPage() {
         });
 
         if (matchingExpenses.length > 0) {
-            setExpenseRows(prev => {
-                const hasExisting = prev.some(r => r.name || r.amount);
+            setCustomExpenses(prev => {
+                const hasExisting = prev.some(r => r.keterangan || Number(r.total) > 0 || Number(r.harga) > 0);
                 if (hasExisting) return prev;
-                return matchingExpenses.map(c => ({
-                    name: c.category + (c.description ? ` (${c.description})` : ''),
-                    amount: String(c.amount || '')
+                return matchingExpenses.map((c, idx) => ({
+                    id: c.id || Date.now() + idx,
+                    category: c.category || 'Operasional Kasir & Toko',
+                    keterangan: c.description || c.category || 'Pengeluaran Kasir',
+                    qty: '1',
+                    harga: String(c.amount || ''),
+                    total: String(c.amount || '')
                 }));
             });
         }
     }, [tanggal, cashflowsStr, viewingArchive]);
+
+    // Automatic Synchronization: Custom Expenses -> Section V (expenseRows)
+    useEffect(() => {
+        if (viewingArchive) return;
+
+        const activeItems = customExpenses.filter(item => 
+            (item.keterangan && item.keterangan.trim()) || 
+            (Number(item.total) > 0) || 
+            (Number(item.harga) > 0 && Number(item.qty) > 0)
+        );
+
+        if (activeItems.length > 0) {
+            const categoryMap = new Map();
+            activeItems.forEach(item => {
+                const rawCat = (item.category || 'Operasional Lain-lain').trim();
+                const displayCat = rawCat.replace(/^\d+\)\s*/, '').trim() || rawCat;
+                const itemTotal = Number(item.total) || (Number(item.qty || 1) * Number(item.harga || 0)) || 0;
+                
+                categoryMap.set(displayCat, (categoryMap.get(displayCat) || 0) + itemTotal);
+            });
+
+            const newRows = Array.from(categoryMap.entries()).map(([name, amount]) => ({
+                name,
+                amount: amount > 0 ? String(amount) : ''
+            }));
+
+            setExpenseRows(prev => {
+                if (JSON.stringify(prev) === JSON.stringify(newRows)) return prev;
+                return newRows;
+            });
+        } else {
+            // Check if customExpenses was intentionally cleared or reset to empty
+            const isCompletelyEmpty = customExpenses.length === 0 || (customExpenses.length === 1 && !customExpenses[0].keterangan && !customExpenses[0].total && !customExpenses[0].harga);
+            if (isCompletelyEmpty) {
+                setExpenseRows(prev => {
+                    const hasData = prev.some(r => r.name || (Number(r.amount) > 0));
+                    if (!hasData) return prev;
+                    return [
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" }
+                    ];
+                });
+            }
+        }
+    }, [JSON.stringify(customExpenses), viewingArchive]);
 
     const handleSyncFromCashFlow = () => {
         if (!tanggal) return;
@@ -247,21 +325,15 @@ export default function BeritaAcaraPage() {
             return;
         }
 
-        const newExpenseRows = matchingExpenses.map(c => ({
-            name: c.category + (c.description ? ` (${c.description})` : ''),
-            amount: String(c.amount || '')
-        }));
-
         const newCustomExpenses = matchingExpenses.map((c, idx) => ({
             id: c.id || Date.now() + idx,
-            category: c.category || '1) Tiket Masuk',
+            category: c.category || 'Operasional Kasir & Toko',
             keterangan: c.description || c.category || 'Pengeluaran Kasir',
             qty: '1',
             harga: String(c.amount || ''),
             total: String(c.amount || '')
         }));
 
-        setExpenseRows(newExpenseRows);
         setCustomExpenses(newCustomExpenses);
         alert(`Berhasil menarik ${matchingExpenses.length} catatan pengeluaran kasir dari sistem untuk tanggal ${tanggal}!`);
     };
@@ -567,6 +639,9 @@ export default function BeritaAcaraPage() {
                 { name: "", amount: "" },
                 { name: "", amount: "" }
             ]);
+            setCustomExpenses([
+                { id: Date.now(), category: categoryOptions[0] || '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
+            ]);
         }
     };
 
@@ -606,6 +681,9 @@ export default function BeritaAcaraPage() {
         currentCustomExpenses.forEach(item => {
             if (item.keterangan || item.qty || item.harga || item.total) {
                 const section = mapCategoryToSection(item.category);
+                if (!result[section]) {
+                    result[section] = [];
+                }
                 result[section].push(item);
             }
         });
@@ -624,19 +702,16 @@ export default function BeritaAcaraPage() {
         setExpenseRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: val } : row));
     };
 
-    // Custom Categories State & Management - disamakan dengan kategori Sumber Pendapatan
+    // Custom Categories State & Management
     const [categoryOptions, setCategoryOptions] = useState(() => {
-        const defaultList = BASE_SALES_CATEGORIES.map((cat, idx) => `${idx + 1}) ${cat}`);
+        const defaultList = buildDefaultCategoryOptions(BASE_SALES_CATEGORIES);
         if (typeof window !== 'undefined') {
             try {
                 const saved = localStorage.getItem('custom_expense_categories');
                 if (saved) {
                     const parsed = JSON.parse(saved);
                     if (Array.isArray(parsed) && parsed.length > 0) {
-                        const hasOldLegacy = parsed.some(c => c.includes("CAFÉ") || c.includes("REPARASI") || c.includes("LISTRIK PLN") || c.includes("PANJAR"));
-                        if (!hasOldLegacy) {
-                            return parsed;
-                        }
+                        return parsed;
                     }
                 }
             } catch (e) {
@@ -650,7 +725,7 @@ export default function BeritaAcaraPage() {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('custom_expense_categories');
             if (!saved) {
-                const newList = allSalesCategories.map((cat, idx) => `${idx + 1}) ${cat}`);
+                const newList = buildDefaultCategoryOptions(allSalesCategories);
                 setCategoryOptions(prev => {
                     if (JSON.stringify(prev) === JSON.stringify(newList)) return prev;
                     return newList;
@@ -697,8 +772,8 @@ export default function BeritaAcaraPage() {
     };
 
     const handleResetCategories = () => {
-        if (confirm("Kembalikan daftar kategori pengeluaran ke kategori bawaan (Sumber Pendapatan)?")) {
-            const defaultList = allSalesCategories.map((cat, idx) => `${idx + 1}) ${cat}`);
+        if (confirm("Kembalikan daftar kategori pengeluaran ke kategori bawaan?")) {
+            const defaultList = buildDefaultCategoryOptions(allSalesCategories);
             setCategoryOptions(defaultList);
             try {
                 localStorage.removeItem('custom_expense_categories');
@@ -1073,6 +1148,9 @@ export default function BeritaAcaraPage() {
                                                 {categoryOptions.map(cat => (
                                                     <option key={cat} value={cat}>{cat}</option>
                                                 ))}
+                                                {exp.category && !categoryOptions.includes(exp.category) && (
+                                                    <option value={exp.category}>{exp.category}</option>
+                                                )}
                                             </optgroup>
                                             <optgroup label="Opsi Tambahan">
                                                 <option value="__ADD_NEW__">➕ + Tambah Kategori Baru...</option>
@@ -1564,7 +1642,7 @@ export default function BeritaAcaraPage() {
                                                     <input 
                                                         type="text" 
                                                         className="editable-cell text-right font-mono font-bold text-red-700" 
-                                                        value={row.amount} 
+                                                        value={row.amount ? (isNaN(Number(row.amount)) ? row.amount : Number(row.amount).toLocaleString('id-ID')) : ''} 
                                                         onChange={(e) => handleExpenseRowChange(idx, 'amount', e.target.value)} 
                                                         placeholder="0"
                                                         readOnly={!!viewingArchive}
@@ -1624,9 +1702,14 @@ export default function BeritaAcaraPage() {
                 {/* Page 2: Detailed Expenses (Dynamic Masonry Layout) */}
                 <div id="berita-acara-page-2" className="print-page pb-8">
                     {(() => {
-                        const activeTables = DETAILED_EXPENSE_CONFIG.map(config => ({
-                            config,
-                            dataRows: derivedDetailedExpensesCurrent[config.title]
+                        const allSectionTitles = [
+                            ...DETAILED_EXPENSE_CONFIG.map(c => c.title),
+                            ...Object.keys(derivedDetailedExpensesCurrent).filter(t => !DETAILED_EXPENSE_CONFIG.some(c => c.title === t))
+                        ];
+
+                        const activeTables = allSectionTitles.map(title => ({
+                            config: { title },
+                            dataRows: derivedDetailedExpensesCurrent[title] || []
                         })).filter(t => t.dataRows && t.dataRows.length > 0);
 
                         if (activeTables.length === 0) return null;
