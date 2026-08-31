@@ -170,6 +170,13 @@ export const StorageService = {
     notifyListeners('transactions');
     notifyListeners('products');
     notifyListeners('cashflow');
+    notifyListeners('travel_booking_commissions');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('transactions_updated'));
+      window.dispatchEvent(new Event('products_updated'));
+      window.dispatchEvent(new Event('cashflow_updated'));
+      window.dispatchEvent(new Event('commissions_updated'));
+    }
   },
 
   // Purchases (Stock In)
@@ -193,6 +200,11 @@ export const StorageService = {
     notifyListeners('purchases');
     notifyListeners('products');
     notifyListeners('cashflow');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('purchases_updated'));
+      window.dispatchEvent(new Event('products_updated'));
+      window.dispatchEvent(new Event('cashflow_updated'));
+    }
   },
 
   // Cash Flow
