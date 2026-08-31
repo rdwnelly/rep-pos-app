@@ -1232,12 +1232,10 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     };
 
     const handleDeleteTransaction = async (id: string) => {
-        if (!confirm('Yakin ingin menghapus transaksi ini? Aksi ini tidak dapat dibatalkan.')) return;
+        if (!confirm('Yakin ingin menghapus transaksi ini? Stok barang akan otomatis dikembalikan ke inventaris toko dan catatan pendapatan/arus kas terkait akan disesuaikan.')) return;
         try {
             await StorageService.deleteTransaction(id);
-            window.dispatchEvent(new Event('transactions_updated'));
-            window.dispatchEvent(new Event('products_updated'));
-            alert("Transaksi berhasil dihapus.");
+            alert("Transaksi berhasil dihapus. Stok barang dan pendapatan telah otomatis dikembalikan.");
         } catch (error) {
             console.error("Failed to delete transaction:", error);
             alert("Gagal menghapus transaksi.");

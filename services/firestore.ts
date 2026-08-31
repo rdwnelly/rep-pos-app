@@ -292,8 +292,78 @@ export const FirestoreService = {
   },
   updateTransaction: async (transaction: Transaction) =>
     saveEntity<Transaction>("transactions", transaction),
-  deleteTransaction: async (id: string) =>
-    deleteDoc(doc(collectionRef("transactions"), id)),
+  deleteTransaction: async (id: string) => {
+    const txRef = doc(collectionRef("transactions"), id);
+    const txSnap = await getDoc(txRef);
+    if (!txSnap.exists()) return;
+
+    const txData = txSnap.data() as Transaction;
+    const batch = writeBatch(db);
+
+    // 1. Revert Stock for each item in the main transaction
+    if (Array.isArray(txData.items)) {
+      txData.items.forEach((item) => {
+        if (item && item.id) {
+          const productRef = doc(collectionRef("products"), item.id);
+          const quantity = Number(item.qty) || 0;
+          // Normal sale decremented stock (-qty), so deleting sale INCREMENTS stock back (+qty)
+          // Return transaction incremented stock (+qty), so deleting return DECREMENTS stock back (-qty)
+          const stockDelta = txData.type === TransactionType.RETURN ? -quantity : quantity;
+          batch.update(productRef, { stock: increment(stockDelta) });
+        }
+      });
+    }
+
+    // 2. Find and revert any child return transactions linked to this transaction
+    try {
+      const returnQuery = query(collectionRef("transactions"), where("originalTransactionId", "==", id));
+      const returnSnap = await getDocs(returnQuery);
+      returnSnap.docs.forEach((retDoc) => {
+        const retData = retDoc.data() as Transaction;
+        if (Array.isArray(retData.items)) {
+          retData.items.forEach((item) => {
+            if (item && item.id) {
+              const productRef = doc(collectionRef("products"), item.id);
+              const quantity = Number(item.qty) || 0;
+              batch.update(productRef, { stock: increment(-quantity) });
+            }
+          });
+        }
+        batch.delete(retDoc.ref);
+      });
+    } catch (e) {
+      console.warn("Could not query child return transactions:", e);
+    }
+
+    // 3. Find and delete linked Cash Flow entries (Pendapatan Kas Masuk / Pelunasan)
+    try {
+      const cfQuery = query(collectionRef("cashflow"), where("referenceId", "==", id));
+      const cfSnap = await getDocs(cfQuery);
+      cfSnap.docs.forEach((cfDoc) => {
+        batch.delete(cfDoc.ref);
+      });
+    } catch (e) {
+      console.warn("Could not query linked cash flows by referenceId:", e);
+    }
+
+    // 4. Find and delete linked travel agent commissions if any
+    try {
+      const invoiceNum = txData.invoiceNumber;
+      if (invoiceNum) {
+        const commQuery = query(collectionRef("travel_booking_commissions"), where("bookingCode", "==", invoiceNum));
+        const commSnap = await getDocs(commQuery);
+        commSnap.docs.forEach((commDoc) => {
+          batch.delete(commDoc.ref);
+        });
+      }
+    } catch (e) {
+      console.warn("Could not query linked travel agent commissions:", e);
+    }
+
+    // 5. Delete the main transaction document
+    batch.delete(txRef);
+    await batch.commit();
+  },
 
   getPurchases: async (): Promise<Purchase[]> =>
     getCollectionOrdered<Purchase>("purchases", "date", "desc"),
@@ -320,8 +390,40 @@ export const FirestoreService = {
   },
   updatePurchase: async (purchase: Purchase) =>
     saveEntity<Purchase>("purchases", purchase),
-  deletePurchase: async (id: string) =>
-    deleteDoc(doc(collectionRef("purchases"), id)),
+  deletePurchase: async (id: string) => {
+    const purRef = doc(collectionRef("purchases"), id);
+    const purSnap = await getDoc(purRef);
+    if (!purSnap.exists()) return;
+
+    const purData = purSnap.data() as Purchase;
+    const batch = writeBatch(db);
+
+    // Revert Stock for purchase (Purchase increased stock (+qty), deleting purchase DECREMENTS stock (-qty))
+    if (Array.isArray(purData.items)) {
+      purData.items.forEach((item) => {
+        if (item && item.id) {
+          const productRef = doc(collectionRef("products"), item.id);
+          const quantity = Number(item.qty) || 0;
+          const stockDelta = purData.type === PurchaseType.RETURN ? quantity : -quantity;
+          batch.update(productRef, { stock: increment(stockDelta) });
+        }
+      });
+    }
+
+    // Delete linked Cash Flow entries for purchase
+    try {
+      const cfQuery = query(collectionRef("cashflow"), where("referenceId", "==", id));
+      const cfSnap = await getDocs(cfQuery);
+      cfSnap.docs.forEach((cfDoc) => {
+        batch.delete(cfDoc.ref);
+      });
+    } catch (e) {
+      console.warn("Could not query linked cash flows for purchase:", e);
+    }
+
+    batch.delete(purRef);
+    await batch.commit();
+  },
 
   getCashFlow: async (): Promise<CashFlow[]> =>
     getCollectionOrdered<CashFlow>("cashflow", "date", "desc"),

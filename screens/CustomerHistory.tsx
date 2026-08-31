@@ -250,15 +250,13 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
     }, [filteredTransactions]);
 
     const handleDeleteTransaction = async (transactionId: string) => {
-        if (!confirm('Yakin ingin menghapus transaksi ini? Seluruh item dalam transaksi ini akan ikut terhapus. Aksi ini tidak dapat dibatalkan.')) return;
+        if (!confirm('Yakin ingin menghapus transaksi ini? Stok barang akan otomatis dikembalikan ke inventaris toko dan catatan pendapatan/arus kas terkait akan disesuaikan.')) return;
         try {
             await StorageService.deleteTransaction(transactionId);
-            window.dispatchEvent(new Event('transactions_updated'));
-            window.dispatchEvent(new Event('products_updated'));
             if (detailTransaction?.id === transactionId) {
                 setDetailTransaction(null);
             }
-            alert('Transaksi berhasil dihapus.');
+            alert('Transaksi berhasil dihapus. Stok barang dan pendapatan telah otomatis dikembalikan.');
         } catch (error) {
             console.error("Failed to delete transaction:", error);
             alert("Gagal menghapus transaksi.");
