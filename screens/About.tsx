@@ -128,7 +128,7 @@ export const About: React.FC = () => {
                             </div>
                             
                             <div className="flex flex-wrap gap-3 pt-2">
-                                <a href="https://wa.me/6281342310203" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg text-sm transition-colors backdrop-blur-sm">
+                                <a href="https://web.whatsapp.com/send?phone=6281342310203" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg text-sm transition-colors backdrop-blur-sm" title="Chat via WhatsApp Web">
                                     <SiWhatsapp size={16} className="text-green-400" />
                                     0813 4231 0203
                                 </a>

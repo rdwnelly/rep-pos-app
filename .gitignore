@@ -59,6 +59,7 @@ Desktop.ini
 
 # Local editor / backup files
 *.backup
+*.tsbuildinfo
 
 # Linux
 *~

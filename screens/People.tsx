@@ -580,12 +580,13 @@ export const People: React.FC = () => {
                             {item.phone && (
                                 <div className="pt-3 border-t border-slate-100 flex gap-2">
                                     <a
-                                        href={`https://wa.me/${formattedWa}`}
+                                        href={`https://web.whatsapp.com/send?phone=${formattedWa}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="flex-1 py-1.5 px-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-xl font-bold text-[11px] flex items-center justify-center gap-1.5 transition-colors"
+                                        title="Buka Chat di WhatsApp Web"
                                     >
-                                        <Phone size={12} /> WhatsApp
+                                        <Phone size={12} /> WhatsApp Web
                                     </a>
                                     <a
                                         href={`tel:${item.phone}`}
