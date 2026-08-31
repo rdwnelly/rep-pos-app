@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useData } from "../../../hooks/useData";
 import { StorageService } from "../../../services/storage";
 import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
-import { Plus, Trash2, Info, Save, Archive, FileText, X, Printer, Eye, FolderPlus, Download, Loader2, CheckCircle2 } from "lucide-react";
+import { Plus, PlusCircle, Trash2, Info, Save, Archive, FileText, X, Printer, Eye, FolderPlus, Download, Loader2, CheckCircle2 } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -402,7 +402,8 @@ export default function BeritaAcaraPage() {
         const pdf = new jsPDF({
             orientation: "portrait",
             unit: "mm",
-            format: "a4"
+            format: "a4",
+            compress: true
         });
 
         const pdfWidth = 210;
@@ -413,11 +414,19 @@ export default function BeritaAcaraPage() {
             useCORS: true,
             logging: false,
             backgroundColor: "#ffffff",
+            windowWidth: 794,
             onclone: (clonedDoc) => {
                 const p1 = clonedDoc.getElementById("berita-acara-page-1");
                 const p2 = clonedDoc.getElementById("berita-acara-page-2");
                 [p1, p2].forEach(container => {
                     if (!container) return;
+                    container.style.width = "794px";
+                    container.style.maxWidth = "794px";
+                    container.style.boxSizing = "border-box";
+                    container.style.padding = "20px";
+                    container.style.margin = "0 auto";
+                    container.style.background = "#ffffff";
+                    
                     const inputs = container.querySelectorAll("input, textarea");
                     inputs.forEach(input => {
                         const parent = input.parentNode;
@@ -430,7 +439,7 @@ export default function BeritaAcaraPage() {
                         replacement.style.background = "transparent";
                         replacement.style.padding = "0";
                         replacement.style.margin = "0";
-                        replacement.style.lineHeight = "1.3";
+                        replacement.style.lineHeight = "1.25";
                         replacement.style.minHeight = "14px";
                         replacement.style.boxSizing = "border-box";
                         if (input.classList.contains("text-right")) {
@@ -449,18 +458,19 @@ export default function BeritaAcaraPage() {
 
         // Render Halaman 1
         const canvas1 = await html2canvas(page1El, canvasOptions);
-        const imgData1 = canvas1.toDataURL("image/png");
+        const imgData1 = canvas1.toDataURL("image/jpeg", 0.98);
         const imgHeight1 = (canvas1.height * pdfWidth) / canvas1.width;
-        pdf.addImage(imgData1, "PNG", 0, 0, pdfWidth, Math.min(pdfHeight, imgHeight1));
+        pdf.addImage(imgData1, "JPEG", 0, 0, pdfWidth, Math.min(pdfHeight, imgHeight1));
 
         // Render Halaman 2 jika ada rincian pengeluaran
         const page2El = document.getElementById("berita-acara-page-2");
-        if (page2El && page2El.clientHeight > 10) {
+        const hasExpenses = (currentCustomExpenses || []).some(r => (r.keterangan && r.keterangan.trim()) || Number(r.total) > 0 || Number(r.harga) > 0);
+        if (page2El && hasExpenses) {
             const canvas2 = await html2canvas(page2El, canvasOptions);
-            const imgData2 = canvas2.toDataURL("image/png");
+            const imgData2 = canvas2.toDataURL("image/jpeg", 0.98);
             const imgHeight2 = (canvas2.height * pdfWidth) / canvas2.width;
-            pdf.addPage();
-            pdf.addImage(imgData2, "PNG", 0, 0, pdfWidth, Math.min(pdfHeight, imgHeight2));
+            pdf.addPage("a4", "portrait");
+            pdf.addImage(imgData2, "JPEG", 0, 0, pdfWidth, Math.min(pdfHeight, imgHeight2));
         }
 
         return pdf;
@@ -842,13 +852,18 @@ export default function BeritaAcaraPage() {
 
     const totalSalesTunai = currentSalesRows.reduce((sum, row) => sum + (Number(row.tunai) || 0), 0);
     const totalHppTunai = currentSalesRows.reduce((sum, row) => sum + (Number(row.hppTunai) || 0), 0);
+    const totalModalTunai = totalHppTunai;
     const totalProfitTunai = totalSalesTunai - totalHppTunai;
+    const totalLabaTunai = totalProfitTunai;
     const totalSalesQR = currentSalesRows.reduce((sum, row) => sum + (Number(row.qr) || 0), 0);
     const totalHppQR = currentSalesRows.reduce((sum, row) => sum + (Number(row.hppQR) || 0), 0);
+    const totalModalQR = totalHppQR;
     const totalProfitQR = totalSalesQR - totalHppQR;
+    const totalLabaQR = totalProfitQR;
     const totalAllSales = totalSalesTunai + totalSalesQR;
     const totalPengeluaran = currentExpenseRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
     const netto = totalSalesTunai - totalPengeluaran;
+    const totalLabaNetto = (totalProfitTunai + totalProfitQR) - totalPengeluaran;
 
     return (
         <div className="min-h-screen print:min-h-0 print:h-auto print:overflow-visible bg-slate-100 p-2 md:p-6 lg:p-8 print:bg-white print:p-0">
@@ -1214,7 +1229,6 @@ export default function BeritaAcaraPage() {
                     >
                         <Plus size={16} /> Tambah Pengeluaran
                     </button>
-                    
                     <div className="flex items-center gap-2 text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100">
                         <Info size={16} className="text-blue-500 flex-shrink-0" />
                         <span>Kategori yang sama akan dikelompokkan otomatis di halaman cetak.</span>
@@ -1223,8 +1237,7 @@ export default function BeritaAcaraPage() {
             </div>
 
             {/* Printable Area */}
-            <div className="w-full overflow-x-auto no-scrollbar pb-8 print:pb-0">
-                <div className="bg-white mx-auto print:shadow-none text-black w-[210mm] max-w-full p-4 print:p-2 shadow-lg mb-8 print:mb-0">
+            <div className="w-full overflow-x-auto no-scrollbar pb-8 print:pb-0 bg-slate-100/60 print:bg-transparent py-4 print:py-0">
                 <style>{`
                     .no-scrollbar::-webkit-scrollbar,
                     .no-scrollbar::-webkit-scrollbar-thumb,
@@ -1241,23 +1254,43 @@ export default function BeritaAcaraPage() {
                     @media print {
                         @page {
                             size: A4 portrait;
-                            margin: 6mm;
+                            margin: 5mm;
                         }
                         html, body {
-                            height: auto;
-                            min-height: 100%;
-                            -webkit-print-color-adjust: exact;
-                            print-color-adjust: exact;
+                            height: auto !important;
+                            min-height: 100% !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
                             background: white !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
                         }
                         .page-break {
-                            page-break-before: always;
-                            break-before: page;
+                            page-break-before: always !important;
+                            break-before: page !important;
+                            height: 0 !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            border: none !important;
+                            display: block !important;
                         }
-                        /* Ensure flex containers don't force page cuts */
                         .print-page {
-                            page-break-inside: avoid;
-                            break-inside: avoid;
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                            page-break-inside: avoid !important;
+                            break-inside: avoid !important;
+                        }
+                        #berita-acara-page-1 {
+                            page-break-after: always !important;
+                            break-after: page !important;
+                        }
+                        #berita-acara-page-2 {
+                            page-break-before: always !important;
+                            break-before: page !important;
                         }
                         input, textarea {
                             border: none !important;
@@ -1271,18 +1304,19 @@ export default function BeritaAcaraPage() {
                         color: white !important;
                         font-weight: bold;
                         padding: 3px 6px;
-                        font-size: 11px;
+                        font-size: 9.5px;
+                        line-height: 1.3;
                     }
                     .report-table {
                         width: 100%;
                         border-collapse: collapse;
-                        font-size: 9.5px;
+                        font-size: 8.5px;
                         table-layout: fixed;
                     }
                     .report-table th, .report-table td {
                         border: 1px solid #94a3b8;
-                        padding: 3px 4px;
-                        line-height: 1.3;
+                        padding: 2.5px 3.5px;
+                        line-height: 1.25;
                         vertical-align: middle;
                         box-sizing: border-box;
                     }
@@ -1291,6 +1325,7 @@ export default function BeritaAcaraPage() {
                         text-align: center;
                         font-weight: 700;
                         color: #0f172a;
+                        font-size: 8px;
                     }
                     .editable-cell {
                         width: 100%;
@@ -1298,8 +1333,8 @@ export default function BeritaAcaraPage() {
                         border: none !important;
                         outline: none !important;
                         font-family: inherit;
-                        font-size: 9.5px;
-                        line-height: 1.3;
+                        font-size: 8.5px;
+                        line-height: 1.25;
                         color: inherit;
                         padding: 0 !important;
                         margin: 0 !important;
@@ -1311,8 +1346,10 @@ export default function BeritaAcaraPage() {
                     }
                 `}</style>
 
-                {/* Page 1 */}
-                <div id="berita-acara-page-1" className="print-page mb-2">
+                {/* ======================================================== */}
+                {/* HALAMAN 1: BERITA ACARA UTAMA (A4 PORTRAIT) */}
+                {/* ======================================================== */}
+                <div id="berita-acara-page-1" className="print-page bg-white mx-auto text-black w-[210mm] max-w-full p-6 print:p-0 shadow-lg mb-8 print:mb-0 box-border">
                     {/* Header */}
                     <div className="flex items-center justify-between border-b-2 border-amber-900 pb-2 mb-3">
                         <div className="w-1/4">
@@ -1418,21 +1455,103 @@ export default function BeritaAcaraPage() {
                                     <tr className="bg-[#f5e6d3] font-bold">
                                         <td colSpan={2} className="text-right">TOTAL PENJUALAN (TUNAI)</td>
                                         <td className="text-right">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
-                                        <td className="text-right text-red-700">Rp {totalHppTunai.toLocaleString('id-ID')}</td>
-                                        <td className="text-right text-green-700">Rp {totalProfitTunai.toLocaleString('id-ID')}</td>
+                                        <td className="text-right text-red-700">Rp {totalModalTunai.toLocaleString('id-ID')}</td>
+                                        <td className="text-right text-green-700 font-bold">Rp {totalLabaTunai.toLocaleString('id-ID')}</td>
                                     </tr>
-                                    <tr className="bg-emerald-100 font-bold text-emerald-900">
-                                        <td colSpan={2} className="text-right">SETORAN TUNAI BERSIH (NETTO)</td>
-                                        <td className="text-right text-emerald-800 text-xs font-bold">Rp {netto.toLocaleString('id-ID')}</td>
-                                        <td colSpan={2} className="text-right text-[10px] text-emerald-700">Uang Kasir</td>
+                                </tbody>
+                            </table>
+                            {!viewingArchive && (
+                                <button 
+                                    onClick={addSalesRow}
+                                    className="mt-1 text-[9px] text-amber-800 hover:text-amber-950 font-bold flex items-center gap-1 print:hidden"
+                                >
+                                    <PlusCircle size={10} /> Tambah Baris Penjualan
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Section III - Setoran Tunai Kasir */}
+                        <div>
+                            <div className="brown-header">III. LAPORAN SETORAN TUNAI KASIR</div>
+                            <table className="report-table">
+                                <thead>
+                                    <tr>
+                                        <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
+                                            1. Total Pendapatan Penjualan Tunai
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style={{ width: '8%' }} className="text-center">1</td>
+                                        <td style={{ width: '52%' }}>Penjualan Tunai Hari ini</td>
+                                        <td style={{ width: '40%' }} className="text-right font-medium text-green-700">
+                                            Rp {totalSalesTunai.toLocaleString('id-ID')}
+                                        </td>
+                                    </tr>
+                                    <tr className="bg-[#f5e6d3] font-bold">
+                                        <td colSpan={2} className="text-right">JUMLAH (1)</td>
+                                        <td className="text-right text-green-800">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <table className="report-table mt-1.5">
+                                <thead>
+                                    <tr>
+                                        <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
+                                            2. Pengeluaran Operasional Toko Hari ini
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style={{ width: '8%' }} className="text-center">1</td>
+                                        <td style={{ width: '52%' }}>Dipotong Pengeluaran (V)</td>
+                                        <td style={{ width: '40%' }} className="text-right font-medium text-red-700">
+                                            - Rp {totalPengeluaran.toLocaleString('id-ID')}
+                                        </td>
+                                    </tr>
+                                    <tr className="bg-[#fee2e2] font-bold text-red-950">
+                                        <td colSpan={2} className="text-right">JUMLAH (2)</td>
+                                        <td className="text-right text-red-700">- Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <table className="report-table mt-1.5">
+                                <thead>
+                                    <tr>
+                                        <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
+                                            3. SETORAN FISIK (TUNAI) = (1 - 2)
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style={{ width: '8%' }} className="text-center">1</td>
+                                        <td style={{ width: '52%' }}>Setoran Bruto</td>
+                                        <td style={{ width: '40%' }} className="text-right font-medium">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="text-center">2</td>
+                                        <td>Dipotong Pengeluaran (V)</td>
+                                        <td className="text-right font-medium text-red-700">- Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
+                                    </tr>
+                                    <tr className="bg-[#dcfce7] font-extrabold text-green-950">
+                                        <td colSpan={2} className="text-right">NETTO (UANG FISIK KASIR)</td>
+                                        <td className="text-right font-mono text-green-800 text-[10px]">Rp {netto.toLocaleString('id-ID')}</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
+                    </div>
 
-                        {/* Section III - QR */}
+                    {/* Section IV & V - Berdampingan (Side by Side) */}
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                        {/* Section IV - QR Code */}
                         <div>
-                            <div className="brown-header">III. LAPORAN PENJUALAN (QR / TRANSFER)</div>
+                            <div className="brown-header">IV. LAPORAN PENJUALAN (NON-TUNAI / QR)</div>
                             <table className="report-table">
                                 <thead>
                                     <tr>
@@ -1450,16 +1569,9 @@ export default function BeritaAcaraPage() {
                                         const keuntungan = pendapatan - modal;
                                         const isRowEmpty = !row.qr && !row.hppQR;
                                         return (
-                                            <tr key={`salesQR-${idx}`}>
+                                            <tr key={`sales-qr-${idx}`}>
                                                 <td className="text-center">{idx + 1}</td>
-                                                <td>
-                                                    <input 
-                                                        type="text" 
-                                                        className="editable-cell" 
-                                                        value={row.name} 
-                                                        readOnly
-                                                    />
-                                                </td>
+                                                <td className="font-medium text-gray-800">{row.name}</td>
                                                 <td>
                                                     <input 
                                                         type="text" 
@@ -1480,129 +1592,61 @@ export default function BeritaAcaraPage() {
                                                         readOnly={!!viewingArchive}
                                                     />
                                                 </td>
-                                                <td className="text-right font-medium text-green-700 bg-slate-50/50 pr-1">
+                                                <td className="text-right font-medium text-blue-700 bg-slate-50/50 pr-1">
                                                     {isRowEmpty ? '' : keuntungan.toLocaleString('id-ID')}
                                                 </td>
                                             </tr>
                                         );
                                     })}
-                                    <tr className="bg-[#f5e6d3] font-bold">
-                                        <td colSpan={2} className="text-right">TOTAL (QR)</td>
+                                    <tr className="bg-[#e0f2fe] font-bold">
+                                        <td colSpan={2} className="text-right">TOTAL PENJUALAN (QR)</td>
                                         <td className="text-right">Rp {totalSalesQR.toLocaleString('id-ID')}</td>
-                                        <td className="text-right text-red-700">Rp {totalHppQR.toLocaleString('id-ID')}</td>
-                                        <td className="text-right text-green-700">Rp {totalProfitQR.toLocaleString('id-ID')}</td>
+                                        <td className="text-right text-red-700">Rp {totalModalQR.toLocaleString('id-ID')}</td>
+                                        <td className="text-right text-blue-700 font-bold">Rp {totalLabaQR.toLocaleString('id-ID')}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            {/* Rekapitulasi Laba Rugi Penjualan */}
+                            <table className="report-table mt-2">
+                                <thead>
+                                    <tr>
+                                        <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
+                                            2. REKAPITULASI LABA PENJUALAN (NETTO PROFIT)
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style={{ width: '8%' }} className="text-center">1</td>
+                                        <td style={{ width: '52%' }}>Keuntungan Laba Penjualan (Tunai)</td>
+                                        <td style={{ width: '40%' }} className="text-right font-medium text-green-700">Rp {totalLabaTunai.toLocaleString('id-ID')}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="text-center">2</td>
+                                        <td>Keuntungan Laba Penjualan (QR)</td>
+                                        <td className="text-right font-medium text-blue-700">Rp {totalLabaQR.toLocaleString('id-ID')}</td>
+                                    </tr>
+                                    <tr className="bg-slate-100 font-bold">
+                                        <td colSpan={2} className="text-right">TOTAL LABA KOTOR</td>
+                                        <td className="text-right font-mono">Rp {(totalLabaTunai + totalLabaQR).toLocaleString('id-ID')}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="text-center">3</td>
+                                        <td>Dipotong Beban Pengeluaran (V)</td>
+                                        <td className="text-right font-medium text-red-700">- Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
+                                    </tr>
+                                    <tr className="bg-[#fef08a] font-extrabold text-amber-950">
+                                        <td colSpan={2} className="text-right">KEUNTUNGAN BERSIH (NETTO)</td>
+                                        <td className="text-right font-mono text-amber-900 text-[10px]">Rp {totalLabaNetto.toLocaleString('id-ID')}</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
-                    </div>
 
-                    {/* Section IV & V - Berdampingan (Side by Side) */}
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                        {/* Section IV (Rekapitulasi) */}
+                        {/* Section V - Pengeluaran */}
                         <div>
-                            <div className="brown-header">IV. REKAPITULASI</div>
-                            <div className="border border-[#d1d5db] p-2 space-y-2 text-xs">
-                                {/* 1. Pemasukan */}
-                                <table className="report-table w-full">
-                                    <thead>
-                                        <tr>
-                                            <th colSpan={2} className="bg-slate-100 text-slate-800 text-left px-2 py-0.5 font-bold text-[10px]">1. PEMASUKAN</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td className="w-3/5 text-gray-700">Penjualan Tunai (II)</td>
-                                            <td className="w-2/5 text-right font-medium">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
-                                        </tr>
-                                        <tr>
-                                            <td className="text-gray-700">Penjualan QR (III)</td>
-                                            <td className="text-right font-medium">Rp {totalSalesQR.toLocaleString('id-ID')}</td>
-                                        </tr>
-                                        <tr className="bg-amber-50/60 font-bold text-amber-900">
-                                            <td>TOTAL PEMASUKAN (BRUTO)</td>
-                                            <td className="text-right">Rp {totalAllSales.toLocaleString('id-ID')}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-
-                                {/* 2. Laba Penjualan */}
-                                <table className="report-table w-full">
-                                    <thead>
-                                        <tr>
-                                            <th colSpan={2} className="bg-slate-100 text-slate-800 text-left px-2 py-0.5 font-bold text-[10px]">2. LABA PENJUALAN</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td className="w-3/5 text-gray-700">Total Pendapatan</td>
-                                            <td className="w-2/5 text-right font-medium">Rp {totalAllSales.toLocaleString('id-ID')}</td>
-                                        </tr>
-                                        <tr>
-                                            <td className="text-gray-700">Total HPP (Modal)</td>
-                                            <td className="text-right font-medium text-red-600">Rp {(totalHppTunai + totalHppQR).toLocaleString('id-ID')}</td>
-                                        </tr>
-                                        <tr>
-                                            <td className="text-gray-700">Dipotong Pengeluaran (V)</td>
-                                            <td className="text-right font-medium text-red-600">- Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
-                                        </tr>
-                                        <tr className="bg-green-50/60 font-bold text-green-700">
-                                            <td>KEUNTUNGAN BERSIH (NETTO)</td>
-                                            <td className="text-right">Rp {((totalSalesTunai + totalSalesQR) - (totalHppTunai + totalHppQR) - totalPengeluaran).toLocaleString('id-ID')}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-
-                                {/* 3. Setoran Fisik (Tunai) */}
-                                <table className="report-table w-full">
-                                    <thead>
-                                        <tr>
-                                            <th colSpan={2} className="bg-slate-100 text-slate-800 text-left px-2 py-0.5 font-bold text-[10px]">3. SETORAN FISIK (TUNAI)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td className="w-3/5 text-gray-700">Penjualan Tunai (II)</td>
-                                            <td className="w-2/5 text-right font-medium">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
-                                        </tr>
-                                        <tr>
-                                            <td className="text-gray-700">Dipotong Pengeluaran (V)</td>
-                                            <td className="text-right font-medium text-red-600">- Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
-                                        </tr>
-                                        <tr className="bg-emerald-100 font-bold text-slate-900">
-                                            <td>NETTO (UANG FISIK KASIR)</td>
-                                            <td className="text-right text-emerald-800 font-extrabold text-[11px]">Rp {netto.toLocaleString('id-ID')}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {/* Section V (Pengeluaran) */}
-                        <div>
-                            <div className="brown-header flex justify-between items-center">
-                                <span>V. LAPORAN PENGELUARAN</span>
-                                {!viewingArchive && (
-                                    <div className="flex items-center gap-1 print:hidden">
-                                        <button 
-                                            type="button" 
-                                            onClick={addExpenseRow}
-                                            className="text-[9px] bg-amber-700 hover:bg-amber-600 text-white px-1.5 py-0.5 rounded font-bold transition-colors shadow-2xs"
-                                            title="Tambah Baris Pengeluaran Manual"
-                                        >
-                                            + Tambah Baris
-                                        </button>
-                                        <button 
-                                            type="button" 
-                                            onClick={handleClearExpenses}
-                                            className="text-[9px] bg-red-800 hover:bg-red-700 text-white px-1.5 py-0.5 rounded font-bold transition-colors shadow-2xs"
-                                            title="Kosongkan Semua Baris Pengeluaran"
-                                        >
-                                            Kosongkan
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
+                            <div className="brown-header">V. LAPORAN PENGELUARAN</div>
                             <table className="report-table">
                                 <thead>
                                     <tr>
@@ -1618,7 +1662,7 @@ export default function BeritaAcaraPage() {
                                         if (activeRows.length === 0) {
                                             return (
                                                 <tr>
-                                                    <td colSpan={!viewingArchive ? 4 : 3} className="p-3 text-center text-slate-400 italic text-[9.5px] print:text-[6.5pt]">
+                                                    <td colSpan={!viewingArchive ? 4 : 3} className="p-3 text-center text-slate-400 italic text-[9px] print:text-[6.5pt]">
                                                         Belum ada catatan pengeluaran operasional (biaya) yang terinput pada hari ini.
                                                     </td>
                                                 </tr>
@@ -1696,94 +1740,141 @@ export default function BeritaAcaraPage() {
                     </div>
                 </div>
 
-                {/* Page Break for Detailed Expenses */}
-                <div className="page-break"></div>
+                {/* ======================================================== */}
+                {/* HALAMAN 2: LAMPIRAN VI. URAIAN PENGELUARAN (A4 PORTRAIT) */}
+                {/* ======================================================== */}
+                {(() => {
+                    const allSectionTitles = [
+                        ...DETAILED_EXPENSE_CONFIG.map(c => c.title),
+                        ...Object.keys(derivedDetailedExpensesCurrent).filter(t => !DETAILED_EXPENSE_CONFIG.some(c => c.title === t))
+                    ];
 
-                {/* Page 2: Detailed Expenses (Dynamic Masonry Layout) */}
-                <div id="berita-acara-page-2" className="print-page pb-8">
-                    {(() => {
-                        const allSectionTitles = [
-                            ...DETAILED_EXPENSE_CONFIG.map(c => c.title),
-                            ...Object.keys(derivedDetailedExpensesCurrent).filter(t => !DETAILED_EXPENSE_CONFIG.some(c => c.title === t))
-                        ];
-
-                        const activeTables = allSectionTitles.map(title => ({
+                    const activeTables = allSectionTitles.map(title => {
+                        const allRows = derivedDetailedExpensesCurrent[title] || [];
+                        const validRows = allRows.filter(r => (r.keterangan && r.keterangan.trim()) || Number(r.total) > 0 || Number(r.harga) > 0);
+                        return {
                             config: { title },
-                            dataRows: derivedDetailedExpensesCurrent[title] || []
-                        })).filter(t => t.dataRows && t.dataRows.length > 0);
-
-                        if (activeTables.length === 0) return null;
-
-                        const leftTables = [];
-                        const rightTables = [];
-                        let leftRows = 0;
-                        let rightRows = 0;
-
-                        activeTables.forEach(t => {
-                            const weight = t.dataRows.length + 3; // +3 for headers/total row
-                            if (leftRows <= rightRows) {
-                                leftTables.push(t);
-                                leftRows += weight;
-                            } else {
-                                rightTables.push(t);
-                                rightRows += weight;
-                            }
-                        });
-
-                        const renderTable = (t) => {
-                            const colTotal = t.dataRows.reduce((sum, row) => sum + (Number(row.total) || 0), 0);
-                            return (
-                                <div key={t.config.title} className="w-full">
-                                    <h4 className="font-bold text-[10px] mb-1 text-center">{t.config.title}</h4>
-                                    <table className="report-table">
-                                        <thead>
-                                            <tr>
-                                                <th style={{ width: '10%' }}>NO</th>
-                                                <th style={{ width: '40%' }}>KETERANGAN</th>
-                                                <th style={{ width: '15%' }}>QTY</th>
-                                                <th style={{ width: '15%' }}>HARGA</th>
-                                                <th style={{ width: '20%' }}>TOTAL</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {t.dataRows.map((row, rowIdx) => (
-                                                <tr key={`row-${t.config.title}-${rowIdx}`}>
-                                                    <td className="text-center">{rowIdx + 1}</td>
-                                                    <td className="font-medium text-gray-700 p-0.5 px-2 leading-tight">{row.keterangan}</td>
-                                                    <td className="text-center font-medium text-gray-700 p-0.5 px-2 leading-tight">{row.qty}</td>
-                                                    <td className="text-right font-medium text-gray-700 p-0.5 px-2 leading-tight">{row.harga ? Number(row.harga).toLocaleString('id-ID') : ''}</td>
-                                                    <td className="text-right font-bold text-gray-800 p-0.5 px-2 leading-tight">{row.total ? Number(row.total).toLocaleString('id-ID') : ''}</td>
-                                                </tr>
-                                            ))}
-                                            <tr>
-                                                <td colSpan={4} className="font-bold text-center bg-[#f3f4f6]">TOTAL</td>
-                                                <td className="text-right font-bold bg-[#f3f4f6] p-0.5 px-2">
-                                                    {colTotal > 0 ? colTotal.toLocaleString('id-ID') : ''}
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            );
+                            dataRows: validRows
                         };
+                    }).filter(t => t.dataRows && t.dataRows.length > 0);
 
+                    if (activeTables.length === 0) return null;
+
+                    const leftTables = [];
+                    const rightTables = [];
+                    let leftRows = 0;
+                    let rightRows = 0;
+
+                    activeTables.forEach(t => {
+                        const weight = t.dataRows.length + 3; // +3 for headers/total row
+                        if (leftRows <= rightRows) {
+                            leftTables.push(t);
+                            leftRows += weight;
+                        } else {
+                            rightTables.push(t);
+                            rightRows += weight;
+                        }
+                    });
+
+                    const renderTable = (t) => {
+                        const colTotal = t.dataRows.reduce((sum, row) => sum + (Number(row.total) || 0), 0);
+                        const categoryCleanName = t.config.title.replace(/^VI\.\s*URAIAN\s*PENGELUARAN\s*\(?/i, '').replace(/\)?$/, '').trim() || t.config.title;
                         return (
-                            <div className="flex gap-x-6 items-start w-full">
-                                <div className="w-1/2 flex flex-col gap-y-4">
-                                    {leftTables.map(renderTable)}
+                            <div key={t.config.title} className="w-full border border-slate-300 rounded overflow-hidden shadow-2xs mb-2.5 break-inside-avoid">
+                                <div className="brown-header text-[9.5px] text-center font-bold uppercase tracking-wider py-1">
+                                    POS: {categoryCleanName.toUpperCase()}
                                 </div>
-                                <div className="w-1/2 flex flex-col gap-y-4">
-                                    {rightTables.map(renderTable)}
-                                </div>
+                                <table className="report-table">
+                                    <thead>
+                                        <tr>
+                                            <th style={{ width: '8%' }} className="text-center">NO</th>
+                                            <th style={{ width: '44%' }} className="text-left px-1.5">KETERANGAN</th>
+                                            <th style={{ width: '12%' }} className="text-center">QTY</th>
+                                            <th style={{ width: '18%' }} className="text-right px-1.5">HARGA (Rp)</th>
+                                            <th style={{ width: '18%' }} className="text-right px-1.5">TOTAL (Rp)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {t.dataRows.map((row, rowIdx) => (
+                                            <tr key={`row-${t.config.title}-${rowIdx}`} className="odd:bg-white even:bg-slate-50/70">
+                                                <td className="text-center font-mono text-slate-600">{rowIdx + 1}</td>
+                                                <td className="font-semibold text-slate-800 p-1 px-1.5 leading-tight">{row.keterangan}</td>
+                                                <td className="text-center font-mono text-slate-700 p-1 px-1 leading-tight">{row.qty || '1'}</td>
+                                                <td className="text-right font-mono text-slate-700 p-1 px-1.5 leading-tight">{row.harga ? Number(row.harga).toLocaleString('id-ID') : '-'}</td>
+                                                <td className="text-right font-mono font-bold text-red-700 p-1 px-1.5 leading-tight">{row.total ? Number(row.total).toLocaleString('id-ID') : '-'}</td>
+                                            </tr>
+                                        ))}
+                                        <tr className="bg-[#fee2e2] font-extrabold text-red-950 border-t border-slate-300">
+                                            <td colSpan={4} className="text-right uppercase px-2 py-0.5 text-[8px]">SUBTOTAL ({categoryCleanName})</td>
+                                            <td className="text-right font-mono text-red-700 font-black p-1 px-1.5 text-[8.5px]">
+                                                {colTotal > 0 ? `Rp ${colTotal.toLocaleString('id-ID')}` : 'Rp 0'}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         );
-                    })()}
-                </div>
+                    };
 
+                    return (
+                        <>
+                            <div className="page-break"></div>
+                            <div id="berita-acara-page-2" className="print-page bg-white mx-auto text-black w-[210mm] max-w-full p-6 print:p-0 shadow-lg mb-8 print:mb-0 box-border">
+                                {/* Formal Page 2 Header */}
+                                <div className="flex items-center justify-between border-b-2 border-amber-900 pb-2 mb-3">
+                                    <div className="w-1/4">
+                                        <img src="/logokasir.jpg" alt="Logo" style={{ height: '48px', objectFit: 'contain' }} onError={(e) => e.target.style.display='none'} />
+                                    </div>
+                                    <div className="w-3/4 text-center">
+                                        <h1 className="text-base font-bold uppercase tracking-wider mb-0.5">BERITA ACARA - LAMPIRAN</h1>
+                                        <h2 className="text-xs font-bold uppercase text-amber-900">VI. URAIAN RINCIAN PENGELUARAN OPERASIONAL</h2>
+                                        <h3 className="text-[10px] font-medium text-gray-600">RUMAH ETNIK PAPUA - WISATA BUDAYA PAPUA</h3>
+                                    </div>
+                                </div>
+
+                                {/* Sub-bar Info */}
+                                <div className="bg-amber-50/80 border border-amber-200 rounded px-3 py-1.5 mb-3 flex justify-between items-center text-[10px] font-medium text-gray-800">
+                                    <div><strong>Tanggal:</strong> {tanggal.split("-").reverse().join("/")}</div>
+                                    <div><strong>Periode:</strong> {periode}</div>
+                                    <div><strong>Kasir:</strong> {kasir || '-'}</div>
+                                    <div><strong>Lokasi:</strong> {lokasi || '-'}</div>
+                                </div>
+
+                                {/* 2 Column Layout */}
+                                <div className="flex gap-x-4 items-start w-full mb-4">
+                                    <div className="w-1/2 flex flex-col">
+                                        {leftTables.map(renderTable)}
+                                    </div>
+                                    <div className="w-1/2 flex flex-col">
+                                        {rightTables.map(renderTable)}
+                                    </div>
+                                </div>
+
+                                {/* Grand Total Footer */}
+                                <div className="border border-red-300 bg-[#fee2e2] rounded p-2 flex justify-between items-center text-xs font-extrabold text-red-950 mb-4">
+                                    <span className="uppercase tracking-wider">TOTAL KESELURUHAN PENGELUARAN (VI. URAIAN OPERASIONAL)</span>
+                                    <span className="font-mono text-sm text-red-700 font-black">Rp {totalPengeluaran.toLocaleString('id-ID')}</span>
+                                </div>
+
+                                {/* Page 2 Validation Signatures */}
+                                <div className="flex justify-between text-xs mt-6 px-8 font-medium">
+                                    <div className="text-center">
+                                        <p className="mb-8">Dibuat oleh,<br/>Kasir / Administrasi</p>
+                                        <p className="font-bold">(&nbsp;&nbsp;{kasir || '........................................'}&nbsp;&nbsp;)</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="mb-8">Sorong, {tanggal.split("-").reverse().join("/")}<br/>Mengetahui,<br/>Staff Keuangan</p>
+                                        <p>( ................................................. )</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    );
+                })()}
             </div>
-            </div>
-                </>
+            </>
             )}
+
             {/* Category Management Modal */}
             {showCategoryModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:hidden">
