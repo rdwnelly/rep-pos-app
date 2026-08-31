@@ -209,6 +209,63 @@ export default function BeritaAcaraPage() {
         }
     }, [tanggal, transactionsStr, categoriesStr]);
 
+    const cashflowsStr = JSON.stringify(cashflows);
+
+    // Auto-populate expenses from CashFlow if not viewing archive and expenseRows is empty
+    useEffect(() => {
+        if (!tanggal || viewingArchive) return;
+        const currentCashflows = JSON.parse(cashflowsStr || '[]');
+        const matchingExpenses = currentCashflows.filter(c => {
+            if (!c || c.type !== CashFlowType.OUT) return false;
+            const cDate = typeof c.date === 'string' ? c.date.slice(0, 10) : '';
+            return cDate === tanggal;
+        });
+
+        if (matchingExpenses.length > 0) {
+            setExpenseRows(prev => {
+                const hasExisting = prev.some(r => r.name || r.amount);
+                if (hasExisting) return prev;
+                return matchingExpenses.map(c => ({
+                    name: c.category + (c.description ? ` (${c.description})` : ''),
+                    amount: String(c.amount || '')
+                }));
+            });
+        }
+    }, [tanggal, cashflowsStr, viewingArchive]);
+
+    const handleSyncFromCashFlow = () => {
+        if (!tanggal) return;
+        const currentCashflows = JSON.parse(cashflowsStr || '[]');
+        const matchingExpenses = currentCashflows.filter(c => {
+            if (!c || c.type !== CashFlowType.OUT) return false;
+            const cDate = typeof c.date === 'string' ? c.date.slice(0, 10) : '';
+            return cDate === tanggal;
+        });
+
+        if (matchingExpenses.length === 0) {
+            alert(`Tidak ditemukan data pengeluaran kasir pada tanggal ${tanggal} di sistem.`);
+            return;
+        }
+
+        const newExpenseRows = matchingExpenses.map(c => ({
+            name: c.category + (c.description ? ` (${c.description})` : ''),
+            amount: String(c.amount || '')
+        }));
+
+        const newCustomExpenses = matchingExpenses.map((c, idx) => ({
+            id: c.id || Date.now() + idx,
+            category: c.category || '1) Tiket Masuk',
+            keterangan: c.description || c.category || 'Pengeluaran Kasir',
+            qty: '1',
+            harga: String(c.amount || ''),
+            total: String(c.amount || '')
+        }));
+
+        setExpenseRows(newExpenseRows);
+        setCustomExpenses(newCustomExpenses);
+        alert(`Berhasil menarik ${matchingExpenses.length} catatan pengeluaran kasir dari sistem untuk tanggal ${tanggal}!`);
+    };
+
     const [autoSaveStatus, setAutoSaveStatus] = useState("idle");
 
     // Auto-save Berita Acara to Archives whenever data for a date changes
@@ -365,8 +422,7 @@ export default function BeritaAcaraPage() {
             }
 
             const fileName = `Berita_Acara_${currentTanggal}.pdf`;
-            const pdfBlob = pdf.output("blob");
-            const file = new File([pdfBlob], fileName, { type: "application/pdf" });
+            pdf.save(fileName);
 
             const textMessage = 
 `*BERITA ACARA REKAPAN PENJUALAN & PENGELUARAN*
@@ -378,44 +434,18 @@ export default function BeritaAcaraPage() {
 💸 Total Pengeluaran: Rp ${totalPengeluaran.toLocaleString('id-ID')}
 💵 Netto (Kas Bersih): Rp ${netto.toLocaleString('id-ID')}
 
-📌 Dokumen lengkap Berita Acara terlampir dalam file PDF.`;
+📄 _Dokumen PDF resmi Berita Acara telah otomatis diunduh ke perangkat Anda. Silakan lampirkan file PDF tersebut ke pesan WhatsApp Web ini._`;
 
-            // 1. Coba fitur Web Share API langsung ke aplikasi WhatsApp (Perangkat Seluler)
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({
-                        title: `Berita Acara - ${currentTanggal}`,
-                        text: textMessage,
-                        files: [file]
-                    });
-                    return;
-                } catch (shareError) {
-                    console.log("Web Share dibatalkan/tidak didukung, beralih ke fallback download", shareError);
-                }
-            }
-
-            // 2. Fallback untuk browser PC/Desktop atau browser tanpa dukungan Berkas Web Share
-            pdf.save(fileName);
-
-            const encodedText = encodeURIComponent(
-                textMessage + "\n\n(File PDF telah otomatis diunduh ke perangkat Anda. Silakan lampirkan berkas PDF tersebut ke pesan WhatsApp)."
-            );
-
-            const targetPhone = prompt("Masukkan nomor WhatsApp tujuan (opsional, kosongkan jika ingin memilih di aplikasi WhatsApp):", "");
-            let waUrl = "";
-            if (targetPhone && targetPhone.trim()) {
-                const cleanPhone = targetPhone.trim().replace(/[^0-9]/g, "");
-                const formattedPhone = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
-                waUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodedText}`;
-            } else {
-                waUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
-            }
+            const encodedText = encodeURIComponent(textMessage);
+            const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const waUrl = isMobile 
+                ? `https://api.whatsapp.com/send?text=${encodedText}`
+                : `https://web.whatsapp.com/send?text=${encodedText}`;
 
             window.open(waUrl, "_blank");
-            alert("File PDF Berita Acara telah diunduh ke perangkat Anda. Silakan lampirkan file PDF tersebut pada jendela WhatsApp yang baru saja dibuka!");
         } catch (error) {
-            console.error("Error sharing PDF to WhatsApp:", error);
-            alert("Gagal membagikan ke WhatsApp: " + (error.message || error));
+            console.error("Error sharing PDF to WhatsApp Web:", error);
+            alert("Gagal membagikan ke WhatsApp Web: " + (error.message || error));
         } finally {
             setIsGeneratingPdf(false);
         }
@@ -881,8 +911,8 @@ export default function BeritaAcaraPage() {
                                                     <button onClick={() => handleArchivePrint(arch)} className="px-2 py-1 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-lg text-[11px] font-semibold border border-slate-200 flex items-center gap-1" title="Cetak Dokumen">
                                                         <Printer size={13} /> Cetak
                                                     </button>
-                                                    <button onClick={() => handleArchiveShareWhatsApp(arch)} disabled={isGeneratingPdf} className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold border border-emerald-200 flex items-center gap-1" title="Kirim WA">
-                                                        <WhatsAppIcon size={13} /> WA
+                                                    <button onClick={() => handleArchiveShareWhatsApp(arch)} disabled={isGeneratingPdf} className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold border border-emerald-200 flex items-center gap-1" title="Kirim Dokumen via WhatsApp Web">
+                                                        <WhatsAppIcon size={13} /> WA Web
                                                     </button>
                                                     <button onClick={() => handleDeleteArchive(arch.id)} className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg" title="Hapus Arsip">
                                                         <Trash2 size={15} />
@@ -910,8 +940,8 @@ export default function BeritaAcaraPage() {
                             <button onClick={handleDownloadPdf} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
                                 {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Download PDF
                             </button>
-                            <button onClick={handleShareWhatsApp} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
-                                {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />} Kirim WhatsApp
+                            <button onClick={handleShareWhatsApp} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors" title="Ekspor PDF Dokumen & Otomatis Buka WhatsApp Web">
+                                {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />} WhatsApp Web
                             </button>
                             <button onClick={handlePrint} className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
                                 <Printer size={14}/> Cetak
@@ -976,10 +1006,11 @@ export default function BeritaAcaraPage() {
                     <button
                         onClick={handleShareWhatsApp}
                         disabled={isGeneratingPdf}
-                        className="bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white px-4 py-2 rounded-xl font-bold transition-colors shadow-md flex items-center gap-1.5 text-xs"
+                        className="bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white px-4 py-2 rounded-xl font-bold transition-colors shadow-md flex items-center gap-1.5 text-xs active:scale-95"
+                        title="Ekspor PDF Dokumen & Otomatis Buka WhatsApp Web"
                     >
                         {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />} 
-                        Kirim WA
+                        WhatsApp Web
                     </button>
                     <button
                         onClick={handlePrint}
@@ -1000,12 +1031,21 @@ export default function BeritaAcaraPage() {
                         </h3>
                         <p className="text-xs text-slate-500 mt-0.5">Tabel ini otomatis merekapitulasi uraian pengeluaran pada cetakan Berita Acara.</p>
                     </div>
-                    <button
-                        onClick={() => setShowCategoryModal(true)}
-                        className="flex items-center gap-1.5 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-3.5 py-2 rounded-xl transition-colors shadow-sm shrink-0"
-                    >
-                        <FolderPlus size={15} className="text-amber-700" /> Kelola Kategori Pengeluaran
-                    </button>
+                    <div className="flex flex-wrap gap-2 items-center">
+                        <button
+                            onClick={handleSyncFromCashFlow}
+                            className="flex items-center gap-1.5 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 px-3.5 py-2 rounded-xl transition-colors shadow-sm shrink-0"
+                            title="Tarik catatan pengeluaran kasir dari database arus kas POS pada tanggal ini"
+                        >
+                            🔄 Tarik Arus Kas POS (Tanggal Ini)
+                        </button>
+                        <button
+                            onClick={() => setShowCategoryModal(true)}
+                            className="flex items-center gap-1.5 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-3.5 py-2 rounded-xl transition-colors shadow-sm shrink-0"
+                        >
+                            <FolderPlus size={15} className="text-amber-700" /> Kelola Kategori Pengeluaran
+                        </button>
+                    </div>
                 </div>
                 
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -1495,46 +1535,59 @@ export default function BeritaAcaraPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {currentExpenseRows.map((row, idx) => (
-                                        <tr key={`expense-${idx}`}>
-                                            <td className="text-center">{idx + 1}</td>
-                                            <td>
-                                                <input 
-                                                    type="text" 
-                                                    className="editable-cell" 
-                                                    value={row.name} 
-                                                    onChange={(e) => handleExpenseRowChange(idx, 'name', e.target.value)} 
-                                                    placeholder="Tulis kategori pengeluaran..."
-                                                    readOnly={!!viewingArchive}
-                                                />
-                                            </td>
-                                            <td>
-                                                <input 
-                                                    type="text" 
-                                                    className="editable-cell text-right" 
-                                                    value={row.amount} 
-                                                    onChange={(e) => handleExpenseRowChange(idx, 'amount', e.target.value)} 
-                                                    placeholder="0"
-                                                    readOnly={!!viewingArchive}
-                                                />
-                                            </td>
-                                            {!viewingArchive && (
-                                                <td className="text-center print:hidden p-0.5">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => deleteExpenseRow(idx)}
-                                                        className="text-red-500 hover:text-red-700 p-0.5 rounded hover:bg-red-50"
-                                                        title="Hapus Baris Ini"
-                                                    >
-                                                        <Trash2 size={11} />
-                                                    </button>
+                                    {(() => {
+                                        const activeRows = currentExpenseRows.filter(r => (r.name && r.name.trim()) || (Number(r.amount) > 0));
+                                        if (activeRows.length === 0) {
+                                            return (
+                                                <tr>
+                                                    <td colSpan={!viewingArchive ? 4 : 3} className="p-3 text-center text-slate-400 italic text-[9.5px] print:text-[6.5pt]">
+                                                        Belum ada catatan pengeluaran operasional (biaya) yang terinput pada hari ini.
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
+
+                                        return activeRows.map((row, idx) => (
+                                            <tr key={`expense-${idx}`}>
+                                                <td className="text-center font-mono">{idx + 1}</td>
+                                                <td>
+                                                    <input 
+                                                        type="text" 
+                                                        className="editable-cell" 
+                                                        value={row.name} 
+                                                        onChange={(e) => handleExpenseRowChange(idx, 'name', e.target.value)} 
+                                                        placeholder="Tulis kategori pengeluaran..."
+                                                        readOnly={!!viewingArchive}
+                                                    />
                                                 </td>
-                                            )}
-                                        </tr>
-                                    ))}
-                                    <tr className="bg-[#f5e6d3] font-bold">
-                                        <td colSpan={!viewingArchive ? 2 : 2} className="text-right">TOTAL PENGELUARAN</td>
-                                        <td className="text-right text-red-700">Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
+                                                <td>
+                                                    <input 
+                                                        type="text" 
+                                                        className="editable-cell text-right font-mono font-bold text-red-700" 
+                                                        value={row.amount} 
+                                                        onChange={(e) => handleExpenseRowChange(idx, 'amount', e.target.value)} 
+                                                        placeholder="0"
+                                                        readOnly={!!viewingArchive}
+                                                    />
+                                                </td>
+                                                {!viewingArchive && (
+                                                    <td className="text-center print:hidden p-0.5">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => deleteExpenseRow(idx)}
+                                                            className="text-red-500 hover:text-red-700 p-0.5 rounded hover:bg-red-50"
+                                                            title="Hapus Baris Ini"
+                                                        >
+                                                            <Trash2 size={11} />
+                                                        </button>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        ));
+                                    })()}
+                                    <tr className="bg-[#fee2e2] font-extrabold text-red-950">
+                                        <td colSpan={!viewingArchive ? 2 : 2} className="text-right uppercase">TOTAL PENGELUARAN</td>
+                                        <td className="text-right text-red-700 font-bold font-mono">Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
                                         {!viewingArchive && <td className="print:hidden"></td>}
                                     </tr>
                                 </tbody>

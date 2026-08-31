@@ -991,10 +991,11 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
                             {item.agent.category || 'Driver'}
                           </span>
                           <a
-                            href={`https://wa.me/${item.agent.phone.replace(/^0/, '62').replace(/\D/g, '')}`}
+                            href={`https://web.whatsapp.com/send?phone=${item.agent.phone.replace(/^0/, '62').replace(/\D/g, '')}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-[10px] text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5"
+                            title="Buka Chat di WhatsApp Web"
                           >
                             <Phone size={10} /> {item.agent.phone}
                           </a>
@@ -1346,7 +1347,13 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
                   <div className="mt-4 space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-3">
                     <div className="flex items-center gap-2">
                       <Phone size={13} className="text-slate-400" />
-                      <a href={`https://wa.me/${agent.phone.replace(/^0/, '62').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="hover:text-emerald-600 font-mono font-medium">
+                      <a 
+                        href={`https://web.whatsapp.com/send?phone=${agent.phone.replace(/^0/, '62').replace(/\D/g, '')}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="hover:text-emerald-600 font-mono font-medium"
+                        title="Buka Chat di WhatsApp Web"
+                      >
                         {agent.phone}
                       </a>
                     </div>
