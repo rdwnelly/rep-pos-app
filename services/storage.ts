@@ -460,11 +460,22 @@ export const StorageService = {
   getBeritaAcaraArchives: async (): Promise<any[]> => {
     return await ApiService.getBeritaAcaraArchives();
   },
+  getBeritaAcaraByDate: async (date: string): Promise<any | null> => {
+    return await ApiService.getBeritaAcaraByDate(date);
+  },
   saveBeritaAcaraArchive: async (archive: any, notify: boolean = true) => {
-    await ApiService.saveBeritaAcaraArchive(archive);
+    const docId = archive.id || `ba_${archive.date}`;
+    await ApiService.saveBeritaAcaraArchive({
+      ...archive,
+      id: docId,
+      updatedAt: archive.updatedAt || Date.now(),
+    });
     if (notify) {
       notifyListeners('berita_acara_archives');
     }
+  },
+  subscribeBeritaAcaraByDate: (date: string, callback: (data: any) => void) => {
+    return ApiService.subscribeBeritaAcaraByDate(date, callback);
   },
   deleteBeritaAcaraArchive: async (id: string) => {
     await ApiService.deleteBeritaAcaraArchive(id);

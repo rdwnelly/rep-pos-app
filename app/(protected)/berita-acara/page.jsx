@@ -413,6 +413,7 @@ export default function BeritaAcaraPage() {
     const [catatan, setCatatan] = useState("");
 
     const loadedDateRef = useRef(null);
+    const lastLocalEditTimeRef = useRef(0);
 
     // Compute default sales rows from transactions for current `tanggal`
     const computedSalesRows = useMemo(() => {
@@ -506,43 +507,107 @@ export default function BeritaAcaraPage() {
         return rawCat;
     };
 
-    // Hydration & Loading Effect: Restore saved draft or archive for `tanggal` (Runs ONCE per date)
+    // Hydration & Loading Effect: Restore saved cloud archive or draft for `tanggal` (Runs ONCE per date)
     useEffect(() => {
         if (!tanggal || viewingArchive) return;
         if (loadedDateRef.current === tanggal) return;
         loadedDateRef.current = tanggal;
 
-        // 1. Try reading draft from localStorage
-        let loadedDraft = null;
-        try {
-            const rawDraft = localStorage.getItem(`rep_ba_draft_${tanggal}`);
-            if (rawDraft) {
-                loadedDraft = JSON.parse(rawDraft);
+        let isCancelled = false;
+
+        const hydrateData = async () => {
+            // 1. Try reading draft from localStorage
+            let loadedDraft = null;
+            try {
+                const rawDraft = localStorage.getItem(`rep_ba_draft_${tanggal}`);
+                if (rawDraft) {
+                    loadedDraft = JSON.parse(rawDraft);
+                }
+            } catch (e) {
+                console.error("Failed to read local draft:", e);
             }
-        } catch (e) {
-            console.error("Failed to read local draft:", e);
-        }
 
-        // 2. Check existing archive from StorageService
-        const existingArch = (archives || []).find(a => a.date === tanggal);
-        const source = loadedDraft || existingArch;
+            // 2. Fetch fresh archive directly from Firebase Firestore
+            let cloudArchive = null;
+            try {
+                cloudArchive = await StorageService.getBeritaAcaraByDate(tanggal);
+            } catch (e) {
+                console.warn("Failed to read cloud archive:", e);
+            }
 
-        const hasRealCustomExpenses = (items) => {
-            return Array.isArray(items) && items.some(c => (c.keterangan && c.keterangan.trim()) || Number(c.total) > 0 || Number(c.harga) > 0);
-        };
+            if (isCancelled) return;
 
-        if (source) {
-            if (source.kasir !== undefined && source.kasir !== "") setKasir(source.kasir);
-            if (source.lokasi !== undefined && source.lokasi !== "") setLokasi(source.lokasi);
-            if (source.catatan !== undefined && source.catatan !== "") setCatatan(source.catatan);
+            const hasRealCustomExpenses = (items) => {
+                return Array.isArray(items) && items.some(c => (c.keterangan && c.keterangan.trim()) || Number(c.total) > 0 || Number(c.harga) > 0);
+            };
 
-            // Custom Expenses: prioritize non-empty customExpenses with actual data
-            if (hasRealCustomExpenses(source.customExpenses)) {
-                setCustomExpenses(source.customExpenses);
-            } else if (existingArch && hasRealCustomExpenses(existingArch.customExpenses)) {
-                setCustomExpenses(existingArch.customExpenses);
+            // Prefer cloudArchive if it exists and has real expenses or is newer than local draft
+            const draftUpdatedAt = loadedDraft?.updatedAt || 0;
+            const cloudUpdatedAt = cloudArchive?.updatedAt || 0;
+
+            let source = loadedDraft || cloudArchive;
+            if (cloudArchive) {
+                if (!loadedDraft || cloudUpdatedAt >= draftUpdatedAt || hasRealCustomExpenses(cloudArchive.customExpenses)) {
+                    source = cloudArchive;
+                }
+            }
+
+            if (source) {
+                if (source.kasir !== undefined && source.kasir !== "") setKasir(source.kasir);
+                if (source.lokasi !== undefined && source.lokasi !== "") setLokasi(source.lokasi);
+                if (source.catatan !== undefined && source.catatan !== "") setCatatan(source.catatan);
+
+                // Custom Expenses: prioritize non-empty customExpenses with actual data
+                if (hasRealCustomExpenses(source.customExpenses)) {
+                    setCustomExpenses(source.customExpenses);
+                } else if (cloudArchive && hasRealCustomExpenses(cloudArchive.customExpenses)) {
+                    setCustomExpenses(cloudArchive.customExpenses);
+                } else {
+                    // If draft/archive is empty or placeholder, check cashflows for this date
+                    const matchingExpenses = getMatchingCashflowsForDate(cashflows, tanggal);
+                    if (matchingExpenses.length > 0) {
+                        setCustomExpenses(matchingExpenses.map((c, idx) => ({
+                            id: c.id || Date.now() + idx,
+                            category: mapCashflowCategoryToOption(c.category, categoryOptions),
+                            keterangan: c.description || c.category || 'Pengeluaran Kasir',
+                            qty: '1',
+                            harga: String(c.amount || ''),
+                            total: String(c.amount || '')
+                        })));
+                    } else if (!Array.isArray(source.customExpenses) || source.customExpenses.length === 0) {
+                        setCustomExpenses([
+                            { id: Date.now(), category: categoryOptions[0] || '1) Taman Etnik', keterangan: '', qty: '', harga: '', total: '' }
+                        ]);
+                    }
+                }
+
+                // Sales Rows: if live computed sales from transactions has positive values, use it to ensure no data is missed!
+                const hasComputedSales = computedSalesRows.some(r => Number(r.tunai) > 0 || Number(r.qr) > 0);
+                let baseRows = computedSalesRows;
+                if (Array.isArray(source.salesRows) && source.salesRows.length > 0) {
+                    const hasManualSales = source.salesRows.some(r => Number(r.tunai) > 0 || Number(r.qr) > 0);
+                    if (!hasComputedSales && hasManualSales) {
+                        baseRows = source.salesRows;
+                    }
+                }
+
+                // Saring dan petakan murni ke kategori master aktif (allSalesCategories)
+                const existingMap = new Map(baseRows.map(r => [r.name.toLowerCase().trim(), r]));
+                const mergedSalesRows = allSalesCategories.map(name => {
+                    const found = existingMap.get(name.toLowerCase().trim());
+                    return found ? { ...found, name } : { name, tunai: "", hppTunai: "", qr: "", hppQR: "" };
+                });
+                setSalesRows(mergedSalesRows);
+
+                // Expense Rows:
+                if (Array.isArray(source.expenseRows) && source.expenseRows.length > 0) {
+                    setExpenseRows(source.expenseRows);
+                }
             } else {
-                // If draft/archive is empty or placeholder, check cashflows for this date
+                // Completely fresh date with no draft/archive:
+                setSalesRows(computedSalesRows);
+
+                // Check cashflows for this date
                 const matchingExpenses = getMatchingCashflowsForDate(cashflows, tanggal);
                 if (matchingExpenses.length > 0) {
                     setCustomExpenses(matchingExpenses.map((c, idx) => ({
@@ -553,56 +618,62 @@ export default function BeritaAcaraPage() {
                         harga: String(c.amount || ''),
                         total: String(c.amount || '')
                     })));
-                } else if (!Array.isArray(source.customExpenses) || source.customExpenses.length === 0) {
+                } else {
                     setCustomExpenses([
-                        { id: Date.now(), category: categoryOptions[0] || '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
+                        { id: Date.now(), category: categoryOptions[0] || '1) Taman Etnik', keterangan: '', qty: '', harga: '', total: '' }
                     ]);
                 }
             }
+        };
 
-            // Sales Rows: if live computed sales from transactions has positive values, use it to ensure no data is missed!
-            const hasComputedSales = computedSalesRows.some(r => Number(r.tunai) > 0 || Number(r.qr) > 0);
-            let baseRows = computedSalesRows;
-            if (Array.isArray(source.salesRows) && source.salesRows.length > 0) {
-                const hasManualSales = source.salesRows.some(r => Number(r.tunai) > 0 || Number(r.qr) > 0);
-                if (!hasComputedSales && hasManualSales) {
-                    baseRows = source.salesRows;
+        hydrateData();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [tanggal, viewingArchive]);
+
+    // Real-time Cloud Synchronization from Firebase Firestore (Multi-user sync)
+    useEffect(() => {
+        if (!tanggal || viewingArchive) return;
+
+        const unsubscribe = StorageService.subscribeBeritaAcaraByDate(tanggal, (remoteArchive) => {
+            if (!remoteArchive) return;
+
+            // Prevent remote data from overwriting local edits if user is actively typing in the last 1.5 seconds
+            const now = Date.now();
+            const isActivelyEditing = (now - (lastLocalEditTimeRef.current || 0)) < 1500;
+            if (isActivelyEditing) return;
+
+            // Sync Custom Expenses live from Firestore
+            if (Array.isArray(remoteArchive.customExpenses) && remoteArchive.customExpenses.length > 0) {
+                const hasValidItems = remoteArchive.customExpenses.some(c => (c.keterangan && c.keterangan.trim()) || Number(c.total) > 0 || Number(c.harga) > 0);
+                if (hasValidItems) {
+                    setCustomExpenses(remoteArchive.customExpenses);
                 }
             }
 
-            // Saring dan petakan murni ke kategori master aktif (allSalesCategories)
-            const existingMap = new Map(baseRows.map(r => [r.name.toLowerCase().trim(), r]));
-            const mergedSalesRows = allSalesCategories.map(name => {
-                const found = existingMap.get(name.toLowerCase().trim());
-                return found ? { ...found, name } : { name, tunai: "", hppTunai: "", qr: "", hppQR: "" };
-            });
-            setSalesRows(mergedSalesRows);
-
-            // Expense Rows:
-            if (Array.isArray(source.expenseRows) && source.expenseRows.length > 0) {
-                setExpenseRows(source.expenseRows);
+            // Sync Summary Expense Table live from Firestore
+            if (Array.isArray(remoteArchive.expenseRows) && remoteArchive.expenseRows.length > 0) {
+                setExpenseRows(remoteArchive.expenseRows);
             }
-        } else {
-            // Completely fresh date with no draft/archive:
-            setSalesRows(computedSalesRows);
 
-            // Check cashflows for this date
-            const matchingExpenses = getMatchingCashflowsForDate(cashflows, tanggal);
-            if (matchingExpenses.length > 0) {
-                setCustomExpenses(matchingExpenses.map((c, idx) => ({
-                    id: c.id || Date.now() + idx,
-                    category: mapCashflowCategoryToOption(c.category, categoryOptions),
-                    keterangan: c.description || c.category || 'Pengeluaran Kasir',
-                    qty: '1',
-                    harga: String(c.amount || ''),
-                    total: String(c.amount || '')
-                })));
-            } else {
-                setCustomExpenses([
-                    { id: Date.now(), category: categoryOptions[0] || '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
-                ]);
+            // Sync header fields if not set locally
+            if (remoteArchive.kasir && !kasir) setKasir(remoteArchive.kasir);
+            if (remoteArchive.lokasi && !lokasi) setLokasi(remoteArchive.lokasi);
+            if (remoteArchive.catatan && !catatan) setCatatan(remoteArchive.catatan);
+
+            // Update local storage draft to keep it in sync with Cloud
+            try {
+                localStorage.setItem(`rep_ba_draft_${tanggal}`, JSON.stringify(remoteArchive));
+            } catch (e) {
+                // ignore
             }
-        }
+        });
+
+        return () => {
+            if (typeof unsubscribe === 'function') unsubscribe();
+        };
     }, [tanggal, viewingArchive]);
 
     // Automatic Synchronization: Custom Expenses -> Section V (expenseRows)
@@ -812,15 +883,18 @@ export default function BeritaAcaraPage() {
             console.error("Failed to save local draft:", e);
         }
 
-        // Debounced StorageService / Firestore save
+        // Debounced StorageService / Firebase Firestore save (Fast auto-sync)
         const timer = setTimeout(async () => {
             try {
                 setAutoSaveStatus("saving");
                 const existingArchives = await StorageService.getBeritaAcaraArchives();
                 const existingForDate = existingArchives.find(arch => arch.date === tanggal);
 
+                const docId = existingForDate ? existingForDate.id : `ba_${tanggal}`;
+                const nowTimestamp = Date.now();
+
                 const archiveData = {
-                    id: existingForDate ? existingForDate.id : Date.now().toString(),
+                    id: docId,
                     title: existingForDate ? existingForDate.title : `Berita Acara - ${tanggal}`,
                     date: tanggal,
                     periode,
@@ -834,8 +908,8 @@ export default function BeritaAcaraPage() {
                     totalIncome: totalInc,
                     totalExpense: totalExp,
                     totalClean: totalInc - totalExp,
-                    createdAt: existingForDate ? (existingForDate.createdAt || Date.now()) : Date.now(),
-                    updatedAt: Date.now()
+                    createdAt: existingForDate ? (existingForDate.createdAt || nowTimestamp) : nowTimestamp,
+                    updatedAt: nowTimestamp
                 };
 
                 await StorageService.saveBeritaAcaraArchive(archiveData, false);
@@ -844,7 +918,7 @@ export default function BeritaAcaraPage() {
                 console.error("Auto save archive error:", err);
                 setAutoSaveStatus("idle");
             }
-        }, 1000);
+        }, 500);
 
         return () => clearTimeout(timer);
     }, [tanggal, periode, kasir, lokasi, JSON.stringify(salesRows), JSON.stringify(expenseRows), JSON.stringify(customExpenses), catatan, viewingArchive]);
@@ -1245,6 +1319,7 @@ export default function BeritaAcaraPage() {
     };
 
     const handleCategorySelect = (expId, selectedVal) => {
+        lastLocalEditTimeRef.current = Date.now();
         if (selectedVal === '__ADD_NEW__') {
             const input = prompt("Masukkan nama kategori pengeluaran baru:");
             if (input && input.trim()) {
@@ -1257,15 +1332,18 @@ export default function BeritaAcaraPage() {
 
     // Modern Table Handlers
     const addCustomExpense = () => {
-        const defaultCat = categoryOptions[0] || '1) CAFÉ';
+        lastLocalEditTimeRef.current = Date.now();
+        const defaultCat = categoryOptions[0] || '1) Taman Etnik';
         setCustomExpenses([...customExpenses, { id: Date.now(), category: defaultCat, keterangan: '', qty: '', harga: '', total: '' }]);
     };
 
     const removeCustomExpense = (id) => {
+        lastLocalEditTimeRef.current = Date.now();
         setCustomExpenses(customExpenses.filter(e => e.id !== id));
     };
 
     const updateCustomExpense = (id, field, value) => {
+        lastLocalEditTimeRef.current = Date.now();
         setCustomExpenses(prev => prev.map(item => {
             if (item.id === id) {
                 const updated = { ...item, [field]: value };
@@ -1626,11 +1704,22 @@ export default function BeritaAcaraPage() {
                     <div className="bg-white p-5 rounded-2xl shadow-sm mb-6 print:hidden border border-slate-200">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
                             <div>
-                                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                    <FileText size={16} className="text-amber-600" />
-                                    Input Rincian Pengeluaran Operasional
-                                </h3>
-                                <p className="text-xs text-slate-500 mt-0.5">Tabel ini otomatis merekapitulasi uraian pengeluaran pada cetakan Berita Acara.</p>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                        <FileText size={16} className="text-amber-600" />
+                                        Input Rincian Pengeluaran Operasional
+                                    </h3>
+                                    {autoSaveStatus === "saving" ? (
+                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full animate-pulse">
+                                            <RefreshCw size={11} className="animate-spin" /> Menyimpan ke Firebase...
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                                            <CheckCircle2 size={11} className="text-emerald-600" /> Tersimpan di Firebase (Auto-Sync)
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-xs text-slate-500 mt-0.5">Tabel ini otomatis tersimpan ke Firebase dan bisa langsung dilihat oleh pengguna lain secara real-time.</p>
                             </div>
                             <div className="flex flex-wrap gap-2 items-center">
                                 <button
