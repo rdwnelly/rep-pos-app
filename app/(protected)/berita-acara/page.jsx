@@ -7,7 +7,8 @@ import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
 import { formatIDR, formatNumber } from "../../../utils";
 import {
     Plus, PlusCircle, Trash2, Info, Save, Archive, FileText, X, Printer, Eye,
-    FolderPlus, Download, Loader2, CheckCircle2, RefreshCw, AlertCircle, Sparkles, Check
+    FolderPlus, Download, Loader2, CheckCircle2, RefreshCw, AlertCircle, Sparkles, Check,
+    CloudUpload, CheckCheck
 } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -760,42 +761,65 @@ export default function BeritaAcaraPage() {
             const calculation = calculateSalesRowsForDate(freshTx, tanggal, finalSalesCats, freshCats, freshProds);
             setSalesRows(calculation.rows);
 
-            // 5. Match Cashflow / Expenses
+            // 5. Match Cloud Archive & Cashflow / Expenses
             const matchingExpenses = getMatchingCashflowsForDate(freshCf, tanggal);
             let cashflowUpdated = false;
 
-            const isCustomExpensesEmpty = customExpenses.length === 0 || (customExpenses.length === 1 && !customExpenses[0].keterangan && !customExpenses[0].total && !customExpenses[0].harga);
+            let cloudArchive = (freshArch || []).find(a => a && (a.date === tanggal || a.id === `ba_${tanggal}`));
+            if (!cloudArchive) {
+                try {
+                    cloudArchive = await StorageService.getBeritaAcaraByDate(tanggal);
+                } catch (e) {
+                    console.warn("Error fetching direct cloud archive:", e);
+                }
+            }
 
-            if ((syncCashflow || isCustomExpensesEmpty) && matchingExpenses.length > 0) {
-                const newCustomExpenses = matchingExpenses.map((c, idx) => ({
-                    id: c.id || Date.now() + idx,
-                    category: mapCashflowCategoryToOption(c.category, categoryOptions),
-                    keterangan: c.description || c.category || 'Pengeluaran Kasir',
-                    qty: '1',
-                    harga: String(c.amount || ''),
-                    total: String(c.amount || '')
-                }));
-                setCustomExpenses(newCustomExpenses);
-                cashflowUpdated = true;
+            const hasCloudCustomExpenses = cloudArchive && Array.isArray(cloudArchive.customExpenses) && cloudArchive.customExpenses.some(c => (c.keterangan && c.keterangan.trim()) || Number(c.total) > 0 || Number(c.harga) > 0);
+
+            let finalCustomExpenses = customExpenses;
+            let finalExpenseRows = expenseRows;
+
+            if (hasCloudCustomExpenses) {
+                // Priority 1: Use cloud custom expenses saved in Firebase
+                finalCustomExpenses = cloudArchive.customExpenses;
+                setCustomExpenses(cloudArchive.customExpenses);
+
+                if (Array.isArray(cloudArchive.expenseRows) && cloudArchive.expenseRows.length > 0) {
+                    finalExpenseRows = cloudArchive.expenseRows;
+                    setExpenseRows(cloudArchive.expenseRows);
+                }
+                if (cloudArchive.kasir && !kasir) setKasir(cloudArchive.kasir);
+                if (cloudArchive.lokasi && !lokasi) setLokasi(cloudArchive.lokasi);
+                if (cloudArchive.catatan && !catatan) setCatatan(cloudArchive.catatan);
+            } else {
+                // Priority 2: Match Cashflow expenses
+                const isCustomExpensesEmpty = customExpenses.length === 0 || (customExpenses.length === 1 && !customExpenses[0].keterangan && !customExpenses[0].total && !customExpenses[0].harga);
+
+                if ((syncCashflow || isCustomExpensesEmpty) && matchingExpenses.length > 0) {
+                    finalCustomExpenses = matchingExpenses.map((c, idx) => ({
+                        id: c.id || Date.now() + idx,
+                        category: mapCashflowCategoryToOption(c.category, categoryOptions),
+                        keterangan: c.description || c.category || 'Pengeluaran Kasir',
+                        qty: '1',
+                        harga: String(c.amount || ''),
+                        total: String(c.amount || '')
+                    }));
+                    setCustomExpenses(finalCustomExpenses);
+                    cashflowUpdated = true;
+                }
             }
 
             // 6. Update draft in localStorage with live data
             const draftData = {
+                id: cloudArchive?.id || `ba_${tanggal}`,
                 date: tanggal,
                 periode,
-                kasir,
-                lokasi,
+                kasir: kasir || cloudArchive?.kasir || '',
+                lokasi: lokasi || cloudArchive?.lokasi || '',
                 salesRows: calculation.rows,
-                expenseRows,
-                customExpenses: cashflowUpdated ? matchingExpenses.map((c, idx) => ({
-                    id: c.id || Date.now() + idx,
-                    category: mapCashflowCategoryToOption(c.category, categoryOptions),
-                    keterangan: c.description || c.category || 'Pengeluaran Kasir',
-                    qty: '1',
-                    harga: String(c.amount || ''),
-                    total: String(c.amount || '')
-                })) : customExpenses,
-                catatan,
+                expenseRows: finalExpenseRows,
+                customExpenses: finalCustomExpenses,
+                catatan: catatan || cloudArchive?.catatan || '',
                 updatedAt: Date.now()
             };
             try {
@@ -922,6 +946,78 @@ export default function BeritaAcaraPage() {
 
         return () => clearTimeout(timer);
     }, [tanggal, periode, kasir, lokasi, JSON.stringify(salesRows), JSON.stringify(expenseRows), JSON.stringify(customExpenses), catatan, viewingArchive]);
+
+    const [isSavingExpenses, setIsSavingExpenses] = useState(false);
+    const [expenseSaveFeedback, setExpenseSaveFeedback] = useState(null);
+
+    // Explicit Manual Save: Saves Operational Expenses to Firebase Cloud & syncs to all devices
+    const handleSaveExpensesToCloud = async () => {
+        if (!tanggal) return;
+        try {
+            setIsSavingExpenses(true);
+            setExpenseSaveFeedback(null);
+
+            const totalTunai = salesRows.reduce((sum, row) => sum + (Number(row.tunai) || 0), 0);
+            const totalQR = salesRows.reduce((sum, row) => sum + (Number(row.qr) || 0), 0);
+            const totalExp = expenseRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+            const totalInc = totalTunai + totalQR;
+
+            const existingArchives = await StorageService.getBeritaAcaraArchives();
+            const existingForDate = existingArchives.find(arch => arch.date === tanggal);
+
+            const docId = existingForDate ? existingForDate.id : `ba_${tanggal}`;
+            const nowTimestamp = Date.now();
+
+            const archiveData = {
+                id: docId,
+                title: existingForDate ? existingForDate.title : `Berita Acara - ${tanggal}`,
+                date: tanggal,
+                periode,
+                kasir: kasir || '',
+                lokasi: lokasi || '',
+                salesRows,
+                expenseRows,
+                expenses: expenseRows.map(r => r.amount),
+                customExpenses,
+                catatan: catatan || '',
+                totalIncome: totalInc,
+                totalExpense: totalExp,
+                totalClean: totalInc - totalExp,
+                createdAt: existingForDate ? (existingForDate.createdAt || nowTimestamp) : nowTimestamp,
+                updatedAt: nowTimestamp,
+                lastSavedAt: new Date().toISOString(),
+                syncedToCloud: true
+            };
+
+            // 1. Save directly to Firebase Firestore with notify=true to trigger real-time updates
+            await StorageService.saveBeritaAcaraArchive(archiveData, true);
+
+            // 2. Save local draft
+            try {
+                localStorage.setItem(`rep_ba_draft_${tanggal}`, JSON.stringify(archiveData));
+            } catch (e) {
+                console.error("Failed to save local draft:", e);
+            }
+
+            setAutoSaveStatus("saved");
+            setExpenseSaveFeedback({
+                type: 'success',
+                message: `Data Rincian Pengeluaran Operasional (${customExpenses.length} baris) berhasil disimpan ke Firebase Cloud & siap dilihat di semua perangkat!`
+            });
+
+            setTimeout(() => {
+                setExpenseSaveFeedback(null);
+            }, 4500);
+        } catch (err) {
+            console.error("Gagal menyimpan pengeluaran ke cloud:", err);
+            setExpenseSaveFeedback({
+                type: 'error',
+                message: 'Gagal menyimpan ke Firebase Cloud: ' + (err.message || err)
+            });
+        } finally {
+            setIsSavingExpenses(false);
+        }
+    };
 
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
@@ -1719,9 +1815,25 @@ export default function BeritaAcaraPage() {
                                         </span>
                                     )}
                                 </div>
-                                <p className="text-xs text-slate-500 mt-0.5">Tabel ini otomatis tersimpan ke Firebase dan bisa langsung dilihat oleh pengguna lain secara real-time.</p>
+                                <p className="text-xs text-slate-500 mt-0.5">Tabel ini tersimpan ke Cloud Firebase dan dapat langsung dilihat di semua perangkat kasir/admin.</p>
                             </div>
                             <div className="flex flex-wrap gap-2 items-center">
+                                <button
+                                    onClick={handleSaveExpensesToCloud}
+                                    disabled={isSavingExpenses}
+                                    className="flex items-center gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-75 disabled:cursor-not-allowed text-white border border-emerald-600 px-4 py-2 rounded-xl transition-all shadow-sm shrink-0"
+                                    title="Simpan data rincian pengeluaran langsung ke Firebase Cloud agar sinkron ke perangkat lain"
+                                >
+                                    {isSavingExpenses ? (
+                                        <>
+                                            <Loader2 size={15} className="animate-spin" /> Menyimpan ke Cloud...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CloudUpload size={15} /> Simpan Data Pengeluaran (Cloud)
+                                        </>
+                                    )}
+                                </button>
                                 <button
                                     onClick={() => setShowCategoryModal(true)}
                                     className="flex items-center gap-1.5 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-3.5 py-2 rounded-xl transition-colors shadow-sm shrink-0"
@@ -1730,6 +1842,29 @@ export default function BeritaAcaraPage() {
                                 </button>
                             </div>
                         </div>
+
+                        {expenseSaveFeedback && (
+                            <div className={`p-3.5 mb-4 rounded-xl flex items-center justify-between gap-3 text-xs font-medium border ${
+                                expenseSaveFeedback.type === 'success'
+                                    ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                                    : 'bg-red-50 text-red-900 border-red-200'
+                            }`}>
+                                <div className="flex items-center gap-2">
+                                    {expenseSaveFeedback.type === 'success' ? (
+                                        <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                                    ) : (
+                                        <AlertCircle size={18} className="text-red-600 shrink-0" />
+                                    )}
+                                    <span>{expenseSaveFeedback.message}</span>
+                                </div>
+                                <button
+                                    onClick={() => setExpenseSaveFeedback(null)}
+                                    className="p-1 hover:bg-black/5 rounded-lg text-slate-500 hover:text-slate-800 shrink-0"
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        )}
 
                         <div className="overflow-x-auto rounded-lg border border-gray-200">
                             <table className="w-full text-sm text-left text-gray-600">
@@ -1816,14 +1951,31 @@ export default function BeritaAcaraPage() {
                             </table>
                         </div>
                         <div className="mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                            <button
-                                onClick={addCustomExpense}
-                                className="flex items-center gap-2 text-sm font-medium text-white bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition-colors shadow-sm"
-                            >
-                                <Plus size={16} /> Tambah Pengeluaran
-                            </button>
-                            <div className="flex items-center gap-2 text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100">
-                                <Info size={16} className="text-blue-500 flex-shrink-0" />
+                            <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                    onClick={addCustomExpense}
+                                    className="flex items-center gap-2 text-sm font-medium text-white bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl transition-colors shadow-sm"
+                                >
+                                    <Plus size={16} /> Tambah Pengeluaran
+                                </button>
+                                <button
+                                    onClick={handleSaveExpensesToCloud}
+                                    disabled={isSavingExpenses}
+                                    className="flex items-center gap-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-75 disabled:cursor-not-allowed px-4 py-2.5 rounded-xl transition-all shadow-sm"
+                                >
+                                    {isSavingExpenses ? (
+                                        <>
+                                            <Loader2 size={16} className="animate-spin" /> Menyimpan ke Cloud...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CloudUpload size={16} /> Simpan Data Pengeluaran
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-gray-600 bg-blue-50 px-3.5 py-2 rounded-xl border border-blue-100">
+                                <Info size={15} className="text-blue-500 flex-shrink-0" />
                                 <span>Kategori yang sama akan dikelompokkan otomatis di halaman cetak.</span>
                             </div>
                         </div>

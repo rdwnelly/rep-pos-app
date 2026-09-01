@@ -510,15 +510,45 @@ export const FirestoreService = {
     ]);
   },
   
-  getBeritaAcaraArchives: async (): Promise<any[]> =>
-    getCollectionOrdered<any>("berita_acara_archives", "createdAt", "desc"),
+  getBeritaAcaraArchives: async (): Promise<any[]> => {
+    try {
+      const list = await getCollection<any>("berita_acara_archives");
+      return list.sort((a, b) => {
+        const timeA = new Date(a.date || a.createdAt || 0).getTime() || Number(a.createdAt) || 0;
+        const timeB = new Date(b.date || b.createdAt || 0).getTime() || Number(b.createdAt) || 0;
+        return timeB - timeA;
+      });
+    } catch (e) {
+      console.warn("Error fetching berita acara archives:", e);
+      return [];
+    }
+  },
   getBeritaAcaraByDate: async (date: string): Promise<any | null> => {
     if (!date) return null;
-    const docId = `ba_${date}`;
-    const directDoc = await getDocument<any>("berita_acara_archives", docId);
-    if (directDoc) return directDoc;
-    const all = await getCollection<any>("berita_acara_archives");
-    return all.find((a) => a.date === date) || null;
+    try {
+      const docId = `ba_${date}`;
+      const directDoc = await getDocument<any>("berita_acara_archives", docId);
+      if (directDoc && (directDoc.date === date || directDoc.customExpenses?.length > 0)) {
+        return directDoc;
+      }
+      const all = await getCollection<any>("berita_acara_archives");
+      const matched = all.filter((a) => {
+        if (!a) return false;
+        if (a.date === date) return true;
+        if (a.id === docId) return true;
+        if (typeof a.date === 'string' && a.date.slice(0, 10) === date) return true;
+        return false;
+      });
+      if (matched.length > 0) {
+        // Return the one with the latest updatedAt or with customExpenses
+        matched.sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0));
+        return matched[0];
+      }
+      return directDoc || null;
+    } catch (e) {
+      console.warn("Error in getBeritaAcaraByDate:", e);
+      return null;
+    }
   },
   saveBeritaAcaraArchive: async (archive: any) => {
     const docId = archive.id || `ba_${archive.date}`;
@@ -534,11 +564,23 @@ export const FirestoreService = {
     }
     const docId = `ba_${date}`;
     const docRef = doc(collectionRef("berita_acara_archives"), docId);
+    
+    // Listen to direct docRef
     return onSnapshot(docRef, (snapshot) => {
       if (snapshot.exists()) {
         callback(toEntity<any>(snapshot));
       } else {
-        callback(null);
+        // Fallback check query by date field
+        const q = query(collectionRef("berita_acara_archives"), where("date", "==", date));
+        getDocs(q).then((qSnap) => {
+          if (!qSnap.empty) {
+            const list = qSnap.docs.map(d => toEntity<any>(d));
+            list.sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0));
+            callback(list[0]);
+          } else {
+            callback(null);
+          }
+        }).catch(() => callback(null));
       }
     }, (error) => {
       console.warn("Error in subscribeBeritaAcaraByDate:", error);
