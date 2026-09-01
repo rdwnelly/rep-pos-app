@@ -50,8 +50,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
     // Fallbacks
     const defaults = [
       'Paket Sopendo / Saswar / Edukasi',
-      'Tiket Masuk',
-      'Sewa Kostum',
+      'Taman Etnik',
       'TOKO SOUVENIR',
       'Kafe & Resto',
       'Kios',
