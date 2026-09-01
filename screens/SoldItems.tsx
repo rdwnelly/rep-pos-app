@@ -3,7 +3,7 @@ import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { TransactionType, UserRole, User } from '../types';
 import { formatIDR, exportToCSV, exportToExcel } from '../utils';
-import { Download, Search, Filter, RotateCcw, X, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, ShoppingBag, Printer, Calendar, Trash2, Folder, Layers } from 'lucide-react';
+import { Download, Search, Filter, RotateCcw, X, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, ShoppingBag, Printer, Calendar, Folder, Layers } from 'lucide-react';
 
 interface SoldItemsProps {
     currentUser: User | null;
@@ -443,17 +443,6 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
         };
     }, [loadMoreRef.current, soldItems]);
 
-    const handleDeleteTransaction = async (transactionId: string) => {
-        if (!confirm('Yakin ingin menghapus transaksi ini? Stok barang akan otomatis dikembalikan ke inventaris toko dan catatan pendapatan/arus kas terkait akan disesuaikan.')) return;
-        try {
-            await StorageService.deleteTransaction(transactionId);
-            alert('Transaksi berhasil dihapus. Stok barang dan pendapatan telah otomatis dikembalikan.');
-        } catch (error) {
-            console.error("Failed to delete transaction:", error);
-            alert("Gagal menghapus transaksi.");
-        }
-    };
-
     const handleSort = (key: string) => {
         setSortConfig(current => ({
             key,
@@ -870,13 +859,12 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                     <div className="flex items-center">Kasir <SortIcon column="cashierName" /></div>
                                 </th>
                                 <th className="p-3 font-medium text-center">Status</th>
-                                <th className="p-3 font-medium text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {soldItems.length === 0 && (
                                 <tr>
-                                    <td colSpan={12} className="p-8 text-center text-slate-400">Tidak ada data barang terjual.</td>
+                                    <td colSpan={currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.OWNER ? 11 : 10} className="p-8 text-center text-slate-400">Tidak ada data barang terjual.</td>
                                 </tr>
                             )}
 
@@ -889,7 +877,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                         <React.Fragment key={catName}>
                                             {/* Category Section Header Row */}
                                             <tr className="bg-amber-50/90 text-amber-950 font-bold border-y border-amber-200">
-                                                <td colSpan={12} className="px-4 py-2.5">
+                                                <td colSpan={currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.OWNER ? 11 : 10} className="px-4 py-2.5">
                                                     <div className="flex justify-between items-center text-xs">
                                                         <span className="flex items-center gap-2 text-amber-900 font-bold text-sm">
                                                             <Folder size={16} className="text-amber-600" />
@@ -936,11 +924,6 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                                             {item.transactionType === TransactionType.RETURN ? 'RETUR' : item.isReturned ? 'Retur Sebagian' : 'Normal'}
                                                         </span>
                                                     </td>
-                                                    <td className="p-3 text-right">
-                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(item.transactionId); }} className="text-[11px] bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded transition-colors inline-flex items-center gap-1 font-medium" title="Hapus Transaksi">
-                                                            <Trash2 size={12} /> Hapus
-                                                        </button>
-                                                    </td>
                                                 </tr>
                                             ))}
 
@@ -954,7 +937,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                                     <td className="p-2.5"></td>
                                                 )}
                                                 <td className="p-2.5 text-right font-bold text-emerald-700 text-xs">{formatIDR(subTotalRevenue)}</td>
-                                                <td colSpan={5} className="p-2.5"></td>
+                                                <td colSpan={4} className="p-2.5"></td>
                                             </tr>
                                         </React.Fragment>
                                     );
@@ -989,18 +972,13 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                                 {item.transactionType === TransactionType.RETURN ? 'RETUR' : item.isReturned ? 'Retur Sebagian' : 'Normal'}
                                             </span>
                                         </td>
-                                        <td className="p-3 text-right">
-                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(item.transactionId); }} className="text-[11px] bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded transition-colors inline-flex items-center gap-1 font-medium" title="Hapus Transaksi">
-                                                <Trash2 size={12} /> Hapus
-                                            </button>
-                                        </td>
                                     </tr>
                                 ))
                             )}
 
                             {visibleSoldItems.length < soldItems.length && !groupByCategory && (
                                 <tr>
-                                    <td colSpan={12} className="p-4 text-center text-slate-400">
+                                    <td colSpan={currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.OWNER ? 11 : 10} className="p-4 text-center text-slate-400">
                                         <div ref={loadMoreRef}>Loading more...</div>
                                     </td>
                                 </tr>

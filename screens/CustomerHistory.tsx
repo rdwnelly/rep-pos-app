@@ -1288,10 +1288,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                                     className="bg-emerald-600 text-white border border-emerald-700 px-3.5 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-emerald-700 transition-colors shadow-xs"
                                     title="Cetak Langsung Struk Thermal Bluetooth (Tanpa Popup Konfirmasi)"
                                 >
-                                    <Bluetooth size={16} /> Cetak Struk
-                                </button>
-                                <button onClick={() => printTransactionDetail(detailTransaction)} className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50">
-                                    <Printer size={16} /> Cetak Detail
+                                    <Bluetooth size={16} /> Struk BT
                                 </button>
                                 <button onClick={() => setDetailTransaction(null)} className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold">Tutup</button>
                             </div>

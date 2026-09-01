@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useData } from "../../../hooks/useData";
 import { StorageService } from "../../../services/storage";
 import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
@@ -11,7 +11,7 @@ import jsPDF from "jspdf";
 
 const WhatsAppIcon = ({ size = 16 }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984a9.932 9.932 0 001.332 4.982L2 22l5.237-1.343a9.96 9.96 0 004.775 1.216h.004c5.505 0 9.988-4.478 9.989-9.984 0-2.667-1.037-5.176-2.922-7.062A9.923 9.923 0 0012.012 2zm5.834 14.164c-.247.692-1.246 1.34-1.745 1.408-.475.064-1.077.096-1.724-.112-.417-.133-.96-.31-1.666-.615-2.949-1.272-4.869-4.28-5.016-4.476-.146-.197-1.196-1.591-1.196-3.036 0-1.445.758-2.158 1.026-2.45.247-.269.544-.336.726-.336.183 0 .366.002.525.009.17.008.396-.065.62.472.247.592.84 2.052.913 2.2.073.149.122.323.024.518-.098.196-.147.32-.293.491-.146.172-.307.385-.438.518-.146.147-.298.307-.128.598.17.292.756 1.248 1.626 2.024 1.12.998 2.062 1.308 2.355 1.455.293.147.464.123.635-.073.17-.197.733-.853.929-1.147.196-.293.391-.245.659-.147.269.098 1.708.805 2.001.951.293.147.488.221.561.344.073.123.073.715-.174 1.407z"/>
+        <path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984a9.932 9.932 0 001.332 4.982L2 22l5.237-1.343a9.96 9.96 0 004.775 1.216h.004c5.505 0 9.988-4.478 9.989-9.984 0-2.667-1.037-5.176-2.922-7.062A9.923 9.923 0 0012.012 2zm5.834 14.164c-.247.692-1.246 1.34-1.745 1.408-.475.064-1.077.096-1.724-.112-.417-.133-.96-.31-1.666-.615-2.949-1.272-4.869-4.28-5.016-4.476-.146-.197-1.196-1.591-1.196-3.036 0-1.445.758-2.158 1.026-2.45.247-.269.544-.336.726-.336.183 0 .366.002.525.009.17.008.396-.065.62.472.247.592.84 2.052.913 2.2.073.149.122.323.024.518-.098.196-.147.32-.293.491-.146.172-.307.385-.438.518-.146.147-.298.307-.128.598.17.292.756 1.248 1.626 2.024 1.12.998 2.062 1.308 2.355 1.455.293.147.464.123.635-.073.17-.197.733-.853.929-1.147.196-.293.391-.245.659-.147.269.098 1.708.805 2.001.951.293.147.488.221.561.344.073.123.073.715-.174 1.407z" />
     </svg>
 );
 
@@ -31,8 +31,9 @@ const BASE_SALES_CATEGORIES = [
 // Mapping dari categoryName (lowercase) ke nama tampilan pada Berita Acara
 // Jika kategori tidak cocok dengan pola ini, akan ditambahkan sebagai baris baru secara otomatis
 const mapCategoryNameToSalesRow = (catName) => {
-    const lower = catName.toLowerCase();
+    const lower = (catName || "").toLowerCase().trim();
     if (lower.includes("tiket")) return "Tiket Masuk";
+    if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar") || lower === "sewa kostum keluar") return "Sewa kostum keluar";
     if (lower.includes("sewa kostum") || lower.includes("kostum")) return "Sewa Kostum";
     if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "Toko / Souvenir";
     if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) return "Kafe & Resto";
@@ -92,15 +93,15 @@ const DETAILED_EXPENSE_CONFIG = [
 // Helper to map category dropdown to the correct printable table
 const mapCategoryToSection = (cat) => {
     if (!cat) return "VI. URAIAN PENGELUARAN (Lain-lain)";
-    const lower = cat.toLowerCase();
+    const lower = cat.toLowerCase().trim();
     if (lower.includes("tiket")) return "VI. URAIAN PENGELUARAN (Tiket Masuk)";
+    if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar")) return "VI. URAIAN PENGELUARAN (Sewa kostum keluar)";
     if (lower.includes("sewa kostum") || lower.includes("kostum")) return "VI. URAIAN PENGELUARAN (Sewa Kostum)";
     if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "VI. URAIAN PENGELUARAN (Toko / Souvenir)";
     if (lower.includes("café") || lower.includes("cafe") || lower.includes("kafe") || lower.includes("resto")) return "VI. URAIAN PENGELUARAN (Pembelanjaan Café)";
     if (lower.includes("kios")) return "VI. URAIAN PENGELUARAN (Biaya Kios)";
     if (lower.includes("sopendo") || lower.includes("saswar") || lower.includes("edukasi")) return "VI. URAIAN PENGELUARAN (Paket Sopendo / Saswar / Edukasi)";
     if (lower.includes("fotografer") || lower.includes("foto")) return "VI. URAIAN PENGELUARAN (Jasa Fotografer)";
-    if (lower.includes("sewa kostum keluar")) return "VI. URAIAN PENGELUARAN (Sewa kostum keluar)";
     if (lower.includes("reparasi") || lower.includes("service") || lower.includes("servis") || lower.includes("bengkel")) return "VI. URAIAN PENGELUARAN (REPARASI)";
     if (lower.includes("transportasi") || lower.includes("transport") || lower.includes("bbm") || lower.includes("bensin") || lower.includes("ongkir")) return "VI. URAIAN PENGELUARAN (Transportasi)";
     if (lower.includes("listrik") || lower.includes("pln") || lower.includes("token") || lower.includes("pdam") || lower.includes("air") || lower.includes("internet") || lower.includes("wifi")) return "VI. URAIAN PENGELUARAN (Listrik)";
@@ -156,6 +157,38 @@ export default function BeritaAcaraPage() {
         { name: "", amount: "" }
     ]);
 
+    // Custom Categories State & Management
+    const [categoryOptions, setCategoryOptions] = useState(() => {
+        const defaultList = buildDefaultCategoryOptions(BASE_SALES_CATEGORIES);
+        if (typeof window !== 'undefined') {
+            try {
+                const saved = localStorage.getItem('custom_expense_categories');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        return parsed;
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading custom expense categories:', e);
+            }
+        }
+        return defaultList;
+    });
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('custom_expense_categories');
+            if (!saved) {
+                const newList = buildDefaultCategoryOptions(allSalesCategories);
+                setCategoryOptions(prev => {
+                    if (JSON.stringify(prev) === JSON.stringify(newList)) return prev;
+                    return newList;
+                });
+            }
+        }
+    }, [JSON.stringify(allSalesCategories)]);
+
     // Modern Dynamic Expenses (Hidden on print)
     const [customExpenses, setCustomExpenses] = useState([
         { id: Date.now(), category: '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
@@ -163,37 +196,30 @@ export default function BeritaAcaraPage() {
 
     const [catatan, setCatatan] = useState("");
 
-    // Auto-calculate logic from transactions
-    const transactionsStr = JSON.stringify(transactions);
-    const categoriesStr = JSON.stringify(allSalesCategories);
+    const loadedDateRef = useRef(null);
 
-    useEffect(() => {
-        if (!tanggal) return;
+    // Compute default sales rows from transactions for current `tanggal`
+    const computedSalesRows = useMemo(() => {
+        if (!tanggal) return allSalesCategories.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" }));
 
         const startDate = new Date(tanggal);
         startDate.setHours(0, 0, 0, 0);
         const endDate = new Date(tanggal);
         endDate.setHours(23, 59, 59, 999);
 
-        let hasData = false;
-
-        const currentTransactions = JSON.parse(transactionsStr);
-
-        // === LOGIKA PENJUALAN DINAMIS BERBASIS KATEGORI ===
         const salesMap = {};
         allSalesCategories.forEach(name => {
             salesMap[name] = { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
         });
 
-        currentTransactions.forEach(t => {
+        (transactions || []).forEach(t => {
             if (!t || !t.date) return;
             const rawDateStr = typeof t.date === 'string' ? t.date : '';
             const tDateOnly = rawDateStr.slice(0, 10);
             const tDate = new Date(rawDateStr.replace(' ', 'T'));
             const isMatch = tDateOnly === tanggal || (!isNaN(tDate.getTime()) && tDate >= startDate && tDate <= endDate);
 
-            if (isMatch) {
-                hasData = true;
+            if (isMatch && Array.isArray(t.items)) {
                 t.items.forEach(item => {
                     const originalCatName = item.categoryName || 'Lainnya';
                     const rowName = mapCategoryNameToSalesRow(originalCatName);
@@ -220,56 +246,201 @@ export default function BeritaAcaraPage() {
             }
         });
 
-        const newSalesRows = Object.entries(salesMap).map(([name, vals]) => ({
+        return Object.entries(salesMap).map(([name, vals]) => ({
             name,
             tunai: vals.tunai === 0 ? "" : String(vals.tunai),
             hppTunai: vals.hppTunai === 0 ? "" : String(vals.hppTunai),
             qr: vals.qr === 0 ? "" : String(vals.qr),
             hppQR: vals.hppQR === 0 ? "" : String(vals.hppQR),
         }));
+    }, [tanggal, transactions, allSalesCategories]);
 
-        if (hasData) {
-            setSalesRows(newSalesRows);
-        } else {
-            setSalesRows(allSalesCategories.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" })));
+    // Helper to get matching cashflow expenses for a given target date (timezone-safe)
+    const getMatchingCashflowsForDate = (allCashflows, targetDate) => {
+        if (!targetDate || !Array.isArray(allCashflows)) return [];
+
+        const startDate = new Date(targetDate);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(targetDate);
+        endDate.setHours(23, 59, 59, 999);
+
+        return allCashflows.filter(c => {
+            if (!c) return false;
+            // Match Cash OUT (expenses / pengeluaran kas)
+            const typeStr = (c.type || '').toString().toUpperCase();
+            const isOut = typeStr === 'OUT' || typeStr === 'EXPENSE' || typeStr === 'KAS_KELUAR' || typeStr === CashFlowType.OUT;
+            if (!isOut) return false;
+
+            const rawDateStr = typeof c.date === 'string' ? c.date : '';
+            const cDateOnly = rawDateStr.slice(0, 10);
+            const cDate = new Date(rawDateStr.replace(' ', 'T'));
+            return cDateOnly === targetDate || (!isNaN(cDate.getTime()) && cDate >= startDate && cDate <= endDate);
+        });
+    };
+
+    const mapCashflowCategoryToOption = (rawCat, availableOptions) => {
+        if (!rawCat) return availableOptions[0] || '1) Tiket Masuk';
+        const lower = rawCat.toLowerCase().trim();
+
+        const directMatch = availableOptions.find(opt => {
+            const cleaned = opt.replace(/^\d+\)\s*/, '').toLowerCase().trim();
+            return cleaned === lower || opt.toLowerCase().trim() === lower;
+        });
+        if (directMatch) return directMatch;
+
+        if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("sewa kostum keluar"));
+            if (found) return found;
         }
-    }, [tanggal, transactionsStr, categoriesStr]);
+        if (lower.includes("sewa kostum") || lower.includes("kostum")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("sewa kostum"));
+            if (found) return found;
+        }
+        if (lower.includes("tiket")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("tiket"));
+            if (found) return found;
+        }
+        if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("café") || o.toLowerCase().includes("cafe") || o.toLowerCase().includes("kafe"));
+            if (found) return found;
+        }
+        if (lower.includes("toko") || lower.includes("souvenir")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("toko") || o.toLowerCase().includes("souvenir"));
+            if (found) return found;
+        }
+        if (lower.includes("kios")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("kios"));
+            if (found) return found;
+        }
+        if (lower.includes("listrik") || lower.includes("pln")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("listrik") || o.toLowerCase().includes("pln"));
+            if (found) return found;
+        }
+        if (lower.includes("transport") || lower.includes("bbm") || lower.includes("bensin")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("transport"));
+            if (found) return found;
+        }
+        if (lower.includes("makan") || lower.includes("konsumsi") || lower.includes("lunch")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("makan"));
+            if (found) return found;
+        }
+        if (lower.includes("reparasi") || lower.includes("servis") || lower.includes("service")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("reparasi"));
+            if (found) return found;
+        }
+        if (lower.includes("panjar") || lower.includes("kasbon")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("panjar"));
+            if (found) return found;
+        }
+        if (lower.includes("perlengkapan") || lower.includes("atk")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("perlengkapan"));
+            if (found) return found;
+        }
 
-    const cashflowsStr = JSON.stringify(cashflows);
+        return rawCat;
+    };
 
-    // Auto-populate expenses from CashFlow if not viewing archive and customExpenses is empty
+    // Hydration & Loading Effect: Restore saved draft or archive for `tanggal` (Runs ONCE per date)
     useEffect(() => {
         if (!tanggal || viewingArchive) return;
-        const currentCashflows = JSON.parse(cashflowsStr || '[]');
-        const matchingExpenses = currentCashflows.filter(c => {
-            if (!c || c.type !== CashFlowType.OUT) return false;
-            const cDate = typeof c.date === 'string' ? c.date.slice(0, 10) : '';
-            return cDate === tanggal;
-        });
+        if (loadedDateRef.current === tanggal) return;
+        loadedDateRef.current = tanggal;
 
-        if (matchingExpenses.length > 0) {
-            setCustomExpenses(prev => {
-                const hasExisting = prev.some(r => r.keterangan || Number(r.total) > 0 || Number(r.harga) > 0);
-                if (hasExisting) return prev;
-                return matchingExpenses.map((c, idx) => ({
+        // 1. Try reading draft from localStorage
+        let loadedDraft = null;
+        try {
+            const rawDraft = localStorage.getItem(`rep_ba_draft_${tanggal}`);
+            if (rawDraft) {
+                loadedDraft = JSON.parse(rawDraft);
+            }
+        } catch (e) {
+            console.error("Failed to read local draft:", e);
+        }
+
+        // 2. Check existing archive from StorageService
+        const existingArch = (archives || []).find(a => a.date === tanggal);
+        const source = loadedDraft || existingArch;
+
+        const hasRealCustomExpenses = (items) => {
+            return Array.isArray(items) && items.some(c => (c.keterangan && c.keterangan.trim()) || Number(c.total) > 0 || Number(c.harga) > 0);
+        };
+
+        if (source) {
+            if (source.kasir !== undefined && source.kasir !== "") setKasir(source.kasir);
+            if (source.lokasi !== undefined && source.lokasi !== "") setLokasi(source.lokasi);
+            if (source.periode !== undefined && source.periode !== "") setPeriode(source.periode);
+            if (source.catatan !== undefined && source.catatan !== "") setCatatan(source.catatan);
+
+            // Custom Expenses: prioritize non-empty customExpenses with actual data
+            if (hasRealCustomExpenses(source.customExpenses)) {
+                setCustomExpenses(source.customExpenses);
+            } else if (existingArch && hasRealCustomExpenses(existingArch.customExpenses)) {
+                setCustomExpenses(existingArch.customExpenses);
+            } else {
+                // If draft/archive is empty or placeholder, check cashflows for this date
+                const matchingExpenses = getMatchingCashflowsForDate(cashflows, tanggal);
+                if (matchingExpenses.length > 0) {
+                    setCustomExpenses(matchingExpenses.map((c, idx) => ({
+                        id: c.id || Date.now() + idx,
+                        category: mapCashflowCategoryToOption(c.category, categoryOptions),
+                        keterangan: c.description || c.category || 'Pengeluaran Kasir',
+                        qty: '1',
+                        harga: String(c.amount || ''),
+                        total: String(c.amount || '')
+                    })));
+                } else if (!Array.isArray(source.customExpenses) || source.customExpenses.length === 0) {
+                    setCustomExpenses([
+                        { id: Date.now(), category: categoryOptions[0] || '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
+                    ]);
+                }
+            }
+
+            // Sales Rows: if source has saved salesRows, restore them; otherwise use computedSalesRows
+            if (Array.isArray(source.salesRows) && source.salesRows.length > 0) {
+                const hasManualSales = source.salesRows.some(r => Number(r.tunai) > 0 || Number(r.qr) > 0);
+                if (hasManualSales) {
+                    setSalesRows(source.salesRows);
+                } else {
+                    setSalesRows(computedSalesRows);
+                }
+            } else {
+                setSalesRows(computedSalesRows);
+            }
+
+            // Expense Rows:
+            if (Array.isArray(source.expenseRows) && source.expenseRows.length > 0) {
+                setExpenseRows(source.expenseRows);
+            }
+        } else {
+            // Completely fresh date with no draft/archive:
+            setSalesRows(computedSalesRows);
+
+            // Check cashflows for this date
+            const matchingExpenses = getMatchingCashflowsForDate(cashflows, tanggal);
+            if (matchingExpenses.length > 0) {
+                setCustomExpenses(matchingExpenses.map((c, idx) => ({
                     id: c.id || Date.now() + idx,
-                    category: c.category || 'Operasional Kasir & Toko',
+                    category: mapCashflowCategoryToOption(c.category, categoryOptions),
                     keterangan: c.description || c.category || 'Pengeluaran Kasir',
                     qty: '1',
                     harga: String(c.amount || ''),
                     total: String(c.amount || '')
-                }));
-            });
+                })));
+            } else {
+                setCustomExpenses([
+                    { id: Date.now(), category: categoryOptions[0] || '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
+                ]);
+            }
         }
-    }, [tanggal, cashflowsStr, viewingArchive]);
+    }, [tanggal, viewingArchive]);
 
     // Automatic Synchronization: Custom Expenses -> Section V (expenseRows)
     useEffect(() => {
         if (viewingArchive) return;
 
-        const activeItems = customExpenses.filter(item => 
-            (item.keterangan && item.keterangan.trim()) || 
-            (Number(item.total) > 0) || 
+        const activeItems = customExpenses.filter(item =>
+            (item.keterangan && item.keterangan.trim()) ||
+            (Number(item.total) > 0) ||
             (Number(item.harga) > 0 && Number(item.qty) > 0)
         );
 
@@ -279,7 +450,7 @@ export default function BeritaAcaraPage() {
                 const rawCat = (item.category || 'Operasional Lain-lain').trim();
                 const displayCat = rawCat.replace(/^\d+\)\s*/, '').trim() || rawCat;
                 const itemTotal = Number(item.total) || (Number(item.qty || 1) * Number(item.harga || 0)) || 0;
-                
+
                 categoryMap.set(displayCat, (categoryMap.get(displayCat) || 0) + itemTotal);
             });
 
@@ -314,21 +485,16 @@ export default function BeritaAcaraPage() {
 
     const handleSyncFromCashFlow = () => {
         if (!tanggal) return;
-        const currentCashflows = JSON.parse(cashflowsStr || '[]');
-        const matchingExpenses = currentCashflows.filter(c => {
-            if (!c || c.type !== CashFlowType.OUT) return false;
-            const cDate = typeof c.date === 'string' ? c.date.slice(0, 10) : '';
-            return cDate === tanggal;
-        });
+        const matchingExpenses = getMatchingCashflowsForDate(cashflows, tanggal);
 
         if (matchingExpenses.length === 0) {
-            alert(`Tidak ditemukan data pengeluaran kasir pada tanggal ${tanggal} di sistem.`);
+            alert(`Tidak ditemukan catatan pengeluaran kasir (Arus Kas Keluar) pada tanggal ${tanggal} di sistem.`);
             return;
         }
 
         const newCustomExpenses = matchingExpenses.map((c, idx) => ({
             id: c.id || Date.now() + idx,
-            category: c.category || 'Operasional Kasir & Toko',
+            category: mapCashflowCategoryToOption(c.category, categoryOptions),
             keterangan: c.description || c.category || 'Pengeluaran Kasir',
             qty: '1',
             harga: String(c.amount || ''),
@@ -336,24 +502,45 @@ export default function BeritaAcaraPage() {
         }));
 
         setCustomExpenses(newCustomExpenses);
-        alert(`Berhasil menarik ${matchingExpenses.length} catatan pengeluaran kasir dari sistem untuk tanggal ${tanggal}!`);
+        alert(`Berhasil menarik ${matchingExpenses.length} catatan pengeluaran kasir dari arus kas POS untuk tanggal ${tanggal}!`);
     };
 
     const [autoSaveStatus, setAutoSaveStatus] = useState("idle");
 
-    // Auto-save Berita Acara to Archives whenever data for a date changes
+    // Auto-save Berita Acara to localStorage (immediate) & StorageService (debounced)
     useEffect(() => {
         if (viewingArchive) return;
         if (!tanggal) return;
+        if (loadedDateRef.current !== tanggal) return; // Prevent saving unhydrated initial state over real data
 
         const totalTunai = salesRows.reduce((sum, row) => sum + (Number(row.tunai) || 0), 0);
         const totalQR = salesRows.reduce((sum, row) => sum + (Number(row.qr) || 0), 0);
         const totalExp = expenseRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
         const totalInc = totalTunai + totalQR;
 
-        const hasData = totalInc > 0 || totalExp > 0 || kasir || periode || catatan || customExpenses.some(c => c.keterangan || c.total);
+        const hasCustomExpenseData = customExpenses.some(c => c.keterangan || Number(c.total) > 0 || Number(c.harga) > 0);
+        const hasData = totalInc > 0 || totalExp > 0 || kasir || periode || catatan || hasCustomExpenseData;
         if (!hasData) return;
 
+        // Immediate LocalStorage Draft save for instant persistence
+        const draftData = {
+            date: tanggal,
+            periode,
+            kasir,
+            lokasi,
+            salesRows,
+            expenseRows,
+            customExpenses,
+            catatan,
+            updatedAt: Date.now()
+        };
+        try {
+            localStorage.setItem(`rep_ba_draft_${tanggal}`, JSON.stringify(draftData));
+        } catch (e) {
+            console.error("Failed to save local draft:", e);
+        }
+
+        // Debounced StorageService / Firestore save
         const timer = setTimeout(async () => {
             try {
                 setAutoSaveStatus("saving");
@@ -427,7 +614,7 @@ export default function BeritaAcaraPage() {
                     container.style.padding = "20px";
                     container.style.margin = "0 auto";
                     container.style.background = "#ffffff";
-                    
+
                     const inputs = container.querySelectorAll("input, textarea");
                     inputs.forEach(input => {
                         const parent = input.parentNode;
@@ -507,8 +694,8 @@ export default function BeritaAcaraPage() {
             const fileName = `Berita_Acara_${currentTanggal}.pdf`;
             pdf.save(fileName);
 
-            const textMessage = 
-`*BERITA ACARA REKAPAN PENJUALAN & PENGELUARAN*
+            const textMessage =
+                `*BERITA ACARA REKAPAN PENJUALAN & PENGELUARAN*
 📅 Tanggal: ${currentTanggal}
 👤 Kasir: ${currentKasir || '-'}
 📍 Lokasi: ${currentLokasi || '-'}
@@ -521,7 +708,7 @@ export default function BeritaAcaraPage() {
 
             const encodedText = encodeURIComponent(textMessage);
             const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            const waUrl = isMobile 
+            const waUrl = isMobile
                 ? `https://api.whatsapp.com/send?text=${encodedText}`
                 : `https://web.whatsapp.com/send?text=${encodedText}`;
 
@@ -541,7 +728,7 @@ export default function BeritaAcaraPage() {
 
         const totalTunai = salesRows.reduce((sum, row) => sum + (Number(row.tunai) || 0), 0);
         const totalQR = salesRows.reduce((sum, row) => sum + (Number(row.qr) || 0), 0);
-        const totalExpenses = expenses.reduce((sum, val) => sum + (Number(val) || 0), 0);
+        const totalExpenses = expenseRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
 
         const archive = {
             id: Date.now().toString(),
@@ -551,14 +738,20 @@ export default function BeritaAcaraPage() {
             kasir,
             lokasi,
             salesRows,
-            expenses,
+            expenseRows,
+            expenses: expenseRows.map(r => r.amount),
             customExpenses,
             catatan,
             totalIncome: totalTunai + totalQR,
             totalExpense: totalExpenses,
             totalClean: (totalTunai + totalQR) - totalExpenses,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            updatedAt: Date.now()
         };
+
+        try {
+            localStorage.setItem(`rep_ba_draft_${tanggal}`, JSON.stringify(archive));
+        } catch (e) { }
 
         await StorageService.saveBeritaAcaraArchive(archive);
         alert("Arsip berhasil disimpan!");
@@ -567,7 +760,13 @@ export default function BeritaAcaraPage() {
 
     const handleDeleteArchive = async (id) => {
         if (confirm("Yakin ingin menghapus arsip ini?")) {
+            const toDelete = (archives || []).find(a => a.id === id);
             await StorageService.deleteBeritaAcaraArchive(id);
+            if (toDelete?.date) {
+                try {
+                    localStorage.removeItem(`rep_ba_draft_${toDelete.date}`);
+                } catch (e) { }
+            }
             if (viewingArchive?.id === id) setViewingArchive(null);
         }
     };
@@ -642,17 +841,28 @@ export default function BeritaAcaraPage() {
 
     const handleClearExpenses = () => {
         if (confirm("Kosongkan semua isian pada tabel pengeluaran?")) {
-            setExpenseRows([
+            const cleanExpenseRows = [
                 { name: "", amount: "" },
                 { name: "", amount: "" },
                 { name: "", amount: "" },
                 { name: "", amount: "" },
                 { name: "", amount: "" },
                 { name: "", amount: "" }
-            ]);
-            setCustomExpenses([
+            ];
+            const cleanCustomExpenses = [
                 { id: Date.now(), category: categoryOptions[0] || '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
-            ]);
+            ];
+            setExpenseRows(cleanExpenseRows);
+            setCustomExpenses(cleanCustomExpenses);
+            try {
+                const rawDraft = localStorage.getItem(`rep_ba_draft_${tanggal}`);
+                if (rawDraft) {
+                    const parsed = JSON.parse(rawDraft);
+                    parsed.expenseRows = cleanExpenseRows;
+                    parsed.customExpenses = cleanCustomExpenses;
+                    localStorage.setItem(`rep_ba_draft_${tanggal}`, JSON.stringify(parsed));
+                }
+            } catch (e) { }
         }
     };
 
@@ -712,38 +922,6 @@ export default function BeritaAcaraPage() {
         const val = field === 'name' ? value : value.replace(/[^0-9-]/g, "");
         setExpenseRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: val } : row));
     };
-
-    // Custom Categories State & Management
-    const [categoryOptions, setCategoryOptions] = useState(() => {
-        const defaultList = buildDefaultCategoryOptions(BASE_SALES_CATEGORIES);
-        if (typeof window !== 'undefined') {
-            try {
-                const saved = localStorage.getItem('custom_expense_categories');
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        return parsed;
-                    }
-                }
-            } catch (e) {
-                console.error('Error loading custom expense categories:', e);
-            }
-        }
-        return defaultList;
-    });
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('custom_expense_categories');
-            if (!saved) {
-                const newList = buildDefaultCategoryOptions(allSalesCategories);
-                setCategoryOptions(prev => {
-                    if (JSON.stringify(prev) === JSON.stringify(newList)) return prev;
-                    return newList;
-                });
-            }
-        }
-    }, [categoriesStr]);
 
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [newCatInput, setNewCatInput] = useState("");
@@ -881,21 +1059,19 @@ export default function BeritaAcaraPage() {
                 <div className="flex gap-2 py-1 px-1 bg-white border border-slate-200 rounded-xl shadow-sm">
                     <button
                         onClick={() => { setActiveTab('input'); setViewingArchive(null); }}
-                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-lg transition-all ${
-                            activeTab === 'input' && !viewingArchive
-                                ? 'bg-amber-600 text-white shadow-md'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                        }`}
+                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-lg transition-all ${activeTab === 'input' && !viewingArchive
+                            ? 'bg-amber-600 text-white shadow-md'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                            }`}
                     >
                         <Plus size={15} /> Form Berita Acara
                     </button>
                     <button
                         onClick={() => setActiveTab('archives')}
-                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-lg transition-all ${
-                            activeTab === 'archives' || viewingArchive
-                                ? 'bg-amber-600 text-white shadow-md'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                        }`}
+                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-lg transition-all ${activeTab === 'archives' || viewingArchive
+                            ? 'bg-amber-600 text-white shadow-md'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                            }`}
                     >
                         <Archive size={15} /> Daftar Arsip ({archives.length})
                     </button>
@@ -986,7 +1162,7 @@ export default function BeritaAcaraPage() {
                                     {archives.map(arch => (
                                         <tr key={arch.id} className="hover:bg-slate-50 transition-colors">
                                             <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
-                                                {new Date(arch.date).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}
+                                                {new Date(arch.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                                             </td>
                                             <td className="p-3.5 font-bold text-slate-800">{arch.title}</td>
                                             <td className="p-3.5 text-emerald-600 font-extrabold whitespace-nowrap">{formatIDR(arch.totalIncome)}</td>
@@ -1021,225 +1197,228 @@ export default function BeritaAcaraPage() {
 
             {(activeTab === 'input' || viewingArchive) && (
                 <>
-                {viewingArchive && (
-                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden shadow-sm">
+                    {viewingArchive && (
+                        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden shadow-sm">
+                            <div>
+                                <h3 className="font-bold text-amber-900 flex items-center gap-2 text-sm"><Eye size={18} /> Sedang Melihat Arsip: {viewingArchive.title}</h3>
+                                <p className="text-xs text-amber-700 mt-1">Mode Read-Only. Untuk mengubah data, silakan kembali ke tab Form Berita Acara.</p>
+                            </div>
+                            <div className="flex flex-wrap gap-2 items-center shrink-0">
+                                <button onClick={handleDownloadPdf} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
+                                    {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Download PDF
+                                </button>
+                                <button onClick={handleShareWhatsApp} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors" title="Ekspor PDF Dokumen & Otomatis Buka WhatsApp Web">
+                                    {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />} WhatsApp Web
+                                </button>
+                                <button onClick={handlePrint} className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
+                                    <Printer size={14} /> Cetak
+                                </button>
+                                <button onClick={() => setViewingArchive(null)} className="p-2 bg-amber-200 hover:bg-amber-300 text-amber-800 rounded-xl transition-colors">
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Control Panel (Hidden on Print) */}
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 mb-6 print:hidden flex flex-wrap gap-4 items-end text-xs">
                         <div>
-                            <h3 className="font-bold text-amber-900 flex items-center gap-2 text-sm"><Eye size={18} /> Sedang Melihat Arsip: {viewingArchive.title}</h3>
-                            <p className="text-xs text-amber-700 mt-1">Mode Read-Only. Untuk mengubah data, silakan kembali ke tab Form Berita Acara.</p>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Tanggal Laporan</label>
+                            <input
+                                type="date"
+                                value={tanggal}
+                                onChange={(e) => {
+                                    setTanggal(e.target.value);
+                                    loadedDateRef.current = null;
+                                }}
+                                className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none font-semibold text-slate-800"
+                            />
                         </div>
-                        <div className="flex flex-wrap gap-2 items-center shrink-0">
-                            <button onClick={handleDownloadPdf} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
-                                {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Download PDF
+                        <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Periode Sesi</label>
+                            <input
+                                type="text"
+                                value={periode}
+                                onChange={(e) => setPeriode(e.target.value)}
+                                placeholder="Cth: 1 - 7 Juli 2026"
+                                className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-slate-800 font-medium min-w-[200px]"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Nama Kasir</label>
+                            <input
+                                type="text"
+                                value={kasir}
+                                onChange={(e) => setKasir(e.target.value)}
+                                placeholder="Nama Kasir Tugas"
+                                className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-slate-800 font-medium"
+                            />
+                        </div>
+                        <div className="ml-auto flex flex-wrap gap-2 sm:gap-3 items-center">
+                            {autoSaveStatus === "saving" && (
+                                <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl flex items-center gap-1.5 font-semibold animate-pulse">
+                                    <Loader2 size={14} className="animate-spin text-amber-600" /> Menyimpan Otomatis...
+                                </span>
+                            )}
+                            {autoSaveStatus === "saved" && (
+                                <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl flex items-center gap-1.5 font-semibold">
+                                    <CheckCircle2 size={14} className="text-emerald-600" /> Otomatis Tersimpan ke Arsip
+                                </span>
+                            )}
+                            <button
+                                onClick={handleDownloadPdf}
+                                disabled={isGeneratingPdf}
+                                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-4 py-2 rounded-xl font-bold transition-colors shadow-md flex items-center gap-1.5 text-xs"
+                            >
+                                {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                                Download PDF
                             </button>
-                            <button onClick={handleShareWhatsApp} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors" title="Ekspor PDF Dokumen & Otomatis Buka WhatsApp Web">
-                                {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />} WhatsApp Web
+                            <button
+                                onClick={handleShareWhatsApp}
+                                disabled={isGeneratingPdf}
+                                className="bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white px-4 py-2 rounded-xl font-bold transition-colors shadow-md flex items-center gap-1.5 text-xs active:scale-95"
+                                title="Ekspor PDF Dokumen & Otomatis Buka WhatsApp Web"
+                            >
+                                {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />}
+                                WhatsApp Web
                             </button>
-                            <button onClick={handlePrint} className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
-                                <Printer size={14}/> Cetak
-                            </button>
-                            <button onClick={() => setViewingArchive(null)} className="p-2 bg-amber-200 hover:bg-amber-300 text-amber-800 rounded-xl transition-colors">
-                                <X size={18}/>
+                            <button
+                                onClick={handlePrint}
+                                className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl font-bold transition-colors shadow-md flex items-center gap-1.5 text-xs"
+                            >
+                                <Printer size={14} /> Cetak
                             </button>
                         </div>
                     </div>
-                )}
 
-            {/* Control Panel (Hidden on Print) */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 mb-6 print:hidden flex flex-wrap gap-4 items-end text-xs">
-                <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Tanggal Laporan</label>
-                    <input
-                        type="date"
-                        value={tanggal}
-                        onChange={(e) => setTanggal(e.target.value)}
-                        className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none font-semibold text-slate-800"
-                    />
-                </div>
-                <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Periode Sesi</label>
-                    <input
-                        type="text"
-                        value={periode}
-                        onChange={(e) => setPeriode(e.target.value)}
-                        placeholder="Cth: 1 - 7 Juli 2026"
-                        className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-slate-800 font-medium min-w-[200px]"
-                    />
-                </div>
-                <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Nama Kasir</label>
-                    <input
-                        type="text"
-                        value={kasir}
-                        onChange={(e) => setKasir(e.target.value)}
-                        placeholder="Nama Kasir Tugas"
-                        className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-slate-800 font-medium"
-                    />
-                </div>
-                <div className="ml-auto flex flex-wrap gap-2 sm:gap-3 items-center">
-                    {autoSaveStatus === "saving" && (
-                        <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl flex items-center gap-1.5 font-semibold animate-pulse">
-                            <Loader2 size={14} className="animate-spin text-amber-600" /> Menyimpan Otomatis...
-                        </span>
-                    )}
-                    {autoSaveStatus === "saved" && (
-                        <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl flex items-center gap-1.5 font-semibold">
-                            <CheckCircle2 size={14} className="text-emerald-600" /> Otomatis Tersimpan ke Arsip
-                        </span>
-                    )}
-                    <button
-                        onClick={handleDownloadPdf}
-                        disabled={isGeneratingPdf}
-                        className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-4 py-2 rounded-xl font-bold transition-colors shadow-md flex items-center gap-1.5 text-xs"
-                    >
-                        {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} 
-                        Download PDF
-                    </button>
-                    <button
-                        onClick={handleShareWhatsApp}
-                        disabled={isGeneratingPdf}
-                        className="bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white px-4 py-2 rounded-xl font-bold transition-colors shadow-md flex items-center gap-1.5 text-xs active:scale-95"
-                        title="Ekspor PDF Dokumen & Otomatis Buka WhatsApp Web"
-                    >
-                        {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />} 
-                        WhatsApp Web
-                    </button>
-                    <button
-                        onClick={handlePrint}
-                        className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl font-bold transition-colors shadow-md flex items-center gap-1.5 text-xs"
-                    >
-                        <Printer size={14} /> Cetak
-                    </button>
-                </div>
-            </div>
+                    {/* Modern Expense Input Section (Hidden on Print) */}
+                    <div className="bg-white p-5 rounded-2xl shadow-sm mb-6 print:hidden border border-slate-200">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                    <FileText size={16} className="text-amber-600" />
+                                    Input Rincian Pengeluaran Operasional
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-0.5">Tabel ini otomatis merekapitulasi uraian pengeluaran pada cetakan Berita Acara.</p>
+                            </div>
+                            <div className="flex flex-wrap gap-2 items-center">
+                                <button
+                                    onClick={handleSyncFromCashFlow}
+                                    className="flex items-center gap-1.5 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 px-3.5 py-2 rounded-xl transition-colors shadow-sm shrink-0"
+                                    title="Tarik catatan pengeluaran kasir dari database arus kas POS pada tanggal ini"
+                                >
+                                    🔄 Tarik Arus Kas POS (Tanggal Ini)
+                                </button>
+                                <button
+                                    onClick={() => setShowCategoryModal(true)}
+                                    className="flex items-center gap-1.5 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-3.5 py-2 rounded-xl transition-colors shadow-sm shrink-0"
+                                >
+                                    <FolderPlus size={15} className="text-amber-700" /> Kelola Kategori Pengeluaran
+                                </button>
+                            </div>
+                        </div>
 
-            {/* Modern Expense Input Section (Hidden on Print) */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm mb-6 print:hidden border border-slate-200">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
-                    <div>
-                        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                            <FileText size={16} className="text-amber-600" />
-                            Input Rincian Pengeluaran Operasional
-                        </h3>
-                        <p className="text-xs text-slate-500 mt-0.5">Tabel ini otomatis merekapitulasi uraian pengeluaran pada cetakan Berita Acara.</p>
+                        <div className="overflow-x-auto rounded-lg border border-gray-200">
+                            <table className="w-full text-sm text-left text-gray-600">
+                                <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                                    <tr>
+                                        <th className="px-4 py-3 w-56">Kategori</th>
+                                        <th className="px-4 py-3">Keterangan</th>
+                                        <th className="px-4 py-3 w-24">QTY</th>
+                                        <th className="px-4 py-3 w-32">Harga</th>
+                                        <th className="px-4 py-3 w-32">Total</th>
+                                        <th className="px-4 py-3 w-16 text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {customExpenses.map((exp) => (
+                                        <tr key={exp.id} className="border-b hover:bg-gray-50 transition-colors">
+                                            <td className="p-2">
+                                                <select
+                                                    className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 text-sm font-medium text-gray-700"
+                                                    value={exp.category}
+                                                    onChange={(e) => handleCategorySelect(exp.id, e.target.value)}
+                                                >
+                                                    <optgroup label="Pilih Kategori">
+                                                        {categoryOptions.map(cat => (
+                                                            <option key={cat} value={cat}>{cat}</option>
+                                                        ))}
+                                                        {exp.category && !categoryOptions.includes(exp.category) && (
+                                                            <option value={exp.category}>{exp.category}</option>
+                                                        )}
+                                                    </optgroup>
+                                                    <optgroup label="Opsi Tambahan">
+                                                        <option value="__ADD_NEW__">➕ + Tambah Kategori Baru...</option>
+                                                    </optgroup>
+                                                </select>
+                                            </td>
+                                            <td className="p-2">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Keterangan pengeluaran..."
+                                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+                                                    value={exp.keterangan}
+                                                    onChange={(e) => updateCustomExpense(exp.id, 'keterangan', e.target.value)}
+                                                />
+                                            </td>
+                                            <td className="p-2">
+                                                <input
+                                                    type="number"
+                                                    placeholder="0"
+                                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 text-sm text-center"
+                                                    value={exp.qty}
+                                                    onChange={(e) => updateCustomExpense(exp.id, 'qty', e.target.value)}
+                                                />
+                                            </td>
+                                            <td className="p-2">
+                                                <input
+                                                    type="number"
+                                                    placeholder="0"
+                                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 text-sm text-right"
+                                                    value={exp.harga}
+                                                    onChange={(e) => updateCustomExpense(exp.id, 'harga', e.target.value)}
+                                                />
+                                            </td>
+                                            <td className="p-2">
+                                                <input
+                                                    type="number"
+                                                    placeholder="0"
+                                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 text-sm text-right font-bold text-gray-800"
+                                                    value={exp.total}
+                                                    onChange={(e) => updateCustomExpense(exp.id, 'total', e.target.value)}
+                                                />
+                                            </td>
+                                            <td className="p-2 text-center">
+                                                <button
+                                                    onClick={() => removeCustomExpense(exp.id)}
+                                                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Hapus"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <button
+                                onClick={addCustomExpense}
+                                className="flex items-center gap-2 text-sm font-medium text-white bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition-colors shadow-sm"
+                            >
+                                <Plus size={16} /> Tambah Pengeluaran
+                            </button>
+                            <div className="flex items-center gap-2 text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100">
+                                <Info size={16} className="text-blue-500 flex-shrink-0" />
+                                <span>Kategori yang sama akan dikelompokkan otomatis di halaman cetak.</span>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex flex-wrap gap-2 items-center">
-                        <button
-                            onClick={handleSyncFromCashFlow}
-                            className="flex items-center gap-1.5 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 px-3.5 py-2 rounded-xl transition-colors shadow-sm shrink-0"
-                            title="Tarik catatan pengeluaran kasir dari database arus kas POS pada tanggal ini"
-                        >
-                            🔄 Tarik Arus Kas POS (Tanggal Ini)
-                        </button>
-                        <button
-                            onClick={() => setShowCategoryModal(true)}
-                            className="flex items-center gap-1.5 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-3.5 py-2 rounded-xl transition-colors shadow-sm shrink-0"
-                        >
-                            <FolderPlus size={15} className="text-amber-700" /> Kelola Kategori Pengeluaran
-                        </button>
-                    </div>
-                </div>
-                
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
-                    <table className="w-full text-sm text-left text-gray-600">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                            <tr>
-                                <th className="px-4 py-3 w-56">Kategori</th>
-                                <th className="px-4 py-3">Keterangan</th>
-                                <th className="px-4 py-3 w-24">QTY</th>
-                                <th className="px-4 py-3 w-32">Harga</th>
-                                <th className="px-4 py-3 w-32">Total</th>
-                                <th className="px-4 py-3 w-16 text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {customExpenses.map((exp) => (
-                                <tr key={exp.id} className="border-b hover:bg-gray-50 transition-colors">
-                                    <td className="p-2">
-                                        <select 
-                                            className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 text-sm font-medium text-gray-700"
-                                            value={exp.category}
-                                            onChange={(e) => handleCategorySelect(exp.id, e.target.value)}
-                                        >
-                                            <optgroup label="Pilih Kategori">
-                                                {categoryOptions.map(cat => (
-                                                    <option key={cat} value={cat}>{cat}</option>
-                                                ))}
-                                                {exp.category && !categoryOptions.includes(exp.category) && (
-                                                    <option value={exp.category}>{exp.category}</option>
-                                                )}
-                                            </optgroup>
-                                            <optgroup label="Opsi Tambahan">
-                                                <option value="__ADD_NEW__">➕ + Tambah Kategori Baru...</option>
-                                            </optgroup>
-                                        </select>
-                                    </td>
-                                    <td className="p-2">
-                                        <input 
-                                            type="text" 
-                                            placeholder="Keterangan pengeluaran..."
-                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 text-sm"
-                                            value={exp.keterangan}
-                                            onChange={(e) => updateCustomExpense(exp.id, 'keterangan', e.target.value)}
-                                        />
-                                    </td>
-                                    <td className="p-2">
-                                        <input 
-                                            type="number" 
-                                            placeholder="0"
-                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 text-sm text-center"
-                                            value={exp.qty}
-                                            onChange={(e) => updateCustomExpense(exp.id, 'qty', e.target.value)}
-                                        />
-                                    </td>
-                                    <td className="p-2">
-                                        <input 
-                                            type="number" 
-                                            placeholder="0"
-                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 text-sm text-right"
-                                            value={exp.harga}
-                                            onChange={(e) => updateCustomExpense(exp.id, 'harga', e.target.value)}
-                                        />
-                                    </td>
-                                    <td className="p-2">
-                                        <input 
-                                            type="number" 
-                                            placeholder="0"
-                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500 text-sm text-right font-bold text-gray-800"
-                                            value={exp.total}
-                                            onChange={(e) => updateCustomExpense(exp.id, 'total', e.target.value)}
-                                        />
-                                    </td>
-                                    <td className="p-2 text-center">
-                                        <button 
-                                            onClick={() => removeCustomExpense(exp.id)}
-                                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                            title="Hapus"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-                <div className="mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <button 
-                        onClick={addCustomExpense}
-                        className="flex items-center gap-2 text-sm font-medium text-white bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition-colors shadow-sm"
-                    >
-                        <Plus size={16} /> Tambah Pengeluaran
-                    </button>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100">
-                        <Info size={16} className="text-blue-500 flex-shrink-0" />
-                        <span>Kategori yang sama akan dikelompokkan otomatis di halaman cetak.</span>
-                    </div>
-                </div>
-            </div>
 
-            {/* Printable Area */}
-            <div className="w-full overflow-x-auto no-scrollbar pb-8 print:pb-0 bg-slate-100/60 print:bg-transparent py-4 print:py-0">
-                <style>{`
+                    {/* Printable Area */}
+                    <div className="w-full overflow-x-auto no-scrollbar pb-8 print:pb-0 bg-slate-100/60 print:bg-transparent py-4 print:py-0">
+                        <style>{`
                     .no-scrollbar::-webkit-scrollbar,
                     .no-scrollbar::-webkit-scrollbar-thumb,
                     .no-scrollbar::-webkit-scrollbar-track {
@@ -1347,533 +1526,533 @@ export default function BeritaAcaraPage() {
                     }
                 `}</style>
 
-                {/* ======================================================== */}
-                {/* HALAMAN 1: BERITA ACARA UTAMA (A4 PORTRAIT) */}
-                {/* ======================================================== */}
-                <div id="berita-acara-page-1" className="print-page bg-white mx-auto text-black w-[210mm] max-w-full p-6 print:p-0 shadow-lg mb-8 print:mb-0 box-border">
-                    {/* Header */}
-                    <div className="flex items-center justify-between border-b-2 border-amber-900 pb-2 mb-3">
-                        <div className="w-1/4">
-                            <img src="/logokasir.jpg" alt="Logo" style={{ height: '55px', objectFit: 'contain' }} onError={(e) => e.target.style.display='none'} />
-                        </div>
-                        <div className="w-3/4 text-center">
-                            <h1 className="text-lg font-bold uppercase tracking-wider mb-0.5">BERITA ACARA</h1>
-                            <h2 className="text-xs font-bold uppercase">LAPORAN PENJUALAN DAN PENGELUARAN</h2>
-                            <h3 className="text-xs font-bold text-amber-900 italic">RUMAH ETNIK PAPUA - WISATA BUDAYA PAPUA</h3>
-                        </div>
-                    </div>
-
-                    {/* Section I */}
-                    <div className="mb-3">
-                        <div className="brown-header">I. IDENTITAS LAPORAN</div>
-                        <div className="grid grid-cols-2 gap-4 mt-1.5 px-2 text-xs font-medium">
-                            <div>
-                                <div className="flex items-center mb-1">
-                                    <span className="w-16 shrink-0">Date</span>
-                                    <span className="mr-2">:</span>
-                                    <div className="flex-1 border-b border-black pb-0.5 font-semibold text-gray-900">{tanggal.split("-").reverse().join("/")}</div>
+                        {/* ======================================================== */}
+                        {/* HALAMAN 1: BERITA ACARA UTAMA (A4 PORTRAIT) */}
+                        {/* ======================================================== */}
+                        <div id="berita-acara-page-1" className="print-page bg-white mx-auto text-black w-[210mm] max-w-full p-6 print:p-0 shadow-lg mb-8 print:mb-0 box-border">
+                            {/* Header */}
+                            <div className="flex items-center justify-between border-b-2 border-amber-900 pb-2 mb-3">
+                                <div className="w-1/4">
+                                    <img src="/logokasir.jpg" alt="Logo" style={{ height: '55px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
                                 </div>
-                                <div className="flex items-center">
-                                    <span className="w-16 shrink-0">Periode</span>
-                                    <span className="mr-2">:</span>
-                                    <div className="flex-1 border-b border-black pb-0.5 font-semibold text-gray-900">{periode}</div>
+                                <div className="w-3/4 text-center">
+                                    <h1 className="text-lg font-bold uppercase tracking-wider mb-0.5">BERITA ACARA</h1>
+                                    <h2 className="text-xs font-bold uppercase">LAPORAN PENJUALAN DAN PENGELUARAN</h2>
+                                    <h3 className="text-xs font-bold text-amber-900 italic">RUMAH ETNIK PAPUA - WISATA BUDAYA PAPUA</h3>
                                 </div>
                             </div>
-                            <div>
-                                <div className="flex items-center mb-1">
-                                    <span className="w-16 shrink-0">Kasir</span>
-                                    <span className="mr-2">:</span>
-                                    <div className="flex-1 pb-0.5 font-semibold text-gray-900">{kasir}</div>
-                                </div>
-                                <div className="flex items-center">
-                                    <span className="w-16 shrink-0">Lokasi</span>
-                                    <span className="mr-2">:</span>
-                                    <div className="flex-1 pb-0.5 font-semibold text-gray-900">{lokasi}</div>
+
+                            {/* Section I */}
+                            <div className="mb-3">
+                                <div className="brown-header">I. IDENTITAS LAPORAN</div>
+                                <div className="grid grid-cols-2 gap-4 mt-1.5 px-2 text-xs font-medium">
+                                    <div>
+                                        <div className="flex items-center mb-1">
+                                            <span className="w-16 shrink-0">Date</span>
+                                            <span className="mr-2">:</span>
+                                            <div className="flex-1 border-b border-black pb-0.5 font-semibold text-gray-900">{tanggal.split("-").reverse().join("/")}</div>
+                                        </div>
+                                        <div className="flex items-center">
+                                            <span className="w-16 shrink-0">Periode</span>
+                                            <span className="mr-2">:</span>
+                                            <div className="flex-1 border-b border-black pb-0.5 font-semibold text-gray-900">{periode}</div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center mb-1">
+                                            <span className="w-16 shrink-0">Kasir</span>
+                                            <span className="mr-2">:</span>
+                                            <div className="flex-1 pb-0.5 font-semibold text-gray-900">{kasir}</div>
+                                        </div>
+                                        <div className="flex items-center">
+                                            <span className="w-16 shrink-0">Lokasi</span>
+                                            <span className="mr-2">:</span>
+                                            <div className="flex-1 pb-0.5 font-semibold text-gray-900">{lokasi}</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
 
-                    {/* Section II & III - Berdampingan (Side by Side) */}
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                        {/* Section II - Tunai */}
-                        <div>
-                            <div className="brown-header">II. LAPORAN PENJUALAN (TUNAI)</div>
-                            <table className="report-table">
-                                <thead>
-                                    <tr>
-                                        <th style={{ width: '6%' }}>No</th>
-                                        <th style={{ width: '38%' }}>Sumber Pendapatan</th>
-                                        <th style={{ width: '18%' }}>Pendapatan</th>
-                                        <th style={{ width: '18%' }}>Modal</th>
-                                        <th style={{ width: '20%' }}>Keuntungan</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {currentSalesRows.map((row, idx) => {
-                                        const pendapatan = Number(row.tunai) || 0;
-                                        const modal = Number(row.hppTunai) || 0;
-                                        const keuntungan = pendapatan - modal;
-                                        const isRowEmpty = !row.tunai && !row.hppTunai;
-                                        return (
-                                            <tr key={`sales-${idx}`}>
-                                                <td className="text-center">{idx + 1}</td>
-                                                <td>
-                                                    <input 
-                                                        type="text" 
-                                                        className="editable-cell" 
-                                                        value={row.name} 
-                                                        onChange={(e) => handleSalesRowChange(idx, 'name', e.target.value)} 
-                                                        readOnly={!!viewingArchive}
-                                                    />
-                                                </td>
-                                                <td>
-                                                    <input 
-                                                        type="text" 
-                                                        className="editable-cell text-right" 
-                                                        value={row.tunai ? (isNaN(Number(row.tunai)) ? row.tunai : formatNumber(row.tunai)) : ''} 
-                                                        onChange={(e) => handleSalesRowChange(idx, 'tunai', e.target.value)} 
-                                                        placeholder="0"
-                                                        readOnly={!!viewingArchive}
-                                                    />
-                                                </td>
-                                                <td>
-                                                    <input 
-                                                        type="text" 
-                                                        className="editable-cell text-right text-red-700/80" 
-                                                        value={row.hppTunai ? (isNaN(Number(row.hppTunai)) ? row.hppTunai : formatNumber(row.hppTunai)) : ''} 
-                                                        onChange={(e) => handleSalesRowChange(idx, 'hppTunai', e.target.value)} 
-                                                        placeholder="0"
-                                                        readOnly={!!viewingArchive}
-                                                    />
-                                                </td>
-                                                <td className="text-right font-medium text-green-700 bg-slate-50/50 pr-1">
-                                                    {isRowEmpty ? '' : formatIDR(keuntungan)}
+                            {/* Section II & III - Berdampingan (Side by Side) */}
+                            <div className="grid grid-cols-2 gap-3 mb-3">
+                                {/* Section II - Tunai */}
+                                <div>
+                                    <div className="brown-header">II. LAPORAN PENJUALAN (TUNAI)</div>
+                                    <table className="report-table">
+                                        <thead>
+                                            <tr>
+                                                <th style={{ width: '6%' }}>No</th>
+                                                <th style={{ width: '38%' }}>Sumber Pendapatan</th>
+                                                <th style={{ width: '18%' }}>Pendapatan</th>
+                                                <th style={{ width: '18%' }}>Modal</th>
+                                                <th style={{ width: '20%' }}>Keuntungan</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {currentSalesRows.map((row, idx) => {
+                                                const pendapatan = Number(row.tunai) || 0;
+                                                const modal = Number(row.hppTunai) || 0;
+                                                const keuntungan = pendapatan - modal;
+                                                const isRowEmpty = !row.tunai && !row.hppTunai;
+                                                return (
+                                                    <tr key={`sales-${idx}`}>
+                                                        <td className="text-center">{idx + 1}</td>
+                                                        <td>
+                                                            <input
+                                                                type="text"
+                                                                className="editable-cell"
+                                                                value={row.name}
+                                                                onChange={(e) => handleSalesRowChange(idx, 'name', e.target.value)}
+                                                                readOnly={!!viewingArchive}
+                                                            />
+                                                        </td>
+                                                        <td>
+                                                            <input
+                                                                type="text"
+                                                                className="editable-cell text-right"
+                                                                value={row.tunai ? (isNaN(Number(row.tunai)) ? row.tunai : formatNumber(row.tunai)) : ''}
+                                                                onChange={(e) => handleSalesRowChange(idx, 'tunai', e.target.value)}
+                                                                placeholder="0"
+                                                                readOnly={!!viewingArchive}
+                                                            />
+                                                        </td>
+                                                        <td>
+                                                            <input
+                                                                type="text"
+                                                                className="editable-cell text-right text-red-700/80"
+                                                                value={row.hppTunai ? (isNaN(Number(row.hppTunai)) ? row.hppTunai : formatNumber(row.hppTunai)) : ''}
+                                                                onChange={(e) => handleSalesRowChange(idx, 'hppTunai', e.target.value)}
+                                                                placeholder="0"
+                                                                readOnly={!!viewingArchive}
+                                                            />
+                                                        </td>
+                                                        <td className="text-right font-medium text-green-700 bg-slate-50/50 pr-1">
+                                                            {isRowEmpty ? '' : formatIDR(keuntungan)}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            <tr className="bg-[#f5e6d3] font-bold">
+                                                <td colSpan={2} className="text-right">TOTAL PENJUALAN (TUNAI)</td>
+                                                <td className="text-right">{formatIDR(totalSalesTunai)}</td>
+                                                <td className="text-right text-red-700">{formatIDR(totalModalTunai)}</td>
+                                                <td className="text-right text-green-700 font-bold">{formatIDR(totalLabaTunai)}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    {!viewingArchive && (
+                                        <button
+                                            onClick={addSalesRow}
+                                            className="mt-1 text-[9px] text-amber-800 hover:text-amber-950 font-bold flex items-center gap-1 print:hidden"
+                                        >
+                                            <PlusCircle size={10} /> Tambah Baris Penjualan
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Section III - Setoran Tunai Kasir */}
+                                <div>
+                                    <div className="brown-header">III. LAPORAN SETORAN TUNAI KASIR</div>
+                                    <table className="report-table">
+                                        <thead>
+                                            <tr>
+                                                <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
+                                                    1. Total Pendapatan Penjualan Tunai
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td style={{ width: '8%' }} className="text-center">1</td>
+                                                <td style={{ width: '52%' }}>Penjualan Tunai Hari ini</td>
+                                                <td style={{ width: '40%' }} className="text-right font-medium text-green-700">
+                                                    {formatIDR(totalSalesTunai)}
                                                 </td>
                                             </tr>
-                                        );
-                                    })}
-                                    <tr className="bg-[#f5e6d3] font-bold">
-                                        <td colSpan={2} className="text-right">TOTAL PENJUALAN (TUNAI)</td>
-                                        <td className="text-right">{formatIDR(totalSalesTunai)}</td>
-                                        <td className="text-right text-red-700">{formatIDR(totalModalTunai)}</td>
-                                        <td className="text-right text-green-700 font-bold">{formatIDR(totalLabaTunai)}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            {!viewingArchive && (
-                                <button 
-                                    onClick={addSalesRow}
-                                    className="mt-1 text-[9px] text-amber-800 hover:text-amber-950 font-bold flex items-center gap-1 print:hidden"
-                                >
-                                    <PlusCircle size={10} /> Tambah Baris Penjualan
-                                </button>
-                            )}
-                        </div>
+                                            <tr className="bg-[#f5e6d3] font-bold">
+                                                <td colSpan={2} className="text-right">JUMLAH (1)</td>
+                                                <td className="text-right text-green-800">{formatIDR(totalSalesTunai)}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
 
-                        {/* Section III - Setoran Tunai Kasir */}
-                        <div>
-                            <div className="brown-header">III. LAPORAN SETORAN TUNAI KASIR</div>
-                            <table className="report-table">
-                                <thead>
-                                    <tr>
-                                        <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
-                                            1. Total Pendapatan Penjualan Tunai
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td style={{ width: '8%' }} className="text-center">1</td>
-                                        <td style={{ width: '52%' }}>Penjualan Tunai Hari ini</td>
-                                        <td style={{ width: '40%' }} className="text-right font-medium text-green-700">
-                                            {formatIDR(totalSalesTunai)}
-                                        </td>
-                                    </tr>
-                                    <tr className="bg-[#f5e6d3] font-bold">
-                                        <td colSpan={2} className="text-right">JUMLAH (1)</td>
-                                        <td className="text-right text-green-800">{formatIDR(totalSalesTunai)}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-
-                            <table className="report-table mt-1.5">
-                                <thead>
-                                    <tr>
-                                        <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
-                                            2. Pengeluaran Operasional Toko Hari ini
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td style={{ width: '8%' }} className="text-center">1</td>
-                                        <td style={{ width: '52%' }}>Dipotong Pengeluaran (V)</td>
-                                        <td style={{ width: '40%' }} className="text-right font-medium text-red-700">
-                                            - {formatIDR(totalPengeluaran)}
-                                        </td>
-                                    </tr>
-                                    <tr className="bg-[#fee2e2] font-bold text-red-950">
-                                        <td colSpan={2} className="text-right">JUMLAH (2)</td>
-                                        <td className="text-right text-red-700">- {formatIDR(totalPengeluaran)}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-
-                            <table className="report-table mt-1.5">
-                                <thead>
-                                    <tr>
-                                        <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
-                                            3. SETORAN FISIK (TUNAI) = (1 - 2)
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td style={{ width: '8%' }} className="text-center">1</td>
-                                        <td style={{ width: '52%' }}>Setoran Bruto</td>
-                                        <td style={{ width: '40%' }} className="text-right font-medium">{formatIDR(totalSalesTunai)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="text-center">2</td>
-                                        <td>Dipotong Pengeluaran (V)</td>
-                                        <td className="text-right font-medium text-red-700">- {formatIDR(totalPengeluaran)}</td>
-                                    </tr>
-                                    <tr className="bg-[#dcfce7] font-extrabold text-green-950">
-                                        <td colSpan={2} className="text-right">NETTO (UANG FISIK KASIR)</td>
-                                        <td className="text-right font-mono text-green-800 text-[10px]">{formatIDR(netto)}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    {/* Section IV & V - Berdampingan (Side by Side) */}
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                        {/* Section IV - QR Code */}
-                        <div>
-                            <div className="brown-header">IV. LAPORAN PENJUALAN (NON-TUNAI / QR)</div>
-                            <table className="report-table">
-                                <thead>
-                                    <tr>
-                                        <th style={{ width: '6%' }}>No</th>
-                                        <th style={{ width: '38%' }}>Sumber Pendapatan</th>
-                                        <th style={{ width: '18%' }}>Pendapatan</th>
-                                        <th style={{ width: '18%' }}>Modal</th>
-                                        <th style={{ width: '20%' }}>Keuntungan</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {currentSalesRows.map((row, idx) => {
-                                        const pendapatan = Number(row.qr) || 0;
-                                        const modal = Number(row.hppQR) || 0;
-                                        const keuntungan = pendapatan - modal;
-                                        const isRowEmpty = !row.qr && !row.hppQR;
-                                        return (
-                                            <tr key={`sales-qr-${idx}`}>
-                                                <td className="text-center">{idx + 1}</td>
-                                                <td className="font-medium text-gray-800">{row.name}</td>
-                                                <td>
-                                                    <input 
-                                                        type="text" 
-                                                        className="editable-cell text-right" 
-                                                        value={row.qr ? (isNaN(Number(row.qr)) ? row.qr : formatNumber(row.qr)) : ''} 
-                                                        onChange={(e) => handleSalesRowChange(idx, 'qr', e.target.value)} 
-                                                        placeholder="0"
-                                                        readOnly={!!viewingArchive}
-                                                    />
-                                                </td>
-                                                <td>
-                                                    <input 
-                                                        type="text" 
-                                                        className="editable-cell text-right text-red-700/80" 
-                                                        value={row.hppQR ? (isNaN(Number(row.hppQR)) ? row.hppQR : formatNumber(row.hppQR)) : ''} 
-                                                        onChange={(e) => handleSalesRowChange(idx, 'hppQR', e.target.value)} 
-                                                        placeholder="0"
-                                                        readOnly={!!viewingArchive}
-                                                    />
-                                                </td>
-                                                <td className="text-right font-medium text-blue-700 bg-slate-50/50 pr-1">
-                                                    {isRowEmpty ? '' : formatIDR(keuntungan)}
+                                    <table className="report-table mt-1.5">
+                                        <thead>
+                                            <tr>
+                                                <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
+                                                    2. Pengeluaran Operasional Toko Hari ini
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td style={{ width: '8%' }} className="text-center">1</td>
+                                                <td style={{ width: '52%' }}>Dipotong Pengeluaran (V)</td>
+                                                <td style={{ width: '40%' }} className="text-right font-medium text-red-700">
+                                                    - {formatIDR(totalPengeluaran)}
                                                 </td>
                                             </tr>
-                                        );
-                                    })}
-                                    <tr className="bg-[#e0f2fe] font-bold">
-                                        <td colSpan={2} className="text-right">TOTAL PENJUALAN (QR)</td>
-                                        <td className="text-right">{formatIDR(totalSalesQR)}</td>
-                                        <td className="text-right text-red-700">{formatIDR(totalModalQR)}</td>
-                                        <td className="text-right text-blue-700 font-bold">{formatIDR(totalLabaQR)}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                                            <tr className="bg-[#fee2e2] font-bold text-red-950">
+                                                <td colSpan={2} className="text-right">JUMLAH (2)</td>
+                                                <td className="text-right text-red-700">- {formatIDR(totalPengeluaran)}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
 
-                            {/* Rekapitulasi Laba Rugi Penjualan */}
-                            <table className="report-table mt-2">
-                                <thead>
-                                    <tr>
-                                        <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
-                                            2. REKAPITULASI LABA PENJUALAN (NETTO PROFIT)
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td style={{ width: '8%' }} className="text-center">1</td>
-                                        <td style={{ width: '52%' }}>Keuntungan Laba Penjualan (Tunai)</td>
-                                        <td style={{ width: '40%' }} className="text-right font-medium text-green-700">{formatIDR(totalLabaTunai)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="text-center">2</td>
-                                        <td>Keuntungan Laba Penjualan (QR)</td>
-                                        <td className="text-right font-medium text-blue-700">{formatIDR(totalLabaQR)}</td>
-                                    </tr>
-                                    <tr className="bg-slate-100 font-bold">
-                                        <td colSpan={2} className="text-right">TOTAL LABA KOTOR</td>
-                                        <td className="text-right font-mono">{formatIDR(totalLabaTunai + totalLabaQR)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="text-center">3</td>
-                                        <td>Dipotong Beban Pengeluaran (V)</td>
-                                        <td className="text-right font-medium text-red-700">- {formatIDR(totalPengeluaran)}</td>
-                                    </tr>
-                                    <tr className="bg-[#fef08a] font-extrabold text-amber-950">
-                                        <td colSpan={2} className="text-right">KEUNTUNGAN BERSIH (NETTO)</td>
-                                        <td className="text-right font-mono text-amber-900 text-[10px]">{formatIDR(totalLabaNetto)}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                                    <table className="report-table mt-1.5">
+                                        <thead>
+                                            <tr>
+                                                <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
+                                                    3. SETORAN FISIK (TUNAI) = (1 - 2)
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td style={{ width: '8%' }} className="text-center">1</td>
+                                                <td style={{ width: '52%' }}>Setoran Bruto</td>
+                                                <td style={{ width: '40%' }} className="text-right font-medium">{formatIDR(totalSalesTunai)}</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="text-center">2</td>
+                                                <td>Dipotong Pengeluaran (V)</td>
+                                                <td className="text-right font-medium text-red-700">- {formatIDR(totalPengeluaran)}</td>
+                                            </tr>
+                                            <tr className="bg-[#dcfce7] font-extrabold text-green-950">
+                                                <td colSpan={2} className="text-right">NETTO (UANG FISIK KASIR)</td>
+                                                <td className="text-right font-mono text-green-800 text-[10px]">{formatIDR(netto)}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Section IV & V - Berdampingan (Side by Side) */}
+                            <div className="grid grid-cols-2 gap-3 mb-3">
+                                {/* Section IV - QR Code */}
+                                <div>
+                                    <div className="brown-header">IV. LAPORAN PENJUALAN (NON-TUNAI / QR)</div>
+                                    <table className="report-table">
+                                        <thead>
+                                            <tr>
+                                                <th style={{ width: '6%' }}>No</th>
+                                                <th style={{ width: '38%' }}>Sumber Pendapatan</th>
+                                                <th style={{ width: '18%' }}>Pendapatan</th>
+                                                <th style={{ width: '18%' }}>Modal</th>
+                                                <th style={{ width: '20%' }}>Keuntungan</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {currentSalesRows.map((row, idx) => {
+                                                const pendapatan = Number(row.qr) || 0;
+                                                const modal = Number(row.hppQR) || 0;
+                                                const keuntungan = pendapatan - modal;
+                                                const isRowEmpty = !row.qr && !row.hppQR;
+                                                return (
+                                                    <tr key={`sales-qr-${idx}`}>
+                                                        <td className="text-center">{idx + 1}</td>
+                                                        <td className="font-medium text-gray-800">{row.name}</td>
+                                                        <td>
+                                                            <input
+                                                                type="text"
+                                                                className="editable-cell text-right"
+                                                                value={row.qr ? (isNaN(Number(row.qr)) ? row.qr : formatNumber(row.qr)) : ''}
+                                                                onChange={(e) => handleSalesRowChange(idx, 'qr', e.target.value)}
+                                                                placeholder="0"
+                                                                readOnly={!!viewingArchive}
+                                                            />
+                                                        </td>
+                                                        <td>
+                                                            <input
+                                                                type="text"
+                                                                className="editable-cell text-right text-red-700/80"
+                                                                value={row.hppQR ? (isNaN(Number(row.hppQR)) ? row.hppQR : formatNumber(row.hppQR)) : ''}
+                                                                onChange={(e) => handleSalesRowChange(idx, 'hppQR', e.target.value)}
+                                                                placeholder="0"
+                                                                readOnly={!!viewingArchive}
+                                                            />
+                                                        </td>
+                                                        <td className="text-right font-medium text-blue-700 bg-slate-50/50 pr-1">
+                                                            {isRowEmpty ? '' : formatIDR(keuntungan)}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            <tr className="bg-[#e0f2fe] font-bold">
+                                                <td colSpan={2} className="text-right">TOTAL PENJUALAN (QR)</td>
+                                                <td className="text-right">{formatIDR(totalSalesQR)}</td>
+                                                <td className="text-right text-red-700">{formatIDR(totalModalQR)}</td>
+                                                <td className="text-right text-blue-700 font-bold">{formatIDR(totalLabaQR)}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+
+                                    {/* Rekapitulasi Laba Rugi Penjualan */}
+                                    <table className="report-table mt-2">
+                                        <thead>
+                                            <tr>
+                                                <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
+                                                    2. REKAPITULASI LABA PENJUALAN (NETTO PROFIT)
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td style={{ width: '8%' }} className="text-center">1</td>
+                                                <td style={{ width: '52%' }}>Keuntungan Laba Penjualan (Tunai)</td>
+                                                <td style={{ width: '40%' }} className="text-right font-medium text-green-700">{formatIDR(totalLabaTunai)}</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="text-center">2</td>
+                                                <td>Keuntungan Laba Penjualan (QR)</td>
+                                                <td className="text-right font-medium text-blue-700">{formatIDR(totalLabaQR)}</td>
+                                            </tr>
+                                            <tr className="bg-slate-100 font-bold">
+                                                <td colSpan={2} className="text-right">TOTAL LABA KOTOR</td>
+                                                <td className="text-right font-mono">{formatIDR(totalLabaTunai + totalLabaQR)}</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="text-center">3</td>
+                                                <td>Dipotong Beban Pengeluaran (V)</td>
+                                                <td className="text-right font-medium text-red-700">- {formatIDR(totalPengeluaran)}</td>
+                                            </tr>
+                                            <tr className="bg-[#fef08a] font-extrabold text-amber-950">
+                                                <td colSpan={2} className="text-right">KEUNTUNGAN BERSIH (NETTO)</td>
+                                                <td className="text-right font-mono text-amber-900 text-[10px]">{formatIDR(totalLabaNetto)}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Section V - Pengeluaran */}
+                                <div>
+                                    <div className="brown-header">V. LAPORAN PENGELUARAN</div>
+                                    <table className="report-table">
+                                        <thead>
+                                            <tr>
+                                                <th style={{ width: '8%' }}>No</th>
+                                                <th style={{ width: '58%' }}>KATEGORI PENGELUARAN</th>
+                                                <th style={{ width: '28%' }}>Jumlah (Rp)</th>
+                                                {!viewingArchive && <th style={{ width: '6%' }} className="print:hidden">Aksi</th>}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(() => {
+                                                const activeRows = currentExpenseRows.filter(r => (r.name && r.name.trim()) || (Number(r.amount) > 0));
+                                                if (activeRows.length === 0) {
+                                                    return (
+                                                        <tr>
+                                                            <td colSpan={!viewingArchive ? 4 : 3} className="p-3 text-center text-slate-400 italic text-[9px] print:text-[6.5pt]">
+                                                                Belum ada catatan pengeluaran operasional (biaya) yang terinput pada hari ini.
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                }
+
+                                                return activeRows.map((row, idx) => (
+                                                    <tr key={`expense-${idx}`}>
+                                                        <td className="text-center font-mono">{idx + 1}</td>
+                                                        <td>
+                                                            <input
+                                                                type="text"
+                                                                className="editable-cell"
+                                                                value={row.name}
+                                                                onChange={(e) => handleExpenseRowChange(idx, 'name', e.target.value)}
+                                                                placeholder="Tulis kategori pengeluaran..."
+                                                                readOnly={!!viewingArchive}
+                                                            />
+                                                        </td>
+                                                        <td>
+                                                            <input
+                                                                type="text"
+                                                                className="editable-cell text-right font-mono font-bold text-red-700"
+                                                                value={row.amount ? (isNaN(Number(row.amount)) ? row.amount : formatNumber(row.amount)) : ''}
+                                                                onChange={(e) => handleExpenseRowChange(idx, 'amount', e.target.value)}
+                                                                placeholder="0"
+                                                                readOnly={!!viewingArchive}
+                                                            />
+                                                        </td>
+                                                        {!viewingArchive && (
+                                                            <td className="text-center print:hidden p-0.5">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => deleteExpenseRow(idx)}
+                                                                    className="text-red-500 hover:text-red-700 p-0.5 rounded hover:bg-red-50"
+                                                                    title="Hapus Baris Ini"
+                                                                >
+                                                                    <Trash2 size={11} />
+                                                                </button>
+                                                            </td>
+                                                        )}
+                                                    </tr>
+                                                ));
+                                            })()}
+                                            <tr className="bg-[#fee2e2] font-extrabold text-red-950">
+                                                <td colSpan={!viewingArchive ? 2 : 2} className="text-right uppercase">TOTAL PENGELUARAN</td>
+                                                <td className="text-right text-red-700 font-bold font-mono">{formatIDR(totalPengeluaran)}</td>
+                                                {!viewingArchive && <td className="print:hidden"></td>}
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Signatures */}
+                            <div className="flex justify-between text-xs mt-4 mb-4 px-8 font-medium">
+                                <div className="text-center">
+                                    <p className="mb-10">Dibuat oleh,<br />Kasir / Administrasi</p>
+                                    <p>( ................................................. )</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="mb-10">Sorong, ......./......../.............<br />Mengetahui,<br />Staff Keuangan</p>
+                                    <p>( ................................................. )</p>
+                                </div>
+                            </div>
+
+                            {/* Catatan */}
+                            <div className="text-xs font-bold flex gap-2 items-start border-t border-gray-200 pt-2">
+                                <span className="shrink-0 pt-0.5">CATATAN :</span>
+                                <textarea
+                                    className="flex-1 outline-none min-h-[36px] resize-none border border-gray-200 rounded p-1 text-xs print:border-none print:p-0"
+                                    value={catatan}
+                                    onChange={(e) => setCatatan(e.target.value)}
+                                />
+                            </div>
                         </div>
 
-                        {/* Section V - Pengeluaran */}
-                        <div>
-                            <div className="brown-header">V. LAPORAN PENGELUARAN</div>
-                            <table className="report-table">
-                                <thead>
-                                    <tr>
-                                        <th style={{ width: '8%' }}>No</th>
-                                        <th style={{ width: '58%' }}>KATEGORI PENGELUARAN</th>
-                                        <th style={{ width: '28%' }}>Jumlah (Rp)</th>
-                                        {!viewingArchive && <th style={{ width: '6%' }} className="print:hidden">Aksi</th>}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {(() => {
-                                        const activeRows = currentExpenseRows.filter(r => (r.name && r.name.trim()) || (Number(r.amount) > 0));
-                                        if (activeRows.length === 0) {
-                                            return (
+                        {/* ======================================================== */}
+                        {/* HALAMAN 2: LAMPIRAN VI. URAIAN PENGELUARAN (A4 PORTRAIT) */}
+                        {/* ======================================================== */}
+                        {(() => {
+                            const allSectionTitles = [
+                                ...DETAILED_EXPENSE_CONFIG.map(c => c.title),
+                                ...Object.keys(derivedDetailedExpensesCurrent).filter(t => !DETAILED_EXPENSE_CONFIG.some(c => c.title === t))
+                            ];
+
+                            const activeTables = allSectionTitles.map(title => {
+                                const allRows = derivedDetailedExpensesCurrent[title] || [];
+                                const validRows = allRows.filter(r => (r.keterangan && r.keterangan.trim()) || Number(r.total) > 0 || Number(r.harga) > 0);
+                                return {
+                                    config: { title },
+                                    dataRows: validRows
+                                };
+                            }).filter(t => t.dataRows && t.dataRows.length > 0);
+
+                            if (activeTables.length === 0) return null;
+
+                            const leftTables = [];
+                            const rightTables = [];
+                            let leftRows = 0;
+                            let rightRows = 0;
+
+                            activeTables.forEach(t => {
+                                const weight = t.dataRows.length + 3; // +3 for headers/total row
+                                if (leftRows <= rightRows) {
+                                    leftTables.push(t);
+                                    leftRows += weight;
+                                } else {
+                                    rightTables.push(t);
+                                    rightRows += weight;
+                                }
+                            });
+
+                            const renderTable = (t) => {
+                                const colTotal = t.dataRows.reduce((sum, row) => sum + (Number(row.total) || 0), 0);
+                                const categoryCleanName = t.config.title.replace(/^VI\.\s*URAIAN\s*PENGELUARAN\s*\(?/i, '').replace(/\)?$/, '').trim() || t.config.title;
+                                return (
+                                    <div key={t.config.title} className="w-full border border-slate-300 rounded overflow-hidden shadow-2xs mb-2.5 break-inside-avoid">
+                                        <div className="brown-header text-[9.5px] text-center font-bold uppercase tracking-wider py-1">
+                                            POS: {categoryCleanName.toUpperCase()}
+                                        </div>
+                                        <table className="report-table">
+                                            <thead>
                                                 <tr>
-                                                    <td colSpan={!viewingArchive ? 4 : 3} className="p-3 text-center text-slate-400 italic text-[9px] print:text-[6.5pt]">
-                                                        Belum ada catatan pengeluaran operasional (biaya) yang terinput pada hari ini.
+                                                    <th style={{ width: '8%' }} className="text-center">NO</th>
+                                                    <th style={{ width: '44%' }} className="text-left px-1.5">KETERANGAN</th>
+                                                    <th style={{ width: '12%' }} className="text-center">QTY</th>
+                                                    <th style={{ width: '18%' }} className="text-right px-1.5">HARGA (Rp)</th>
+                                                    <th style={{ width: '18%' }} className="text-right px-1.5">TOTAL (Rp)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {t.dataRows.map((row, rowIdx) => (
+                                                    <tr key={`row-${t.config.title}-${rowIdx}`} className="odd:bg-white even:bg-slate-50/70">
+                                                        <td className="text-center font-mono text-slate-600">{rowIdx + 1}</td>
+                                                        <td className="font-semibold text-slate-800 p-1 px-1.5 leading-tight">{row.keterangan}</td>
+                                                        <td className="text-center font-mono text-slate-700 p-1 px-1 leading-tight">{row.qty || '1'}</td>
+                                                        <td className="text-right font-mono text-slate-700 p-1 px-1.5 leading-tight">{row.harga ? formatIDR(row.harga) : '-'}</td>
+                                                        <td className="text-right font-mono font-bold text-red-700 p-1 px-1.5 leading-tight">{row.total ? formatIDR(row.total) : '-'}</td>
+                                                    </tr>
+                                                ))}
+                                                <tr className="bg-[#fee2e2] font-extrabold text-red-950 border-t border-slate-300">
+                                                    <td colSpan={4} className="text-right uppercase px-2 py-0.5 text-[8px]">SUBTOTAL ({categoryCleanName})</td>
+                                                    <td className="text-right font-mono text-red-700 font-black p-1 px-1.5 text-[8.5px]">
+                                                        {colTotal > 0 ? formatIDR(colTotal) : 'Rp 0'}
                                                     </td>
                                                 </tr>
-                                            );
-                                        }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                );
+                            };
 
-                                        return activeRows.map((row, idx) => (
-                                            <tr key={`expense-${idx}`}>
-                                                <td className="text-center font-mono">{idx + 1}</td>
-                                                <td>
-                                                    <input 
-                                                        type="text" 
-                                                        className="editable-cell" 
-                                                        value={row.name} 
-                                                        onChange={(e) => handleExpenseRowChange(idx, 'name', e.target.value)} 
-                                                        placeholder="Tulis kategori pengeluaran..."
-                                                        readOnly={!!viewingArchive}
-                                                    />
-                                                </td>
-                                                <td>
-                                                    <input 
-                                                        type="text" 
-                                                        className="editable-cell text-right font-mono font-bold text-red-700" 
-                                                        value={row.amount ? (isNaN(Number(row.amount)) ? row.amount : formatNumber(row.amount)) : ''} 
-                                                        onChange={(e) => handleExpenseRowChange(idx, 'amount', e.target.value)} 
-                                                        placeholder="0"
-                                                        readOnly={!!viewingArchive}
-                                                    />
-                                                </td>
-                                                {!viewingArchive && (
-                                                    <td className="text-center print:hidden p-0.5">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => deleteExpenseRow(idx)}
-                                                            className="text-red-500 hover:text-red-700 p-0.5 rounded hover:bg-red-50"
-                                                            title="Hapus Baris Ini"
-                                                        >
-                                                            <Trash2 size={11} />
-                                                        </button>
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        ));
-                                    })()}
-                                    <tr className="bg-[#fee2e2] font-extrabold text-red-950">
-                                        <td colSpan={!viewingArchive ? 2 : 2} className="text-right uppercase">TOTAL PENGELUARAN</td>
-                                        <td className="text-right text-red-700 font-bold font-mono">{formatIDR(totalPengeluaran)}</td>
-                                        {!viewingArchive && <td className="print:hidden"></td>}
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                            return (
+                                <>
+                                    <div className="page-break"></div>
+                                    <div id="berita-acara-page-2" className="print-page bg-white mx-auto text-black w-[210mm] max-w-full p-6 print:p-0 shadow-lg mb-8 print:mb-0 box-border">
+                                        {/* Formal Page 2 Header */}
+                                        <div className="flex items-center justify-between border-b-2 border-amber-900 pb-2 mb-3">
+                                            <div className="w-1/4">
+                                                <img src="/logokasir.jpg" alt="Logo" style={{ height: '48px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
+                                            </div>
+                                            <div className="w-3/4 text-center">
+                                                <h1 className="text-base font-bold uppercase tracking-wider mb-0.5">BERITA ACARA - LAMPIRAN</h1>
+                                                <h2 className="text-xs font-bold uppercase text-amber-900">VI. URAIAN RINCIAN PENGELUARAN OPERASIONAL</h2>
+                                                <h3 className="text-[10px] font-medium text-gray-600">RUMAH ETNIK PAPUA - WISATA BUDAYA PAPUA</h3>
+                                            </div>
+                                        </div>
+
+                                        {/* Sub-bar Info */}
+                                        <div className="bg-amber-50/80 border border-amber-200 rounded px-3 py-1.5 mb-3 flex justify-between items-center text-[10px] font-medium text-gray-800">
+                                            <div><strong>Tanggal:</strong> {tanggal.split("-").reverse().join("/")}</div>
+                                            <div><strong>Periode:</strong> {periode}</div>
+                                            <div><strong>Kasir:</strong> {kasir || '-'}</div>
+                                            <div><strong>Lokasi:</strong> {lokasi || '-'}</div>
+                                        </div>
+
+                                        {/* 2 Column Layout */}
+                                        <div className="flex gap-x-4 items-start w-full mb-4">
+                                            <div className="w-1/2 flex flex-col">
+                                                {leftTables.map(renderTable)}
+                                            </div>
+                                            <div className="w-1/2 flex flex-col">
+                                                {rightTables.map(renderTable)}
+                                            </div>
+                                        </div>
+
+                                        {/* Grand Total Footer */}
+                                        <div className="border border-red-300 bg-[#fee2e2] rounded p-2 flex justify-between items-center text-xs font-extrabold text-red-950 mb-4">
+                                            <span className="uppercase tracking-wider">TOTAL KESELURUHAN PENGELUARAN (VI. URAIAN OPERASIONAL)</span>
+                                            <span className="font-mono text-sm text-red-700 font-black">{formatIDR(totalPengeluaran)}</span>
+                                        </div>
+
+                                        {/* Page 2 Validation Signatures */}
+                                        <div className="flex justify-between text-xs mt-6 px-8 font-medium">
+                                            <div className="text-center">
+                                                <p className="mb-8">Dibuat oleh,<br />Kasir / Administrasi</p>
+                                                <p className="font-bold">(&nbsp;&nbsp;{kasir || '........................................'}&nbsp;&nbsp;)</p>
+                                            </div>
+                                            <div className="text-center">
+                                                <p className="mb-8">Sorong, {tanggal.split("-").reverse().join("/")}<br />Mengetahui,<br />Staff Keuangan</p>
+                                                <p>( ................................................. )</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
-
-                    {/* Signatures */}
-                    <div className="flex justify-between text-xs mt-4 mb-4 px-8 font-medium">
-                        <div className="text-center">
-                            <p className="mb-10">Dibuat oleh,<br/>Kasir / Administrasi</p>
-                            <p>( ................................................. )</p>
-                        </div>
-                        <div className="text-center">
-                            <p className="mb-10">Sorong, ......./......../.............<br/>Mengetahui,<br/>Staff Keuangan</p>
-                            <p>( ................................................. )</p>
-                        </div>
-                    </div>
-
-                    {/* Catatan */}
-                    <div className="text-xs font-bold flex gap-2 items-start border-t border-gray-200 pt-2">
-                        <span className="shrink-0 pt-0.5">CATATAN :</span>
-                        <textarea 
-                            className="flex-1 outline-none min-h-[36px] resize-none border border-gray-200 rounded p-1 text-xs print:border-none print:p-0"
-                            value={catatan}
-                            onChange={(e) => setCatatan(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                {/* ======================================================== */}
-                {/* HALAMAN 2: LAMPIRAN VI. URAIAN PENGELUARAN (A4 PORTRAIT) */}
-                {/* ======================================================== */}
-                {(() => {
-                    const allSectionTitles = [
-                        ...DETAILED_EXPENSE_CONFIG.map(c => c.title),
-                        ...Object.keys(derivedDetailedExpensesCurrent).filter(t => !DETAILED_EXPENSE_CONFIG.some(c => c.title === t))
-                    ];
-
-                    const activeTables = allSectionTitles.map(title => {
-                        const allRows = derivedDetailedExpensesCurrent[title] || [];
-                        const validRows = allRows.filter(r => (r.keterangan && r.keterangan.trim()) || Number(r.total) > 0 || Number(r.harga) > 0);
-                        return {
-                            config: { title },
-                            dataRows: validRows
-                        };
-                    }).filter(t => t.dataRows && t.dataRows.length > 0);
-
-                    if (activeTables.length === 0) return null;
-
-                    const leftTables = [];
-                    const rightTables = [];
-                    let leftRows = 0;
-                    let rightRows = 0;
-
-                    activeTables.forEach(t => {
-                        const weight = t.dataRows.length + 3; // +3 for headers/total row
-                        if (leftRows <= rightRows) {
-                            leftTables.push(t);
-                            leftRows += weight;
-                        } else {
-                            rightTables.push(t);
-                            rightRows += weight;
-                        }
-                    });
-
-                    const renderTable = (t) => {
-                        const colTotal = t.dataRows.reduce((sum, row) => sum + (Number(row.total) || 0), 0);
-                        const categoryCleanName = t.config.title.replace(/^VI\.\s*URAIAN\s*PENGELUARAN\s*\(?/i, '').replace(/\)?$/, '').trim() || t.config.title;
-                        return (
-                            <div key={t.config.title} className="w-full border border-slate-300 rounded overflow-hidden shadow-2xs mb-2.5 break-inside-avoid">
-                                <div className="brown-header text-[9.5px] text-center font-bold uppercase tracking-wider py-1">
-                                    POS: {categoryCleanName.toUpperCase()}
-                                </div>
-                                <table className="report-table">
-                                    <thead>
-                                        <tr>
-                                            <th style={{ width: '8%' }} className="text-center">NO</th>
-                                            <th style={{ width: '44%' }} className="text-left px-1.5">KETERANGAN</th>
-                                            <th style={{ width: '12%' }} className="text-center">QTY</th>
-                                            <th style={{ width: '18%' }} className="text-right px-1.5">HARGA (Rp)</th>
-                                            <th style={{ width: '18%' }} className="text-right px-1.5">TOTAL (Rp)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {t.dataRows.map((row, rowIdx) => (
-                                            <tr key={`row-${t.config.title}-${rowIdx}`} className="odd:bg-white even:bg-slate-50/70">
-                                                <td className="text-center font-mono text-slate-600">{rowIdx + 1}</td>
-                                                <td className="font-semibold text-slate-800 p-1 px-1.5 leading-tight">{row.keterangan}</td>
-                                                <td className="text-center font-mono text-slate-700 p-1 px-1 leading-tight">{row.qty || '1'}</td>
-                                                <td className="text-right font-mono text-slate-700 p-1 px-1.5 leading-tight">{row.harga ? formatIDR(row.harga) : '-'}</td>
-                                                <td className="text-right font-mono font-bold text-red-700 p-1 px-1.5 leading-tight">{row.total ? formatIDR(row.total) : '-'}</td>
-                                            </tr>
-                                        ))}
-                                        <tr className="bg-[#fee2e2] font-extrabold text-red-950 border-t border-slate-300">
-                                            <td colSpan={4} className="text-right uppercase px-2 py-0.5 text-[8px]">SUBTOTAL ({categoryCleanName})</td>
-                                            <td className="text-right font-mono text-red-700 font-black p-1 px-1.5 text-[8.5px]">
-                                                {colTotal > 0 ? formatIDR(colTotal) : 'Rp 0'}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        );
-                    };
-
-                    return (
-                        <>
-                            <div className="page-break"></div>
-                            <div id="berita-acara-page-2" className="print-page bg-white mx-auto text-black w-[210mm] max-w-full p-6 print:p-0 shadow-lg mb-8 print:mb-0 box-border">
-                                {/* Formal Page 2 Header */}
-                                <div className="flex items-center justify-between border-b-2 border-amber-900 pb-2 mb-3">
-                                    <div className="w-1/4">
-                                        <img src="/logokasir.jpg" alt="Logo" style={{ height: '48px', objectFit: 'contain' }} onError={(e) => e.target.style.display='none'} />
-                                    </div>
-                                    <div className="w-3/4 text-center">
-                                        <h1 className="text-base font-bold uppercase tracking-wider mb-0.5">BERITA ACARA - LAMPIRAN</h1>
-                                        <h2 className="text-xs font-bold uppercase text-amber-900">VI. URAIAN RINCIAN PENGELUARAN OPERASIONAL</h2>
-                                        <h3 className="text-[10px] font-medium text-gray-600">RUMAH ETNIK PAPUA - WISATA BUDAYA PAPUA</h3>
-                                    </div>
-                                </div>
-
-                                {/* Sub-bar Info */}
-                                <div className="bg-amber-50/80 border border-amber-200 rounded px-3 py-1.5 mb-3 flex justify-between items-center text-[10px] font-medium text-gray-800">
-                                    <div><strong>Tanggal:</strong> {tanggal.split("-").reverse().join("/")}</div>
-                                    <div><strong>Periode:</strong> {periode}</div>
-                                    <div><strong>Kasir:</strong> {kasir || '-'}</div>
-                                    <div><strong>Lokasi:</strong> {lokasi || '-'}</div>
-                                </div>
-
-                                {/* 2 Column Layout */}
-                                <div className="flex gap-x-4 items-start w-full mb-4">
-                                    <div className="w-1/2 flex flex-col">
-                                        {leftTables.map(renderTable)}
-                                    </div>
-                                    <div className="w-1/2 flex flex-col">
-                                        {rightTables.map(renderTable)}
-                                    </div>
-                                </div>
-
-                                {/* Grand Total Footer */}
-                                <div className="border border-red-300 bg-[#fee2e2] rounded p-2 flex justify-between items-center text-xs font-extrabold text-red-950 mb-4">
-                                    <span className="uppercase tracking-wider">TOTAL KESELURUHAN PENGELUARAN (VI. URAIAN OPERASIONAL)</span>
-                                    <span className="font-mono text-sm text-red-700 font-black">{formatIDR(totalPengeluaran)}</span>
-                                </div>
-
-                                {/* Page 2 Validation Signatures */}
-                                <div className="flex justify-between text-xs mt-6 px-8 font-medium">
-                                    <div className="text-center">
-                                        <p className="mb-8">Dibuat oleh,<br/>Kasir / Administrasi</p>
-                                        <p className="font-bold">(&nbsp;&nbsp;{kasir || '........................................'}&nbsp;&nbsp;)</p>
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="mb-8">Sorong, {tanggal.split("-").reverse().join("/")}<br/>Mengetahui,<br/>Staff Keuangan</p>
-                                        <p>( ................................................. )</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    );
-                })()}
-            </div>
-            </>
+                </>
             )}
 
             {/* Category Management Modal */}
@@ -1884,7 +2063,7 @@ export default function BeritaAcaraPage() {
                             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                                 <FolderPlus className="text-amber-600" size={20} /> Kelola Kategori Pengeluaran
                             </h3>
-                            <button 
+                            <button
                                 onClick={() => setShowCategoryModal(false)}
                                 className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
                             >
@@ -1895,7 +2074,7 @@ export default function BeritaAcaraPage() {
                         <div className="my-4">
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">Tambah Kategori Baru</label>
                             <div className="flex gap-2">
-                                <input 
+                                <input
                                     type="text"
                                     placeholder="Contoh: BBM & Transportasi Khusus"
                                     className="flex-1 border border-gray-300 rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
@@ -1944,7 +2123,7 @@ export default function BeritaAcaraPage() {
                                                 <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono">{idx + 1}</span>
                                                 {cat}
                                             </span>
-                                            <button 
+                                            <button
                                                 onClick={() => handleDeleteCategory(cat)}
                                                 className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
                                                 title="Hapus Kategori"

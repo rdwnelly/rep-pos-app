@@ -250,11 +250,10 @@ export const PaymentQRCode: React.FC<PaymentQRCodeProps> = ({ amount, bank, stor
               </div>
               <button
                 onClick={handleCopyAccount}
-                className={`shrink-0 p-2 rounded-lg transition-all duration-300 ${
-                  copied
-                    ? 'bg-green-100 text-green-600 scale-110'
-                    : 'bg-slate-100 text-slate-400 hover:bg-primary/10 hover:text-primary active:scale-95'
-                }`}
+                className={`shrink-0 p-2 rounded-lg transition-all duration-300 ${copied
+                  ? 'bg-green-100 text-green-600 scale-110'
+                  : 'bg-slate-100 text-slate-400 hover:bg-primary/10 hover:text-primary active:scale-95'
+                  }`}
                 title="Salin nomor rekening"
               >
                 {copied ? <Check size={14} /> : <Copy size={14} />}

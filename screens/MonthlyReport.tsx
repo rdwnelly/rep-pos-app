@@ -62,8 +62,9 @@ const parseSafeDate = (d: any): Date => {
 
 // Helper to map category name to standardized display name
 const mapCategoryNameToSalesRow = (catName: string): string => {
-    const lower = (catName || '').toLowerCase();
+    const lower = (catName || '').toLowerCase().trim();
     if (lower.includes("tiket")) return "Tiket Masuk";
+    if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar") || lower === "sewa kostum keluar") return "Sewa kostum keluar";
     if (lower.includes("sewa kostum") || lower.includes("kostum")) return "Sewa Kostum";
     if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "Toko / Souvenir";
     if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) return "Kafe & Resto";
