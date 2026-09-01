@@ -63,6 +63,7 @@ const parseSafeDate = (d: any): Date => {
 // Helper to map category name to standardized display name
 const mapCategoryNameToSalesRow = (catName: string): string => {
     const lower = (catName || '').toLowerCase().trim();
+    if (!lower || lower === "umum" || lower === "tanpa kategori") return "Toko / Souvenir";
     if (lower.includes("tiket")) return "Tiket Masuk";
     if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar") || lower === "sewa kostum keluar") return "Sewa kostum keluar";
     if (lower.includes("sewa kostum") || lower.includes("kostum")) return "Sewa Kostum";
@@ -385,11 +386,11 @@ export const MonthlyReport: React.FC = () => {
             });
         });
 
-        // Initialize master categories
+        // Initialize master categories (exclude 'umum')
         categories.forEach(c => {
-            if (c && c.name && c.name.trim()) {
+            if (c && c.name && c.name.trim() && c.name.trim().toLowerCase() !== 'umum') {
                 const mappedName = mapCategoryNameToSalesRow(c.name.trim());
-                if (!catMap.has(mappedName)) {
+                if (mappedName && mappedName.toLowerCase() !== 'umum' && !catMap.has(mappedName)) {
                     catMap.set(mappedName, {
                         name: mappedName,
                         tunai: 0,

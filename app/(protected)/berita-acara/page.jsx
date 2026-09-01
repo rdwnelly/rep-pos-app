@@ -2,10 +2,13 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useData } from "../../../hooks/useData";
-import { StorageService } from "../../../services/storage";
+import { StorageService, notifyListeners } from "../../../services/storage";
 import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
 import { formatIDR, formatNumber } from "../../../utils";
-import { Plus, PlusCircle, Trash2, Info, Save, Archive, FileText, X, Printer, Eye, FolderPlus, Download, Loader2, CheckCircle2 } from "lucide-react";
+import {
+    Plus, PlusCircle, Trash2, Info, Save, Archive, FileText, X, Printer, Eye,
+    FolderPlus, Download, Loader2, CheckCircle2, RefreshCw, AlertCircle, Sparkles, Check
+} from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -32,6 +35,7 @@ const BASE_SALES_CATEGORIES = [
 // Jika kategori tidak cocok dengan pola ini, akan ditambahkan sebagai baris baru secara otomatis
 const mapCategoryNameToSalesRow = (catName) => {
     const lower = (catName || "").toLowerCase().trim();
+    if (!lower || lower === "umum" || lower === "tanpa kategori") return "Toko / Souvenir";
     if (lower.includes("tiket")) return "Tiket Masuk";
     if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar") || lower === "sewa kostum keluar") return "Sewa kostum keluar";
     if (lower.includes("sewa kostum") || lower.includes("kostum")) return "Sewa Kostum";
@@ -113,26 +117,154 @@ const mapCategoryToSection = (cat) => {
     return `VI. URAIAN PENGELUARAN (${cleaned})`;
 };
 
+// Date Matching Helper (Timezone-safe & format-safe)
+const isTransactionOnDate = (t, targetDate) => {
+    if (!t || !t.date || !targetDate) return false;
+    const rawDateStr = typeof t.date === 'string' ? t.date : '';
+    const tDateOnly = rawDateStr.slice(0, 10);
+    if (tDateOnly === targetDate) return true;
+
+    const tDate = new Date(rawDateStr.includes('T') ? rawDateStr : rawDateStr.replace(' ', 'T'));
+    if (isNaN(tDate.getTime())) return false;
+
+    const year = tDate.getFullYear();
+    const month = String(tDate.getMonth() + 1).padStart(2, '0');
+    const day = String(tDate.getDate()).padStart(2, '0');
+    const localDateOnly = `${year}-${month}-${day}`;
+    if (localDateOnly === targetDate) return true;
+
+    const startDate = new Date(targetDate);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(targetDate);
+    endDate.setHours(23, 59, 59, 999);
+    return tDate >= startDate && tDate <= endDate;
+};
+
+// Pure function to calculate Sales Rows from live transactions
+const calculateSalesRowsForDate = (allTransactions, targetDate, salesCategories = BASE_SALES_CATEGORIES, allCategories = [], allProducts = []) => {
+    if (!targetDate) {
+        return {
+            rows: salesCategories.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" })),
+            totalTunai: 0,
+            totalQR: 0,
+            matchingTxCount: 0
+        };
+    }
+
+    const salesMap = {};
+    salesCategories.forEach(name => {
+        salesMap[name] = { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
+    });
+
+    let matchingTxCount = 0;
+    let totalTunai = 0;
+    let totalQR = 0;
+
+    const catIdToName = {};
+    (allCategories || []).forEach(c => {
+        if (c && c.id && c.name) catIdToName[c.id] = c.name;
+    });
+
+    const prodIdToCatName = {};
+    (allProducts || []).forEach(p => {
+        if (p && p.id && (p.categoryName || p.categoryId)) {
+            prodIdToCatName[p.id] = p.categoryName || catIdToName[p.categoryId] || 'Lainnya';
+        }
+    });
+
+    (allTransactions || []).forEach(t => {
+        if (!isTransactionOnDate(t, targetDate)) return;
+        matchingTxCount++;
+
+        if (Array.isArray(t.items)) {
+            t.items.forEach(item => {
+                const originalCatName = item.categoryName ||
+                    (item.categoryId ? catIdToName[item.categoryId] : null) ||
+                    (item.id ? prodIdToCatName[item.id] : null) ||
+                    'Lainnya';
+                const rowName = mapCategoryNameToSalesRow(originalCatName);
+
+                let itemTotal = (Number(item.finalPrice) || Number(item.price) || 0) * (Number(item.qty) || 1);
+                let itemHpp = (Number(item.hpp) || 0) * (Number(item.qty) || 1);
+
+                if (t.type === TransactionType.RETURN || t.type === 'RETURN') {
+                    itemTotal = -itemTotal;
+                    itemHpp = -itemHpp;
+                }
+
+                if (!salesMap[rowName]) {
+                    salesMap[rowName] = { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
+                }
+
+                const isCash = t.paymentMethod === PaymentMethod.CASH || t.paymentMethod === 'CASH' || t.paymentMethod === 'TUNAI';
+
+                if (isCash) {
+                    salesMap[rowName].tunai += itemTotal;
+                    salesMap[rowName].hppTunai += itemHpp;
+                    totalTunai += itemTotal;
+                } else {
+                    salesMap[rowName].qr += itemTotal;
+                    salesMap[rowName].hppQR += itemHpp;
+                    totalQR += itemTotal;
+                }
+            });
+        }
+    });
+
+    const rows = Object.entries(salesMap)
+        .filter(([name]) => name && name.trim().toLowerCase() !== 'umum')
+        .map(([name, vals]) => ({
+            name,
+            tunai: vals.tunai === 0 ? "" : String(vals.tunai),
+            hppTunai: vals.hppTunai === 0 ? "" : String(vals.hppTunai),
+            qr: vals.qr === 0 ? "" : String(vals.qr),
+            hppQR: vals.hppQR === 0 ? "" : String(vals.hppQR),
+        }));
+
+    return { rows, totalTunai, totalQR, matchingTxCount };
+};
+
+// Helper to format date into readable Indonesian period name automatically
+const formatPeriodeFromDate = (dateStr) => {
+    if (!dateStr) return "";
+    try {
+        const d = new Date(dateStr + "T00:00:00");
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch {
+        return dateStr;
+    }
+};
+
 export default function BeritaAcaraPage() {
     const [tanggal, setTanggal] = useState(new Date().toISOString().split("T")[0]);
-    const [periode, setPeriode] = useState("");
+    // Periode otomatis mengikuti Tanggal Laporan yang dipilih
+    const periode = useMemo(() => formatPeriodeFromDate(tanggal), [tanggal]);
     const [kasir, setKasir] = useState("");
     const [lokasi, setLokasi] = useState("Aimas - Klamono KM 21, Kabupaten Sorong, Papua Barat Daya");
 
     const transactions = useData(() => StorageService.getTransactions(), [], 'transactions') || [];
     const categories = useData(() => StorageService.getCategories(), [], 'categories') || [];
+    const products = useData(() => StorageService.getProducts(), [], 'products') || [];
     const cashflows = useData(() => StorageService.getCashFlow(), [], 'cashflow') || [];
     const archives = useData(() => StorageService.getBeritaAcaraArchives(), [], 'berita_acara_archives') || [];
     const [activeTab, setActiveTab] = useState("input");
     const [viewingArchive, setViewingArchive] = useState(null);
 
-    // Gabungkan kategori penjualan dasar dengan seluruh kategori penjualan dari POS master data
+    // Sync state
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncFeedback, setSyncFeedback] = useState(null);
+    const [lastSyncedTime, setLastSyncedTime] = useState(() =>
+        new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    );
+
+    // Gabungkan kategori penjualan dasar dengan seluruh kategori penjualan dari POS master data (tanpa kategori 'Umum')
     const allSalesCategories = useMemo(() => {
         const list = [...BASE_SALES_CATEGORIES];
         categories.forEach(cat => {
-            if (cat && cat.name && cat.name.trim()) {
+            if (cat && cat.name && cat.name.trim() && cat.name.trim().toLowerCase() !== 'umum') {
                 const rowName = mapCategoryNameToSalesRow(cat.name.trim());
-                if (!list.includes(rowName)) {
+                if (rowName && rowName.toLowerCase() !== 'umum' && !list.includes(rowName)) {
                     list.push(rowName);
                 }
             }
@@ -142,7 +274,6 @@ export default function BeritaAcaraPage() {
 
     // States for editable tables
     // State penjualan kini dinamis: array of { name, tunai, hppTunai, qr, hppQR }
-    // Setiap kategori dari master data & transaksi otomatis dimasukkan
     const [salesRows, setSalesRows] = useState(() =>
         allSalesCategories.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" }))
     );
@@ -202,58 +333,8 @@ export default function BeritaAcaraPage() {
     const computedSalesRows = useMemo(() => {
         if (!tanggal) return allSalesCategories.map(name => ({ name, tunai: "", hppTunai: "", qr: "", hppQR: "" }));
 
-        const startDate = new Date(tanggal);
-        startDate.setHours(0, 0, 0, 0);
-        const endDate = new Date(tanggal);
-        endDate.setHours(23, 59, 59, 999);
-
-        const salesMap = {};
-        allSalesCategories.forEach(name => {
-            salesMap[name] = { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
-        });
-
-        (transactions || []).forEach(t => {
-            if (!t || !t.date) return;
-            const rawDateStr = typeof t.date === 'string' ? t.date : '';
-            const tDateOnly = rawDateStr.slice(0, 10);
-            const tDate = new Date(rawDateStr.replace(' ', 'T'));
-            const isMatch = tDateOnly === tanggal || (!isNaN(tDate.getTime()) && tDate >= startDate && tDate <= endDate);
-
-            if (isMatch && Array.isArray(t.items)) {
-                t.items.forEach(item => {
-                    const originalCatName = item.categoryName || 'Lainnya';
-                    const rowName = mapCategoryNameToSalesRow(originalCatName);
-
-                    let itemTotal = item.finalPrice * item.qty;
-                    let itemHpp = (item.hpp || 0) * item.qty;
-                    if (t.type === TransactionType.RETURN) {
-                        itemTotal = -itemTotal;
-                        itemHpp = -itemHpp;
-                    }
-
-                    if (!salesMap[rowName]) {
-                        salesMap[rowName] = { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
-                    }
-
-                    if (t.paymentMethod === PaymentMethod.CASH) {
-                        salesMap[rowName].tunai += itemTotal;
-                        salesMap[rowName].hppTunai += itemHpp;
-                    } else {
-                        salesMap[rowName].qr += itemTotal;
-                        salesMap[rowName].hppQR += itemHpp;
-                    }
-                });
-            }
-        });
-
-        return Object.entries(salesMap).map(([name, vals]) => ({
-            name,
-            tunai: vals.tunai === 0 ? "" : String(vals.tunai),
-            hppTunai: vals.hppTunai === 0 ? "" : String(vals.hppTunai),
-            qr: vals.qr === 0 ? "" : String(vals.qr),
-            hppQR: vals.hppQR === 0 ? "" : String(vals.hppQR),
-        }));
-    }, [tanggal, transactions, allSalesCategories]);
+        return calculateSalesRowsForDate(transactions, tanggal, allSalesCategories, categories, products).rows;
+    }, [tanggal, transactions, allSalesCategories, categories, products]);
 
     // Helper to get matching cashflow expenses for a given target date (timezone-safe)
     const getMatchingCashflowsForDate = (allCashflows, targetDate) => {
@@ -368,7 +449,6 @@ export default function BeritaAcaraPage() {
         if (source) {
             if (source.kasir !== undefined && source.kasir !== "") setKasir(source.kasir);
             if (source.lokasi !== undefined && source.lokasi !== "") setLokasi(source.lokasi);
-            if (source.periode !== undefined && source.periode !== "") setPeriode(source.periode);
             if (source.catatan !== undefined && source.catatan !== "") setCatatan(source.catatan);
 
             // Custom Expenses: prioritize non-empty customExpenses with actual data
@@ -395,10 +475,13 @@ export default function BeritaAcaraPage() {
                 }
             }
 
-            // Sales Rows: if source has saved salesRows, restore them; otherwise use computedSalesRows
+            // Sales Rows: if live computed sales from transactions has positive values, use it to ensure no data is missed!
+            const hasComputedSales = computedSalesRows.some(r => Number(r.tunai) > 0 || Number(r.qr) > 0);
             if (Array.isArray(source.salesRows) && source.salesRows.length > 0) {
                 const hasManualSales = source.salesRows.some(r => Number(r.tunai) > 0 || Number(r.qr) > 0);
-                if (hasManualSales) {
+                if (hasComputedSales) {
+                    setSalesRows(computedSalesRows);
+                } else if (hasManualSales) {
                     setSalesRows(source.salesRows);
                 } else {
                     setSalesRows(computedSalesRows);
@@ -432,7 +515,7 @@ export default function BeritaAcaraPage() {
                 ]);
             }
         }
-    }, [tanggal, viewingArchive]);
+    }, [tanggal, viewingArchive, computedSalesRows]);
 
     // Automatic Synchronization: Custom Expenses -> Section V (expenseRows)
     useEffect(() => {
@@ -483,26 +566,126 @@ export default function BeritaAcaraPage() {
         }
     }, [JSON.stringify(customExpenses), viewingArchive]);
 
-    const handleSyncFromCashFlow = () => {
+    // Master Synchronization Handler: Forces direct re-fetch from Storage/DB and live recalculation
+    const handleSyncData = async ({ syncCashflow = false, silent = false } = {}) => {
         if (!tanggal) return;
-        const matchingExpenses = getMatchingCashflowsForDate(cashflows, tanggal);
+        try {
+            setIsSyncing(true);
+            if (!silent) setSyncFeedback(null);
 
-        if (matchingExpenses.length === 0) {
-            alert(`Tidak ditemukan catatan pengeluaran kasir (Arus Kas Keluar) pada tanggal ${tanggal} di sistem.`);
-            return;
+            // 1. Fetch fresh data directly from backend
+            const [freshTx, freshCats, freshCf, freshProds, freshArch] = await Promise.all([
+                StorageService.getTransactions(),
+                StorageService.getCategories(),
+                StorageService.getCashFlow(),
+                StorageService.getProducts(),
+                StorageService.getBeritaAcaraArchives()
+            ]);
+
+            // 2. Notify storage change listeners to update any active hooks
+            notifyListeners();
+
+            // 3. Build dynamic categories list
+            const dynamicSalesCats = [...BASE_SALES_CATEGORIES];
+            (freshCats || []).forEach(cat => {
+                if (cat && cat.name && cat.name.trim()) {
+                    const rowName = mapCategoryNameToSalesRow(cat.name.trim());
+                    if (!dynamicSalesCats.includes(rowName)) {
+                        dynamicSalesCats.push(rowName);
+                    }
+                }
+            });
+
+            // 4. Calculate fresh sales rows
+            const calculation = calculateSalesRowsForDate(freshTx, tanggal, dynamicSalesCats, freshCats, freshProds);
+            setSalesRows(calculation.rows);
+
+            // 5. Match Cashflow / Expenses
+            const matchingExpenses = getMatchingCashflowsForDate(freshCf, tanggal);
+            let cashflowUpdated = false;
+
+            const isCustomExpensesEmpty = customExpenses.length === 0 || (customExpenses.length === 1 && !customExpenses[0].keterangan && !customExpenses[0].total && !customExpenses[0].harga);
+
+            if ((syncCashflow || isCustomExpensesEmpty) && matchingExpenses.length > 0) {
+                const newCustomExpenses = matchingExpenses.map((c, idx) => ({
+                    id: c.id || Date.now() + idx,
+                    category: mapCashflowCategoryToOption(c.category, categoryOptions),
+                    keterangan: c.description || c.category || 'Pengeluaran Kasir',
+                    qty: '1',
+                    harga: String(c.amount || ''),
+                    total: String(c.amount || '')
+                }));
+                setCustomExpenses(newCustomExpenses);
+                cashflowUpdated = true;
+            }
+
+            // 6. Update draft in localStorage with live data
+            const draftData = {
+                date: tanggal,
+                periode,
+                kasir,
+                lokasi,
+                salesRows: calculation.rows,
+                expenseRows,
+                customExpenses: cashflowUpdated ? matchingExpenses.map((c, idx) => ({
+                    id: c.id || Date.now() + idx,
+                    category: mapCashflowCategoryToOption(c.category, categoryOptions),
+                    keterangan: c.description || c.category || 'Pengeluaran Kasir',
+                    qty: '1',
+                    harga: String(c.amount || ''),
+                    total: String(c.amount || '')
+                })) : customExpenses,
+                catatan,
+                updatedAt: Date.now()
+            };
+            try {
+                localStorage.setItem(`rep_ba_draft_${tanggal}`, JSON.stringify(draftData));
+            } catch (e) {
+                console.error("Draft update error:", e);
+            }
+
+            const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            setLastSyncedTime(nowStr);
+
+            if (!silent) {
+                const dateFmt = new Date(tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+                if (calculation.matchingTxCount === 0 && matchingExpenses.length === 0) {
+                    setSyncFeedback({
+                        type: 'info',
+                        title: 'Sinkronisasi Selesai (Tidak Ada Data)',
+                        message: `Database berhasil diperiksa. Belum ada transaksi penjualan maupun arus kas keluar yang tercatat pada tanggal ${dateFmt}.`,
+                        details: 'Pastikan tanggal transaksi di kasir POS sesuai dengan tanggal laporan.',
+                        time: nowStr,
+                        txCount: 0,
+                        totalSales: 0,
+                        expCount: 0
+                    });
+                } else {
+                    setSyncFeedback({
+                        type: 'success',
+                        title: 'Sinkronisasi Data Berhasil!',
+                        message: `Data transaksi untuk ${dateFmt} berhasil disinkronkan langsung dari sistem POS.`,
+                        details: `Ditemukan ${calculation.matchingTxCount} transaksi penjualan (Tunai: ${formatIDR(calculation.totalTunai)}, Non-Tunai: ${formatIDR(calculation.totalQR)})${matchingExpenses.length > 0 ? ` & ${matchingExpenses.length} catatan pengeluaran kasir.` : '.'}`,
+                        time: nowStr,
+                        txCount: calculation.matchingTxCount,
+                        totalSales: calculation.totalTunai + calculation.totalQR,
+                        expCount: matchingExpenses.length,
+                        hasPendingCashflow: matchingExpenses.length > 0 && !cashflowUpdated
+                    });
+                }
+            }
+
+        } catch (err) {
+            console.error("Error syncing Berita Acara data:", err);
+            setSyncFeedback({
+                type: 'error',
+                title: 'Gagal Menyinkronkan Data',
+                message: 'Terjadi kesalahan saat memuat data dari database: ' + (err.message || err),
+                time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            });
+        } finally {
+            setIsSyncing(false);
         }
-
-        const newCustomExpenses = matchingExpenses.map((c, idx) => ({
-            id: c.id || Date.now() + idx,
-            category: mapCashflowCategoryToOption(c.category, categoryOptions),
-            keterangan: c.description || c.category || 'Pengeluaran Kasir',
-            qty: '1',
-            harga: String(c.amount || ''),
-            total: String(c.amount || '')
-        }));
-
-        setCustomExpenses(newCustomExpenses);
-        alert(`Berhasil menarik ${matchingExpenses.length} catatan pengeluaran kasir dari arus kas POS untuk tanggal ${tanggal}!`);
     };
 
     const [autoSaveStatus, setAutoSaveStatus] = useState("idle");
@@ -1235,16 +1418,6 @@ export default function BeritaAcaraPage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Periode Sesi</label>
-                            <input
-                                type="text"
-                                value={periode}
-                                onChange={(e) => setPeriode(e.target.value)}
-                                placeholder="Cth: 1 - 7 Juli 2026"
-                                className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-slate-800 font-medium min-w-[200px]"
-                            />
-                        </div>
-                        <div>
                             <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Nama Kasir</label>
                             <input
                                 type="text"
@@ -1254,6 +1427,25 @@ export default function BeritaAcaraPage() {
                                 className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-slate-800 font-medium"
                             />
                         </div>
+
+                        {/* Synchronization Controls & Live Status */}
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                onClick={() => handleSyncData({ syncCashflow: false })}
+                                disabled={isSyncing}
+                                className="bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 hover:from-amber-700 hover:to-amber-900 disabled:opacity-60 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-2 text-xs active:scale-95 shrink-0"
+                                title="Sinkronkan seluruh data transaksi penjualan POS untuk tanggal ini agar tidak ada data yang tertinggal"
+                            >
+                                <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
+                                <span>{isSyncing ? "Menyinkronkan..." : "Sinkronkan Data POS"}</span>
+                            </button>
+
+                            <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-600 font-medium bg-slate-50 px-3 py-2 rounded-xl border border-slate-200 shrink-0 shadow-2xs">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span>Sinkron: <strong className="text-slate-800">{lastSyncedTime}</strong></span>
+                            </div>
+                        </div>
+
                         <div className="ml-auto flex flex-wrap gap-2 sm:gap-3 items-center">
                             {autoSaveStatus === "saving" && (
                                 <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl flex items-center gap-1.5 font-semibold animate-pulse">
@@ -1291,6 +1483,56 @@ export default function BeritaAcaraPage() {
                         </div>
                     </div>
 
+                    {/* Sync Feedback Notification Banner (Hidden on Print) */}
+                    {syncFeedback && (
+                        <div className={`p-4 rounded-2xl border mb-6 print:hidden shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-all duration-300 ${
+                            syncFeedback.type === 'success' ? 'bg-emerald-50/95 border-emerald-200 text-emerald-950' :
+                            syncFeedback.type === 'error' ? 'bg-rose-50/95 border-rose-200 text-rose-950' :
+                            'bg-blue-50/95 border-blue-200 text-blue-950'
+                        }`}>
+                            <div className="flex items-start gap-3">
+                                <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${
+                                    syncFeedback.type === 'success' ? 'bg-emerald-100 text-emerald-700' :
+                                    syncFeedback.type === 'error' ? 'bg-rose-100 text-rose-700' :
+                                    'bg-blue-100 text-blue-700'
+                                }`}>
+                                    {syncFeedback.type === 'success' ? <CheckCircle2 size={20} /> :
+                                     syncFeedback.type === 'error' ? <AlertCircle size={20} /> :
+                                     <Info size={20} />}
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="font-bold text-xs sm:text-sm">{syncFeedback.title}</h4>
+                                        <span className="text-[10px] opacity-75 font-mono">({syncFeedback.time})</span>
+                                    </div>
+                                    <p className="text-xs mt-0.5 font-medium opacity-90">{syncFeedback.message}</p>
+                                    {syncFeedback.details && (
+                                        <p className="text-[11px] mt-1 font-semibold text-slate-700 bg-white/80 px-2.5 py-1 rounded-lg inline-block border border-slate-200/60 shadow-2xs">
+                                            {syncFeedback.details}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 ml-auto sm:ml-0 shrink-0">
+                                {syncFeedback.hasPendingCashflow && (
+                                    <button
+                                        onClick={() => handleSyncData({ syncCashflow: true })}
+                                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5"
+                                    >
+                                        <RefreshCw size={12} /> Muat {syncFeedback.expCount} Arus Kas
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setSyncFeedback(null)}
+                                    className="p-1.5 hover:bg-black/5 rounded-lg transition-colors text-slate-500 hover:text-slate-800"
+                                    title="Tutup Notifikasi"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Modern Expense Input Section (Hidden on Print) */}
                     <div className="bg-white p-5 rounded-2xl shadow-sm mb-6 print:hidden border border-slate-200">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
@@ -1302,13 +1544,6 @@ export default function BeritaAcaraPage() {
                                 <p className="text-xs text-slate-500 mt-0.5">Tabel ini otomatis merekapitulasi uraian pengeluaran pada cetakan Berita Acara.</p>
                             </div>
                             <div className="flex flex-wrap gap-2 items-center">
-                                <button
-                                    onClick={handleSyncFromCashFlow}
-                                    className="flex items-center gap-1.5 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 px-3.5 py-2 rounded-xl transition-colors shadow-sm shrink-0"
-                                    title="Tarik catatan pengeluaran kasir dari database arus kas POS pada tanggal ini"
-                                >
-                                    🔄 Tarik Arus Kas POS (Tanggal Ini)
-                                </button>
                                 <button
                                     onClick={() => setShowCategoryModal(true)}
                                     className="flex items-center gap-1.5 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-3.5 py-2 rounded-xl transition-colors shadow-sm shrink-0"
@@ -1550,24 +1785,24 @@ export default function BeritaAcaraPage() {
                                         <div className="flex items-center mb-1">
                                             <span className="w-16 shrink-0">Date</span>
                                             <span className="mr-2">:</span>
-                                            <div className="flex-1 border-b border-black pb-0.5 font-semibold text-gray-900">{tanggal.split("-").reverse().join("/")}</div>
+                                            <div className="flex-1 border-b border-black pb-0.5 font-semibold text-gray-900">{currentTanggal ? currentTanggal.split("-").reverse().join("/") : ''}</div>
                                         </div>
                                         <div className="flex items-center">
                                             <span className="w-16 shrink-0">Periode</span>
                                             <span className="mr-2">:</span>
-                                            <div className="flex-1 border-b border-black pb-0.5 font-semibold text-gray-900">{periode}</div>
+                                            <div className="flex-1 border-b border-black pb-0.5 font-semibold text-gray-900">{currentPeriode}</div>
                                         </div>
                                     </div>
                                     <div>
                                         <div className="flex items-center mb-1">
                                             <span className="w-16 shrink-0">Kasir</span>
                                             <span className="mr-2">:</span>
-                                            <div className="flex-1 pb-0.5 font-semibold text-gray-900">{kasir}</div>
+                                            <div className="flex-1 pb-0.5 font-semibold text-gray-900">{currentKasir}</div>
                                         </div>
                                         <div className="flex items-center">
                                             <span className="w-16 shrink-0">Lokasi</span>
                                             <span className="mr-2">:</span>
-                                            <div className="flex-1 pb-0.5 font-semibold text-gray-900">{lokasi}</div>
+                                            <div className="flex-1 pb-0.5 font-semibold text-gray-900">{currentLokasi}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -1577,7 +1812,21 @@ export default function BeritaAcaraPage() {
                             <div className="grid grid-cols-2 gap-3 mb-3">
                                 {/* Section II - Tunai */}
                                 <div>
-                                    <div className="brown-header">II. LAPORAN PENJUALAN (TUNAI)</div>
+                                    <div className="brown-header flex justify-between items-center">
+                                        <span>II. LAPORAN PENJUALAN (TUNAI)</span>
+                                        {!viewingArchive && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSyncData({ syncCashflow: false })}
+                                                disabled={isSyncing}
+                                                className="print:hidden text-[8px] bg-amber-950/70 hover:bg-amber-950 text-amber-100 px-1.5 py-0.5 rounded flex items-center gap-1 font-normal transition-colors cursor-pointer"
+                                                title="Sinkronkan data penjualan tunai dari POS"
+                                            >
+                                                <RefreshCw size={9} className={isSyncing ? "animate-spin" : ""} />
+                                                <span>Sinkron POS</span>
+                                            </button>
+                                        )}
+                                    </div>
                                     <table className="report-table">
                                         <thead>
                                             <tr>
@@ -1731,7 +1980,21 @@ export default function BeritaAcaraPage() {
                             <div className="grid grid-cols-2 gap-3 mb-3">
                                 {/* Section IV - QR Code */}
                                 <div>
-                                    <div className="brown-header">IV. LAPORAN PENJUALAN (NON-TUNAI / QR)</div>
+                                    <div className="brown-header flex justify-between items-center">
+                                        <span>IV. LAPORAN PENJUALAN (NON-TUNAI / QR)</span>
+                                        {!viewingArchive && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSyncData({ syncCashflow: false })}
+                                                disabled={isSyncing}
+                                                className="print:hidden text-[8px] bg-amber-950/70 hover:bg-amber-950 text-amber-100 px-1.5 py-0.5 rounded flex items-center gap-1 font-normal transition-colors cursor-pointer"
+                                                title="Sinkronkan data penjualan non-tunai dari POS"
+                                            >
+                                                <RefreshCw size={9} className={isSyncing ? "animate-spin" : ""} />
+                                                <span>Sinkron POS</span>
+                                            </button>
+                                        )}
+                                    </div>
                                     <table className="report-table">
                                         <thead>
                                             <tr>
@@ -2014,10 +2277,10 @@ export default function BeritaAcaraPage() {
 
                                         {/* Sub-bar Info */}
                                         <div className="bg-amber-50/80 border border-amber-200 rounded px-3 py-1.5 mb-3 flex justify-between items-center text-[10px] font-medium text-gray-800">
-                                            <div><strong>Tanggal:</strong> {tanggal.split("-").reverse().join("/")}</div>
-                                            <div><strong>Periode:</strong> {periode}</div>
-                                            <div><strong>Kasir:</strong> {kasir || '-'}</div>
-                                            <div><strong>Lokasi:</strong> {lokasi || '-'}</div>
+                                            <div><strong>Tanggal:</strong> {currentTanggal ? currentTanggal.split("-").reverse().join("/") : ''}</div>
+                                            <div><strong>Periode:</strong> {currentPeriode}</div>
+                                            <div><strong>Kasir:</strong> {currentKasir || '-'}</div>
+                                            <div><strong>Lokasi:</strong> {currentLokasi || '-'}</div>
                                         </div>
 
                                         {/* 2 Column Layout */}
