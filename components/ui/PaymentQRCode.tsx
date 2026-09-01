@@ -121,7 +121,7 @@ export const PaymentQRCode: React.FC<PaymentQRCodeProps> = ({ amount, bank, stor
       return generateDynamicQRIS(bank.qrisCode.trim(), amount);
     }
     // Fallback: show bank transfer info as text
-    return `Transfer ${bank.bankName}\nNo. Rek: ${bank.accountNumber}\na.n. ${bank.holderName}\nJumlah: Rp ${amount.toLocaleString('id-ID')}`;
+    return `Transfer ${bank.bankName}\nNo. Rek: ${bank.accountNumber}\na.n. ${bank.holderName}\nJumlah: ${formatIDR(amount)}`;
   }, [hasQris, bank.qrisCode, bank.bankName, bank.accountNumber, bank.holderName, amount]);
 
   useEffect(() => {

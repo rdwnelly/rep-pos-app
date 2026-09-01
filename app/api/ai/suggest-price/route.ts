@@ -21,7 +21,7 @@ Target pasar mencakup pengunjung lokal, rombongan pelajar, hingga turis mancaneg
 
 Informasi Produk:
 - Nama Produk: ${productName}
-- Kategori: ${category || 'Umum'}
+- Kategori: ${category || '-'}
 - HPP (Harga Pokok Penjualan / Modal Murni per porsi): Rp ${hpp}
 
 Tugas:

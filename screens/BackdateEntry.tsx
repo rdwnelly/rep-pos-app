@@ -10,13 +10,11 @@ import {
   Product, CartItem, PaymentStatus, Transaction, PaymentMethod,
   User as UserType, StoreSettings, TransactionType
 } from '../types';
-import { formatIDR, generateId, formatDate, toMySQLDate } from '../utils';
+import { formatIDR, formatNumber, generateId, formatDate, toMySQLDate } from '../utils';
 
 interface BackdateEntryProps {
   currentUser: { uid: string; email: string | null; role: string; name?: string };
 }
-
-const formatNumber = (val: number) => val.toLocaleString('id-ID');
 
 const toDatetimeLocal = (date: Date) => {
   const pad = (n: number) => String(n).padStart(2, '0');

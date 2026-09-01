@@ -104,11 +104,17 @@ const formatDateWithTime = (dateStr: string) => {
     return `${datePart} ${timePart}`;
 };
 
-const formatNumber = (val: number) => {
-    return val.toLocaleString('id-ID');
+const formatNumber = (val: number | string | null | undefined): string => {
+    if (val === null || val === undefined || val === '') return '0';
+    const num = typeof val === 'number' ? val : Number(val);
+    if (isNaN(num)) return '0';
+    const isNegative = num < 0;
+    const absNum = Math.abs(Math.round(num));
+    const formatted = absNum.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return `${isNegative ? '-' : ''}${formatted}`;
 };
 
-const formatIDR = (val: number) => {
+const formatIDR = (val: number | string | null | undefined): string => {
     return 'Rp ' + formatNumber(val);
 };
 

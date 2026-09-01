@@ -1,16 +1,11 @@
-// Helper function to generate improved print layouts
 import { Transaction, StoreSettings, Purchase, BankAccount } from '../types';
-import { formatDateDateOnly } from '../utils';
+import { formatDateDateOnly, formatIDR, formatNumber } from '../utils';
 
 const formatDateWithTime = (dateStr: string) => {
     const date = new Date(dateStr);
     const datePart = date.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     const timePart = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }).replace(':', '.');
     return `${datePart} ${timePart}`;
-};
-
-const formatNumber = (val: number) => {
-    return val.toLocaleString('id-ID');
 };
 
 // ==========================================
@@ -107,7 +102,7 @@ function generateQRISPrintSection(qrisCode: string | undefined, amount: number, 
             <p style="margin: 0 0 5px 0; font-size: 10px; font-weight: bold;">Scan QRIS untuk Pembayaran</p>
             <canvas id="qrisCanvas" style="margin: 0 auto;"></canvas>
             <p style="margin: 5px 0 0 0; font-size: 9px; color: #333;">${bankName}</p>
-            <p style="margin: 2px 0 0 0; font-size: 8px; color: #666;">Rp ${amount.toLocaleString('id-ID')}</p>
+            <p style="margin: 2px 0 0 0; font-size: 8px; color: #666;">${formatIDR(amount)}</p>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
         <script>
@@ -226,8 +221,8 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                             <td>${item.sku || '-'}</td>
                             <td>${item.name}</td>
                             <td class="text-center">${item.qty} ${item.unit || 'Pcs'}</td>
-                            <td class="text-right">${formatNumber(item.finalPrice)}</td>
-                            <td class="text-right">${formatNumber(item.finalPrice * item.qty)}</td>
+                            <td class="text-right">${formatIDR(item.finalPrice)}</td>
+                            <td class="text-right">${formatIDR(item.finalPrice * item.qty)}</td>
                         </tr>
                     `).join('')}
                 </tbody>
@@ -316,29 +311,29 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                              <table class="summary-table" style="width: auto;">
                                 <tr>
                                     <td style="width: 120px;">Sub Total</td>
-                                    <td style="width: 120px; text-align: right;">${formatNumber(subTotal)}</td>
+                                    <td style="width: 120px; text-align: right;">${formatIDR(subTotal)}</td>
                                 </tr>
                                 <tr>
                                     <td>Diskon</td>
-                                    <td style="text-align: right;">${formatNumber(discountAmount)}</td>
+                                    <td style="text-align: right;">${discountAmount > 0 ? formatIDR(discountAmount) : 'Rp 0'}</td>
                                 </tr>
                                 <tr>
                                     <td style="font-weight: bold;">Total Bayar</td>
-                                    <td style="text-align: right; font-weight: bold;">${formatNumber(tx.totalAmount)}</td>
+                                    <td style="text-align: right; font-weight: bold;">${formatIDR(tx.totalAmount)}</td>
                                 </tr>
                                 <tr>
                                     <td>Bayar (${((tx.paymentMethod as string) === 'TEMPO' || tx.paymentMethod === 'BON') ? 'BON' : tx.paymentMethod})</td>
-                                    <td style="text-align: right;">${formatNumber(tx.amountPaid)}</td>
+                                    <td style="text-align: right;">${formatIDR(tx.amountPaid)}</td>
                                 </tr>
                                 ${tx.change < 0 ? `
                                 <tr>
                                     <td style="color: #000;">Sisa Utang</td>
-                                    <td style="text-align: right; color: #000;">${formatNumber(Math.abs(tx.change))}</td>
+                                    <td style="text-align: right; color: #000;">${formatIDR(Math.abs(tx.change))}</td>
                                 </tr>
                                 ` : `
                                 <tr>
                                     <td>Kembalian</td>
-                                    <td style="text-align: right;">${formatNumber(tx.change)}</td>
+                                    <td style="text-align: right;">${formatIDR(tx.change)}</td>
                                 </tr>
                                 `}
                             </table>
@@ -1053,12 +1048,12 @@ export const generatePrintDashboard = (
                     </div>
                     <div class="stat-card">
                         <div class="stat-label">Item Terjual</div>
-                        <div class="stat-value" style="color: #10b981;">${data.totalItemsSold}</div>
+                        <div class="stat-value" style="color: #10b981;">${formatNumber(data.totalItemsSold)}</div>
                         <div class="stat-sub">Unit Barang</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-label">Stok Menipis</div>
-                        <div class="stat-value" style="color: #ef4444;">${data.lowStockItems}</div>
+                        <div class="stat-value" style="color: #ef4444;">${formatNumber(data.lowStockItems)}</div>
                         <div class="stat-sub">Perlu Restock</div>
                     </div>
                 </div>
@@ -1070,7 +1065,7 @@ export const generatePrintDashboard = (
                             ${data.revenueTrend.length > 0 ? data.revenueTrend.map(d => `
                                 <div class="v-chart-col">
                                     <div class="v-chart-track">
-                                        <div class="v-chart-value">${d.total > 0 ? d.total.toLocaleString('id-ID') : ''}</div>
+                                        <div class="v-chart-value">${d.total > 0 ? formatNumber(d.total) : ''}</div>
                                         <div class="v-chart-fill" style="height: ${(d.total / maxRevenue) * 100}%;"></div>
                                     </div>
                                     <div class="v-chart-label ${data.revenueTrend.length > 12 ? 'rotated' : ''}"><span>${d.name}</span></div>
@@ -1087,7 +1082,7 @@ export const generatePrintDashboard = (
                              ${data.itemsSoldTrend.length > 0 ? data.itemsSoldTrend.map(d => `
                                 <div class="v-chart-col">
                                     <div class="v-chart-track">
-                                        <div class="v-chart-value">${d.total > 0 ? d.total : ''}</div>
+                                        <div class="v-chart-value">${d.total > 0 ? formatNumber(d.total) : ''}</div>
                                         <div class="v-chart-fill alt" style="height: ${(d.total / maxItems) * 100}%;"></div>
                                     </div>
                                     <div class="v-chart-label ${data.itemsSoldTrend.length > 12 ? 'rotated' : ''}"><span>${d.name}</span></div>
@@ -1106,7 +1101,7 @@ export const generatePrintDashboard = (
                                     <div class="hb-label">${p.name}</div>
                                     <div class="hb-track">
                                         <div class="hb-fill" style="width: ${(p.qty / maxProductQty) * 100}%">
-                                            ${p.qty}
+                                            ${formatNumber(p.qty)}
                                         </div>
                                     </div>
                                 </div>
@@ -1121,7 +1116,7 @@ export const generatePrintDashboard = (
                                     <div class="hb-label">${c.name}</div>
                                     <div class="hb-track">
                                         <div class="hb-fill cat" style="width: ${(c.qty / maxCategoryQty) * 100}%">
-                                            ${c.qty}
+                                            ${formatNumber(c.qty)}
                                         </div>
                                     </div>
                                 </div>

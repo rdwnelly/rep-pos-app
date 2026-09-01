@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { getBusinessInsights } from '../services/geminiService';
-import { formatIDR, exportToExcel, exportToCSV, formatDate } from '../utils';
+import { formatIDR, formatNumber, exportToExcel, exportToCSV, formatDate } from '../utils';
 import { generatePrintDashboard } from '../utils/printHelpers';
 import { Transaction, Product, CartItem, User, TransactionType, PaymentMethod, PaymentStatus, StoreSettings } from '../types';
 import { useData } from '../hooks/useData';
@@ -736,7 +736,7 @@ export const Dashboard: React.FC = () => {
             <h3 className="text-lg font-black text-slate-900 font-mono">{formatIDR(kpiMetrics.netRevenue)}</h3>
           </div>
           <p className="text-[10px] text-slate-400 mt-2 font-mono">
-            {kpiMetrics.totalTransactions} Trx • {kpiMetrics.totalItemsSold} Unit
+            {formatNumber(kpiMetrics.totalTransactions)} Trx • {formatNumber(kpiMetrics.totalItemsSold)} Unit
           </p>
         </div>
 
@@ -787,7 +787,7 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
             <h3 className="text-lg font-black text-amber-800 font-mono">
-              {kpiMetrics.totalItemsSold.toLocaleString('id-ID')} <span className="text-xs font-normal text-slate-500">pcs</span>
+              {formatNumber(kpiMetrics.totalItemsSold)} <span className="text-xs font-normal text-slate-500">pcs</span>
             </h3>
           </div>
           <p className="text-[10px] text-slate-400 mt-2 font-mono">
@@ -821,7 +821,7 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
             <h3 className="text-lg font-black text-rose-700 font-mono">
-              {lowStockProducts.length} <span className="text-xs font-normal text-slate-500">produk</span>
+              {formatNumber(lowStockProducts.length)} <span className="text-xs font-normal text-slate-500">produk</span>
             </h3>
           </div>
           <p className="text-[10px] text-slate-400 mt-2 font-mono">
@@ -1072,7 +1072,7 @@ export const Dashboard: React.FC = () => {
               <div key={prod.id} className="py-2.5 flex items-center justify-between">
                 <div>
                   <p className="font-bold text-slate-800">{prod.name}</p>
-                  <p className="text-[10px] text-slate-400">Kategori: {prod.categoryName || 'Umum'} • HPP: {formatIDR(prod.hpp || 0)}</p>
+                  <p className="text-[10px] text-slate-400">Kategori: {prod.categoryName || '-'} • HPP: {formatIDR(prod.hpp || 0)}</p>
                 </div>
                 <div className="text-right">
                   <span className={`font-mono font-black px-2 py-0.5 rounded-lg ${prod.stock <= 3 ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>

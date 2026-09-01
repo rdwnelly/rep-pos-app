@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Product, Category, UserRole } from '../types';
-import { formatIDR, exportToCSV, generateSKU, compressImage, exportToExcel } from '../utils';
+import { formatIDR, formatNumber, exportToCSV, generateSKU, compressImage, exportToExcel } from '../utils';
 import { Edit2, Trash2, Plus, X, Download, Upload, Tag, Barcode, Image as ImageIcon, Search, Printer, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, FileSpreadsheet, Package, Sparkles } from 'lucide-react';
 import { HPPCalculatorModal } from '../components/HPPCalculatorModal';
 
@@ -89,7 +89,7 @@ export const Products: React.FC = () => {
     const payload = {
       ...formData,
       id: editingId || undefined,
-      categoryName: selectedCat?.name || 'Umum',
+      categoryName: selectedCat?.name || '',
       categoryId: formData.categoryId || '',
       image: formData.image || ''
     } as Product;
@@ -557,7 +557,7 @@ export const Products: React.FC = () => {
           <div>
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Stok Produk</p>
             <h3 className="text-lg font-extrabold text-emerald-600 mt-1">
-              {products.reduce((acc, p) => acc + (p.stock || 0), 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-slate-400">unit</span>
+              {formatNumber(products.reduce((acc, p) => acc + (p.stock || 0), 0))} <span className="text-xs font-normal text-slate-400">unit</span>
             </h3>
             <p className="text-[11px] text-slate-400 mt-0.5">Semua Stok Fisik</p>
           </div>
@@ -583,7 +583,7 @@ export const Products: React.FC = () => {
           <div>
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Stok Menipis (&lt; 10)</p>
             <h3 className="text-lg font-extrabold text-rose-600 mt-1">
-              {products.filter(p => (p.stock || 0) < 10).length} <span className="text-xs font-normal text-slate-400">produk</span>
+              {formatNumber(products.filter(p => (p.stock || 0) < 10).length)} <span className="text-xs font-normal text-slate-400">produk</span>
             </h3>
             <p className="text-[11px] text-slate-400 mt-0.5">Perlu Restok Segera</p>
           </div>
@@ -721,7 +721,9 @@ export const Products: React.FC = () => {
                         <div>
                           <span className="font-bold text-slate-800 text-xs block">{p.name}</span>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[10px] font-semibold text-slate-500 px-1.5 py-0.5 bg-slate-100 rounded-md border border-slate-200">{p.categoryName}</span>
+                            {p.categoryName ? (
+                              <span className="text-[10px] font-semibold text-slate-500 px-1.5 py-0.5 bg-slate-100 rounded-md border border-slate-200">{p.categoryName}</span>
+                            ) : null}
                             {marginPercent > 0 && (
                               <span className="text-[10px] font-extrabold text-emerald-700 px-1.5 py-0.5 bg-emerald-50 rounded-md border border-emerald-200">
                                 Margin: +{marginPercent}%
@@ -736,7 +738,7 @@ export const Products: React.FC = () => {
                       <span className={`px-2.5 py-1 rounded-lg font-extrabold text-xs border ${
                         p.stock < 10 ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       }`}>
-                        {p.stock}
+                        {formatNumber(p.stock)}
                       </span>
                     </td>
                     <td className="p-3.5 text-slate-700 font-semibold whitespace-nowrap">{formatIDR(p.hpp || 0)}</td>
