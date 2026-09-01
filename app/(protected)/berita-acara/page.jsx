@@ -19,9 +19,10 @@ const WhatsAppIcon = ({ size = 16 }) => (
 );
 
 // Kategori penjualan dasar yang selalu muncul (urutan tampilan default)
-// Tiket Masuk dan Sewa Kostum digabungkan ke kategori Taman Etnik
+// Tiket Masuk dan Sewa Kostum kini dipisah menjadi 2 kategori berbeda
 const BASE_SALES_CATEGORIES = [
-    "Taman Etnik",
+    "Tiket Masuk",
+    "Sewa Kostum",
     "Toko / Souvenir",
     "Kafe & Resto",
     "Kios",
@@ -35,8 +36,9 @@ const BASE_SALES_CATEGORIES = [
 const mapCategoryNameToSalesRow = (catName) => {
     const lower = (catName || "").toLowerCase().trim();
     if (!lower || lower === "umum" || lower === "tanpa kategori") return "Toko / Souvenir";
+    if (lower.includes("tiket")) return "Tiket Masuk";
     if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar") || lower === "sewa kostum keluar") return "Sewa kostum keluar";
-    if (lower.includes("taman etnik") || lower.includes("taman") || lower.includes("tiket") || lower.includes("sewa kostum") || lower.includes("kostum")) return "Taman Etnik";
+    if (lower.includes("sewa kostum") || lower.includes("kostum")) return "Sewa Kostum";
     if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "Toko / Souvenir";
     if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) return "Kafe & Resto";
     if (lower.includes("kios")) return "Kios";
@@ -75,7 +77,8 @@ const buildDefaultCategoryOptions = (salesCategories = BASE_SALES_CATEGORIES) =>
 const DEFAULT_CATEGORY_OPTIONS = buildDefaultCategoryOptions(BASE_SALES_CATEGORIES);
 
 const DETAILED_EXPENSE_CONFIG = [
-    { title: "VI. URAIAN PENGELUARAN (Taman Etnik)", rows: 15 },
+    { title: "VI. URAIAN PENGELUARAN (Tiket Masuk)", rows: 10 },
+    { title: "VI. URAIAN PENGELUARAN (Sewa Kostum)", rows: 10 },
     { title: "VI. URAIAN PENGELUARAN (Toko / Souvenir)", rows: 10 },
     { title: "VI. URAIAN PENGELUARAN (Pembelanjaan Café)", rows: 21 },
     { title: "VI. URAIAN PENGELUARAN (Biaya Kios)", rows: 10 },
@@ -95,8 +98,9 @@ const DETAILED_EXPENSE_CONFIG = [
 const mapCategoryToSection = (cat) => {
     if (!cat) return "VI. URAIAN PENGELUARAN (Lain-lain)";
     const lower = cat.toLowerCase().trim();
+    if (lower.includes("tiket")) return "VI. URAIAN PENGELUARAN (Tiket Masuk)";
     if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar")) return "VI. URAIAN PENGELUARAN (Sewa kostum keluar)";
-    if (lower.includes("taman etnik") || lower.includes("taman") || lower.includes("tiket") || lower.includes("sewa kostum") || lower.includes("kostum")) return "VI. URAIAN PENGELUARAN (Taman Etnik)";
+    if (lower.includes("sewa kostum") || lower.includes("kostum")) return "VI. URAIAN PENGELUARAN (Sewa Kostum)";
     if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "VI. URAIAN PENGELUARAN (Toko / Souvenir)";
     if (lower.includes("café") || lower.includes("cafe") || lower.includes("kafe") || lower.includes("resto")) return "VI. URAIAN PENGELUARAN (Pembelanjaan Café)";
     if (lower.includes("kios")) return "VI. URAIAN PENGELUARAN (Biaya Kios)";
@@ -303,22 +307,47 @@ export default function BeritaAcaraPage() {
         return defaultList;
     });
 
+    // Otomatis sinkronkan kategori master baru ke salesRows agar selalu muncul di tabel Berita Acara
+    const salesCategoriesKey = useMemo(() => allSalesCategories.join(','), [allSalesCategories]);
+
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('custom_expense_categories');
-            if (!saved) {
-                const newList = buildDefaultCategoryOptions(allSalesCategories);
-                setCategoryOptions(prev => {
-                    if (JSON.stringify(prev) === JSON.stringify(newList)) return prev;
-                    return newList;
-                });
-            }
-        }
-    }, [JSON.stringify(allSalesCategories)]);
+        setSalesRows(prevRows => {
+            const existingNames = new Set(prevRows.map(r => r.name.toLowerCase().trim()));
+            const missingCats = allSalesCategories.filter(cat => !existingNames.has(cat.toLowerCase().trim()));
+            if (missingCats.length === 0) return prevRows;
+
+            const newRowsToAdd = missingCats.map(name => ({
+                name,
+                tunai: "",
+                hppTunai: "",
+                qr: "",
+                hppQR: ""
+            }));
+            return [...prevRows, ...newRowsToAdd];
+        });
+    }, [salesCategoriesKey]);
+
+    // Otomatis sinkronkan kategori master baru ke categoryOptions dropdown
+    useEffect(() => {
+        setCategoryOptions(prevOptions => {
+            const currentClean = new Set(prevOptions.map(opt => opt.replace(/^\d+\)\s*/, '').toLowerCase().trim()));
+            const missing = allSalesCategories.filter(cat => !currentClean.has(cat.toLowerCase().trim()));
+            if (missing.length === 0) return prevOptions;
+
+            const newOptions = [...prevOptions];
+            missing.forEach(cat => {
+                newOptions.push(`${newOptions.length + 1}) ${cat}`);
+            });
+            try {
+                localStorage.setItem('custom_expense_categories', JSON.stringify(newOptions));
+            } catch (e) { }
+            return newOptions;
+        });
+    }, [salesCategoriesKey]);
 
     // Modern Dynamic Expenses (Hidden on print)
     const [customExpenses, setCustomExpenses] = useState([
-        { id: Date.now(), category: '1) Taman Etnik', keterangan: '', qty: '', harga: '', total: '' }
+        { id: Date.now(), category: '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
     ]);
 
     const [catatan, setCatatan] = useState("");
@@ -356,7 +385,7 @@ export default function BeritaAcaraPage() {
     };
 
     const mapCashflowCategoryToOption = (rawCat, availableOptions) => {
-        if (!rawCat) return availableOptions[0] || '1) Taman Etnik';
+        if (!rawCat) return availableOptions[0] || '1) Tiket Masuk';
         const lower = rawCat.toLowerCase().trim();
 
         const directMatch = availableOptions.find(opt => {
@@ -369,8 +398,12 @@ export default function BeritaAcaraPage() {
             const found = availableOptions.find(o => o.toLowerCase().includes("sewa kostum keluar"));
             if (found) return found;
         }
-        if (lower.includes("taman etnik") || lower.includes("taman") || lower.includes("tiket") || lower.includes("sewa kostum") || lower.includes("kostum")) {
-            const found = availableOptions.find(o => o.toLowerCase().includes("taman etnik") || o.toLowerCase().includes("taman") || o.toLowerCase().includes("tiket") || o.toLowerCase().includes("sewa kostum"));
+        if (lower.includes("sewa kostum") || lower.includes("kostum")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("sewa kostum"));
+            if (found) return found;
+        }
+        if (lower.includes("tiket")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("tiket"));
             if (found) return found;
         }
         if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) {
@@ -462,25 +495,34 @@ export default function BeritaAcaraPage() {
                     })));
                 } else if (!Array.isArray(source.customExpenses) || source.customExpenses.length === 0) {
                     setCustomExpenses([
-                        { id: Date.now(), category: categoryOptions[0] || '1) Taman Etnik', keterangan: '', qty: '', harga: '', total: '' }
+                        { id: Date.now(), category: categoryOptions[0] || '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
                     ]);
                 }
             }
 
             // Sales Rows: if live computed sales from transactions has positive values, use it to ensure no data is missed!
             const hasComputedSales = computedSalesRows.some(r => Number(r.tunai) > 0 || Number(r.qr) > 0);
+            let baseRows = computedSalesRows;
             if (Array.isArray(source.salesRows) && source.salesRows.length > 0) {
                 const hasManualSales = source.salesRows.some(r => Number(r.tunai) > 0 || Number(r.qr) > 0);
-                if (hasComputedSales) {
-                    setSalesRows(computedSalesRows);
-                } else if (hasManualSales) {
-                    setSalesRows(source.salesRows);
-                } else {
-                    setSalesRows(computedSalesRows);
+                if (!hasComputedSales && hasManualSales) {
+                    baseRows = source.salesRows;
                 }
-            } else {
-                setSalesRows(computedSalesRows);
             }
+
+            // Gabungkan seluruh kategori master (termasuk kategori baru) ke draft
+            const existingMap = new Map(baseRows.map(r => [r.name.toLowerCase().trim(), r]));
+            const mergedSalesRows = allSalesCategories.map(name => {
+                const found = existingMap.get(name.toLowerCase().trim());
+                return found || { name, tunai: "", hppTunai: "", qr: "", hppQR: "" };
+            });
+            baseRows.forEach(r => {
+                if (!allSalesCategories.some(c => c.toLowerCase().trim() === r.name.toLowerCase().trim()) &&
+                    !mergedSalesRows.some(mr => mr.name.toLowerCase().trim() === r.name.toLowerCase().trim())) {
+                    mergedSalesRows.push(r);
+                }
+            });
+            setSalesRows(mergedSalesRows);
 
             // Expense Rows:
             if (Array.isArray(source.expenseRows) && source.expenseRows.length > 0) {
@@ -503,11 +545,11 @@ export default function BeritaAcaraPage() {
                 })));
             } else {
                 setCustomExpenses([
-                    { id: Date.now(), category: categoryOptions[0] || '1) Taman Etnik', keterangan: '', qty: '', harga: '', total: '' }
+                    { id: Date.now(), category: categoryOptions[0] || '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
                 ]);
             }
         }
-    }, [tanggal, viewingArchive, computedSalesRows]);
+    }, [tanggal, viewingArchive]);
 
     // Automatic Synchronization: Custom Expenses -> Section V (expenseRows)
     useEffect(() => {
@@ -741,7 +783,7 @@ export default function BeritaAcaraPage() {
                     updatedAt: Date.now()
                 };
 
-                await StorageService.saveBeritaAcaraArchive(archiveData);
+                await StorageService.saveBeritaAcaraArchive(archiveData, false);
                 setAutoSaveStatus("saved");
             } catch (err) {
                 console.error("Auto save archive error:", err);
@@ -1025,7 +1067,7 @@ export default function BeritaAcaraPage() {
                 { name: "", amount: "" }
             ];
             const cleanCustomExpenses = [
-                { id: Date.now(), category: categoryOptions[0] || '1) Taman Etnik', keterangan: '', qty: '', harga: '', total: '' }
+                { id: Date.now(), category: categoryOptions[0] || '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
             ];
             setExpenseRows(cleanExpenseRows);
             setCustomExpenses(cleanCustomExpenses);

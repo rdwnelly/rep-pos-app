@@ -37,9 +37,10 @@ const OPEX_CATEGORIES = [
     'Beban Operasional Lain-lain',
 ];
 
-// Baseline categories for Berita Acara report (Tiket Masuk & Sewa Kostum digabung ke Taman Etnik)
+// Baseline categories for Berita Acara report
 const BASE_SALES_CATEGORIES = [
-    "Taman Etnik",
+    "Tiket Masuk",
+    "Sewa Kostum",
     "Toko / Souvenir",
     "Kafe & Resto",
     "Kios",
@@ -63,8 +64,9 @@ const parseSafeDate = (d: any): Date => {
 const mapCategoryNameToSalesRow = (catName: string): string => {
     const lower = (catName || '').toLowerCase().trim();
     if (!lower || lower === "umum" || lower === "tanpa kategori") return "Toko / Souvenir";
+    if (lower.includes("tiket")) return "Tiket Masuk";
     if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar") || lower === "sewa kostum keluar") return "Sewa kostum keluar";
-    if (lower.includes("taman etnik") || lower.includes("taman") || lower.includes("tiket") || lower.includes("sewa kostum") || lower.includes("kostum")) return "Taman Etnik";
+    if (lower.includes("sewa kostum") || lower.includes("kostum")) return "Sewa Kostum";
     if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "Toko / Souvenir";
     if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) return "Kafe & Resto";
     if (lower.includes("kios")) return "Kios";
