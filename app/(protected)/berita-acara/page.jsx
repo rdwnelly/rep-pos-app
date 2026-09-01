@@ -19,10 +19,9 @@ const WhatsAppIcon = ({ size = 16 }) => (
 );
 
 // Kategori penjualan dasar yang selalu muncul (urutan tampilan default)
-// Tiket Masuk dan Sewa Kostum kini dipisah menjadi 2 kategori berbeda
+// Tiket Masuk dan Sewa Kostum digabungkan ke kategori Taman Etnik
 const BASE_SALES_CATEGORIES = [
-    "Tiket Masuk",
-    "Sewa Kostum",
+    "Taman Etnik",
     "Toko / Souvenir",
     "Kafe & Resto",
     "Kios",
@@ -36,9 +35,8 @@ const BASE_SALES_CATEGORIES = [
 const mapCategoryNameToSalesRow = (catName) => {
     const lower = (catName || "").toLowerCase().trim();
     if (!lower || lower === "umum" || lower === "tanpa kategori") return "Toko / Souvenir";
-    if (lower.includes("tiket")) return "Tiket Masuk";
     if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar") || lower === "sewa kostum keluar") return "Sewa kostum keluar";
-    if (lower.includes("sewa kostum") || lower.includes("kostum")) return "Sewa Kostum";
+    if (lower.includes("taman etnik") || lower.includes("taman") || lower.includes("tiket") || lower.includes("sewa kostum") || lower.includes("kostum")) return "Taman Etnik";
     if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "Toko / Souvenir";
     if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) return "Kafe & Resto";
     if (lower.includes("kios")) return "Kios";
@@ -77,8 +75,7 @@ const buildDefaultCategoryOptions = (salesCategories = BASE_SALES_CATEGORIES) =>
 const DEFAULT_CATEGORY_OPTIONS = buildDefaultCategoryOptions(BASE_SALES_CATEGORIES);
 
 const DETAILED_EXPENSE_CONFIG = [
-    { title: "VI. URAIAN PENGELUARAN (Tiket Masuk)", rows: 10 },
-    { title: "VI. URAIAN PENGELUARAN (Sewa Kostum)", rows: 10 },
+    { title: "VI. URAIAN PENGELUARAN (Taman Etnik)", rows: 15 },
     { title: "VI. URAIAN PENGELUARAN (Toko / Souvenir)", rows: 10 },
     { title: "VI. URAIAN PENGELUARAN (Pembelanjaan Café)", rows: 21 },
     { title: "VI. URAIAN PENGELUARAN (Biaya Kios)", rows: 10 },
@@ -98,9 +95,8 @@ const DETAILED_EXPENSE_CONFIG = [
 const mapCategoryToSection = (cat) => {
     if (!cat) return "VI. URAIAN PENGELUARAN (Lain-lain)";
     const lower = cat.toLowerCase().trim();
-    if (lower.includes("tiket")) return "VI. URAIAN PENGELUARAN (Tiket Masuk)";
     if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar")) return "VI. URAIAN PENGELUARAN (Sewa kostum keluar)";
-    if (lower.includes("sewa kostum") || lower.includes("kostum")) return "VI. URAIAN PENGELUARAN (Sewa Kostum)";
+    if (lower.includes("taman etnik") || lower.includes("taman") || lower.includes("tiket") || lower.includes("sewa kostum") || lower.includes("kostum")) return "VI. URAIAN PENGELUARAN (Taman Etnik)";
     if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "VI. URAIAN PENGELUARAN (Toko / Souvenir)";
     if (lower.includes("café") || lower.includes("cafe") || lower.includes("kafe") || lower.includes("resto")) return "VI. URAIAN PENGELUARAN (Pembelanjaan Café)";
     if (lower.includes("kios")) return "VI. URAIAN PENGELUARAN (Biaya Kios)";
@@ -322,7 +318,7 @@ export default function BeritaAcaraPage() {
 
     // Modern Dynamic Expenses (Hidden on print)
     const [customExpenses, setCustomExpenses] = useState([
-        { id: Date.now(), category: '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
+        { id: Date.now(), category: '1) Taman Etnik', keterangan: '', qty: '', harga: '', total: '' }
     ]);
 
     const [catatan, setCatatan] = useState("");
@@ -360,7 +356,7 @@ export default function BeritaAcaraPage() {
     };
 
     const mapCashflowCategoryToOption = (rawCat, availableOptions) => {
-        if (!rawCat) return availableOptions[0] || '1) Tiket Masuk';
+        if (!rawCat) return availableOptions[0] || '1) Taman Etnik';
         const lower = rawCat.toLowerCase().trim();
 
         const directMatch = availableOptions.find(opt => {
@@ -373,12 +369,8 @@ export default function BeritaAcaraPage() {
             const found = availableOptions.find(o => o.toLowerCase().includes("sewa kostum keluar"));
             if (found) return found;
         }
-        if (lower.includes("sewa kostum") || lower.includes("kostum")) {
-            const found = availableOptions.find(o => o.toLowerCase().includes("sewa kostum"));
-            if (found) return found;
-        }
-        if (lower.includes("tiket")) {
-            const found = availableOptions.find(o => o.toLowerCase().includes("tiket"));
+        if (lower.includes("taman etnik") || lower.includes("taman") || lower.includes("tiket") || lower.includes("sewa kostum") || lower.includes("kostum")) {
+            const found = availableOptions.find(o => o.toLowerCase().includes("taman etnik") || o.toLowerCase().includes("taman") || o.toLowerCase().includes("tiket") || o.toLowerCase().includes("sewa kostum"));
             if (found) return found;
         }
         if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) {
@@ -470,7 +462,7 @@ export default function BeritaAcaraPage() {
                     })));
                 } else if (!Array.isArray(source.customExpenses) || source.customExpenses.length === 0) {
                     setCustomExpenses([
-                        { id: Date.now(), category: categoryOptions[0] || '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
+                        { id: Date.now(), category: categoryOptions[0] || '1) Taman Etnik', keterangan: '', qty: '', harga: '', total: '' }
                     ]);
                 }
             }
@@ -511,7 +503,7 @@ export default function BeritaAcaraPage() {
                 })));
             } else {
                 setCustomExpenses([
-                    { id: Date.now(), category: categoryOptions[0] || '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
+                    { id: Date.now(), category: categoryOptions[0] || '1) Taman Etnik', keterangan: '', qty: '', harga: '', total: '' }
                 ]);
             }
         }
@@ -1033,7 +1025,7 @@ export default function BeritaAcaraPage() {
                 { name: "", amount: "" }
             ];
             const cleanCustomExpenses = [
-                { id: Date.now(), category: categoryOptions[0] || '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
+                { id: Date.now(), category: categoryOptions[0] || '1) Taman Etnik', keterangan: '', qty: '', harga: '', total: '' }
             ];
             setExpenseRows(cleanExpenseRows);
             setCustomExpenses(cleanCustomExpenses);
