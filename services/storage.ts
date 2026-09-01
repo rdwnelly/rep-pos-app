@@ -119,6 +119,10 @@ export const StorageService = {
     if (!category.id) {
       await ApiService.saveCategory(category);
     } else {
+      const existingCats = await ApiService.getCategories();
+      const oldCat = existingCats.find(c => c.id === category.id);
+      const oldName = oldCat?.name;
+
       await ApiService.updateCategory(category);
 
       // Cascade the name update to all products that use this category
@@ -130,12 +134,104 @@ export const StorageService = {
         await ApiService.saveProductsBulk(updatedProducts);
         notifyListeners('products');
       }
+
+      // Cascade rename to Berita Acara drafts & options in localStorage
+      if (oldName && oldName.trim().toLowerCase() !== category.name.trim().toLowerCase() && typeof window !== 'undefined') {
+        const oldLower = oldName.trim().toLowerCase();
+        const newName = category.name.trim();
+
+        // 1. Update custom_expense_categories in localStorage
+        try {
+          const rawOpts = localStorage.getItem('custom_expense_categories');
+          if (rawOpts) {
+            const parsed = JSON.parse(rawOpts);
+            if (Array.isArray(parsed)) {
+              const updatedOpts = parsed.map(opt => {
+                const clean = opt.replace(/^\d+\)\s*/, '').trim().toLowerCase();
+                if (clean === oldLower) {
+                  const numMatch = opt.match(/^(\d+\)\s*)/);
+                  return numMatch ? `${numMatch[1]}${newName}` : newName;
+                }
+                return opt;
+              });
+              localStorage.setItem('custom_expense_categories', JSON.stringify(updatedOpts));
+            }
+          }
+        } catch (e) {
+          console.error("Failed to sync renamed category to custom_expense_categories:", e);
+        }
+
+        // 2. Update all active Berita Acara drafts in localStorage
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('rep_ba_draft_')) {
+              const rawDraft = localStorage.getItem(key);
+              if (rawDraft) {
+                const draft = JSON.parse(rawDraft);
+                let changed = false;
+
+                // Update salesRows in draft
+                if (Array.isArray(draft.salesRows)) {
+                  draft.salesRows = draft.salesRows.map((r: any) => {
+                    if (r && r.name && r.name.trim().toLowerCase() === oldLower) {
+                      changed = true;
+                      return { ...r, name: newName };
+                    }
+                    return r;
+                  });
+                }
+
+                // Update customExpenses in draft
+                if (Array.isArray(draft.customExpenses)) {
+                  draft.customExpenses = draft.customExpenses.map((c: any) => {
+                    if (c && c.category) {
+                      const clean = c.category.replace(/^\d+\)\s*/, '').trim().toLowerCase();
+                      if (clean === oldLower) {
+                        changed = true;
+                        const numMatch = c.category.match(/^(\d+\)\s*)/);
+                        return { ...c, category: numMatch ? `${numMatch[1]}${newName}` : newName };
+                      }
+                    }
+                    return c;
+                  });
+                }
+
+                // Update expenseRows in draft
+                if (Array.isArray(draft.expenseRows)) {
+                  draft.expenseRows = draft.expenseRows.map((r: any) => {
+                    if (r && r.name && r.name.trim().toLowerCase() === oldLower) {
+                      changed = true;
+                      return { ...r, name: newName };
+                    }
+                    return r;
+                  });
+                }
+
+                if (changed) {
+                  localStorage.setItem(key, JSON.stringify(draft));
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Failed to sync renamed category to local drafts:", e);
+        }
+
+        // 3. Dispatch global window event
+        window.dispatchEvent(new CustomEvent('category_renamed', {
+          detail: { id: category.id, oldName, newName }
+        }));
+      }
     }
     notifyListeners('categories');
   },
   deleteCategory: async (id: string) => {
     await ApiService.deleteCategory(id);
     notifyListeners('categories');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('category_deleted', { detail: { id } }));
+    }
   },
 
   // Products
@@ -157,7 +253,7 @@ export const StorageService = {
   },
   saveProduct: async (product: Product) => {
     if (product.categoryName?.trim().toLowerCase() === 'umum') {
-      product.categoryName = 'Toko / Souvenir';
+      product.categoryName = 'TOKO SOUVENIR';
     }
     if (!product.id) await ApiService.saveProduct(product);
     else await ApiService.updateProduct(product);

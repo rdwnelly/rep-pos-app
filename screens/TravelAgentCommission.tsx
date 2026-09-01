@@ -52,7 +52,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
       'Paket Sopendo / Saswar / Edukasi',
       'Tiket Masuk',
       'Sewa Kostum',
-      'Toko / Souvenir',
+      'TOKO SOUVENIR',
       'Kafe & Resto',
       'Kios',
       'Jasa Fotografer',
