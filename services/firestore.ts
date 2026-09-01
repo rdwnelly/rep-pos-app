@@ -13,6 +13,8 @@ import {
   orderBy,
   increment,
   where,
+  onSnapshot,
+  Unsubscribe,
 } from "firebase/firestore";
 import { db } from "../src/lib/firebase";
 import {
@@ -510,8 +512,38 @@ export const FirestoreService = {
   
   getBeritaAcaraArchives: async (): Promise<any[]> =>
     getCollectionOrdered<any>("berita_acara_archives", "createdAt", "desc"),
-  saveBeritaAcaraArchive: async (archive: any) =>
-    saveEntity<any>("berita_acara_archives", archive),
+  getBeritaAcaraByDate: async (date: string): Promise<any | null> => {
+    if (!date) return null;
+    const docId = `ba_${date}`;
+    const directDoc = await getDocument<any>("berita_acara_archives", docId);
+    if (directDoc) return directDoc;
+    const all = await getCollection<any>("berita_acara_archives");
+    return all.find((a) => a.date === date) || null;
+  },
+  saveBeritaAcaraArchive: async (archive: any) => {
+    const docId = archive.id || `ba_${archive.date}`;
+    return saveEntity<any>("berita_acara_archives", {
+      ...archive,
+      id: docId,
+      updatedAt: archive.updatedAt || Date.now(),
+    });
+  },
+  subscribeBeritaAcaraByDate: (date: string, callback: (data: any) => void): Unsubscribe => {
+    if (!date) {
+      return (() => {}) as Unsubscribe;
+    }
+    const docId = `ba_${date}`;
+    const docRef = doc(collectionRef("berita_acara_archives"), docId);
+    return onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        callback(toEntity<any>(snapshot));
+      } else {
+        callback(null);
+      }
+    }, (error) => {
+      console.warn("Error in subscribeBeritaAcaraByDate:", error);
+    });
+  },
   deleteBeritaAcaraArchive: async (id: string) =>
     deleteDoc(doc(collectionRef("berita_acara_archives"), id)),
 
