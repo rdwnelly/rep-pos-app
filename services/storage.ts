@@ -41,7 +41,32 @@ export const StorageService = {
 
   // Banks
   getBanks: async (): Promise<BankAccount[]> => {
-    return await ApiService.getBanks();
+    const banks = await ApiService.getBanks();
+    const bankPapuaQRIS = '00020101021126650019ID.CO.BANKPAPUA.WWW011893600132064973534202096497353420303UMI51440014ID.CO.QRIS.WWW0215ID10243300948390303UMI5204569953033605802ID5924MITSHI RUMAH ETNIK PAPUA6006SORONG61059845762070703A016304F40A';
+
+    const existingBankPapua = banks.find(b => b.bankName?.toLowerCase().includes('bank papua') || b.bankName?.toLowerCase().includes('papua'));
+
+    if (!existingBankPapua) {
+      const bankPapua: BankAccount = {
+        id: 'bank-papua-qris',
+        bankName: 'Bank Papua',
+        accountNumber: 'ID1024330094839',
+        holderName: 'MITSHI RUMAH ETNIK PAPUA',
+        qrisCode: bankPapuaQRIS
+      };
+      ApiService.saveBank(bankPapua).catch(console.error);
+      return [bankPapua, ...banks];
+    } else if (!existingBankPapua.qrisCode || existingBankPapua.qrisCode !== bankPapuaQRIS) {
+      const updated: BankAccount = {
+        ...existingBankPapua,
+        bankName: existingBankPapua.bankName || 'Bank Papua',
+        holderName: existingBankPapua.holderName || 'MITSHI RUMAH ETNIK PAPUA',
+        qrisCode: bankPapuaQRIS
+      };
+      ApiService.updateBank(updated).catch(console.error);
+      return banks.map(b => b.id === existingBankPapua.id ? updated : b);
+    }
+    return banks;
   },
   saveBank: async (bank: BankAccount) => {
     if (!bank.id) await ApiService.saveBank(bank);

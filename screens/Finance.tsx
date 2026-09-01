@@ -2895,10 +2895,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                                 </td>
                                                                 <td className="p-3.5 text-center whitespace-nowrap">
                                                                     <div className="flex items-center justify-center gap-1.5">
-                                                                        <button onClick={(e) => { e.stopPropagation(); printInvoice(t); }} className="px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-semibold border border-amber-200 transition-colors flex items-center gap-1" title="Cetak Nota">
-                                                                            <Printer size={12} /> Nota
-                                                                        </button>
-                                                                        <button onClick={(e) => { e.stopPropagation(); printBluetoothInvoice(t); }} className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold border border-emerald-200 transition-colors flex items-center gap-1" title="Cetak Struk Bluetooth">
+                                                                        <button onClick={(e) => { e.stopPropagation(); printBluetoothInvoice(t); }} className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-bold border border-emerald-200 transition-colors flex items-center gap-1" title="Cetak Struk Bluetooth">
                                                                             <Bluetooth size={12} /> BT
                                                                         </button>
                                                                         <button onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }} className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition-colors" title="Detail Transaksi">
@@ -3007,10 +3004,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                                 </td>
                                                                 <td className="p-3.5 text-center whitespace-nowrap">
                                                                     <div className="flex items-center justify-center gap-1.5">
-                                                                        <button onClick={(e) => { e.stopPropagation(); printInvoice(t); }} className="px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-semibold border border-amber-200 transition-colors flex items-center gap-1" title="Cetak Nota">
-                                                                            <Printer size={12} /> Nota
-                                                                        </button>
-                                                                        <button onClick={(e) => { e.stopPropagation(); printBluetoothInvoice(t); }} className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold border border-emerald-200 transition-colors flex items-center gap-1" title="Cetak Struk Bluetooth">
+                                                                        <button onClick={(e) => { e.stopPropagation(); printBluetoothInvoice(t); }} className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-bold border border-emerald-200 transition-colors flex items-center gap-1" title="Cetak Struk Bluetooth">
                                                                             <Bluetooth size={12} /> BT
                                                                         </button>
                                                                         <button onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }} className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition-colors" title="Detail Transaksi">
@@ -3098,10 +3092,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                     </td>
                                                     <td className="p-3.5 text-center whitespace-nowrap">
                                                         <div className="flex items-center justify-center gap-1.5">
-                                                            <button onClick={(e) => { e.stopPropagation(); printInvoice(t); }} className="px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-semibold border border-amber-200 transition-colors flex items-center gap-1" title="Cetak Nota">
-                                                                <Printer size={12} /> Nota
-                                                            </button>
-                                                            <button onClick={(e) => { e.stopPropagation(); printBluetoothInvoice(t); }} className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold border border-emerald-200 transition-colors flex items-center gap-1" title="Cetak Struk Bluetooth">
+                                                            <button onClick={(e) => { e.stopPropagation(); printBluetoothInvoice(t); }} className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-bold border border-emerald-200 transition-colors flex items-center gap-1" title="Cetak Struk Bluetooth">
                                                                 <Bluetooth size={12} /> BT
                                                             </button>
                                                             <button onClick={(e) => { e.stopPropagation(); setDetailTransaction(t); }} className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition-colors" title="Detail Transaksi">
@@ -3804,9 +3795,6 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                             <RotateCcw size={16} /> Retur
                                         </button>
                                     )}
-                                    <button onClick={() => printTransactionDetail(detailTransaction)} className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50">
-                                        <Printer size={16} /> Cetak Detail
-                                    </button>
                                     <button onClick={() => printBluetoothInvoice(detailTransaction)} className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-green-100">
                                         <Bluetooth size={16} /> Struk BT
                                     </button>
