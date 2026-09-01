@@ -1,12 +1,42 @@
 import { Product } from "./types";
 
-export const formatIDR = (amount: number): string => {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount);
+/**
+ * Format angka atau nominal uang ke standar mata uang Rupiah (Rp)
+ * dengan tanda titik (.) sebagai pemisah ribuan.
+ * Contoh: 10000 -> "Rp 10.000", -50000 -> "-Rp 50.000", 0 -> "Rp 0"
+ */
+export const formatIDR = (amount: number | string | null | undefined): string => {
+  if (amount === null || amount === undefined || amount === '') return 'Rp 0';
+  const num = typeof amount === 'number' ? amount : Number(amount);
+  if (isNaN(num)) return 'Rp 0';
+  const isNegative = num < 0;
+  const absNum = Math.abs(Math.round(num));
+  const formatted = absNum.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${isNegative ? '-Rp ' : 'Rp '}${formatted}`;
+};
+
+/**
+ * Format angka umum (kuantitas, unit stok, transaksi) dengan titik (.) sebagai pemisah ribuan
+ * dan koma (,) sebagai pemisah desimal jika ada.
+ * Contoh: 10000 -> "10.000", 1234.5 -> "1.234,5"
+ */
+export const formatNumber = (amount: number | string | null | undefined, decimals?: number): string => {
+  if (amount === null || amount === undefined || amount === '') return '0';
+  const num = typeof amount === 'number' ? amount : Number(amount);
+  if (isNaN(num)) return '0';
+  const isNegative = num < 0;
+  const absNum = Math.abs(num);
+  
+  if (decimals !== undefined && decimals > 0) {
+    const fixed = absNum.toFixed(decimals);
+    const [intPart, decPart] = fixed.split('.');
+    const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return `${isNegative ? '-' : ''}${formattedInt},${decPart}`;
+  }
+  
+  const rounded = Math.round(absNum);
+  const formatted = rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${isNegative ? '-' : ''}${formatted}`;
 };
 
 export const formatDate = (dateString: string): string => {

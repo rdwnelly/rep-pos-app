@@ -68,7 +68,17 @@ export const StorageService = {
 
   // Categories
   getCategories: async (): Promise<Category[]> => {
-    return await ApiService.getCategories();
+    const cats = await ApiService.getCategories();
+    const umumCats = cats.filter(c => c.name?.trim().toLowerCase() === 'umum');
+    if (umumCats.length > 0) {
+      for (const c of umumCats) {
+        if (c.id) {
+          ApiService.deleteCategory(c.id).catch(console.error);
+        }
+      }
+      return cats.filter(c => c.name?.trim().toLowerCase() !== 'umum');
+    }
+    return cats;
   },
   saveCategory: async (category: Category) => {
     if (!category.id) {
@@ -95,7 +105,20 @@ export const StorageService = {
 
   // Products
   getProducts: async (): Promise<Product[]> => {
-    return await ApiService.getProducts();
+    const products = await ApiService.getProducts();
+    let hasUmum = false;
+    const cleaned = products.map(p => {
+      if (p.categoryName?.trim().toLowerCase() === 'umum') {
+        hasUmum = true;
+        return { ...p, categoryName: '', categoryId: '' };
+      }
+      return p;
+    });
+    if (hasUmum) {
+      const toUpdate = products.filter(p => p.categoryName?.trim().toLowerCase() === 'umum').map(p => ({ ...p, categoryName: '', categoryId: '' }));
+      ApiService.saveProductsBulk(toUpdate).catch(console.error);
+    }
+    return cleaned;
   },
   saveProduct: async (product: Product) => {
     if (!product.id) await ApiService.saveProduct(product);

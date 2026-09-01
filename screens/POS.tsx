@@ -4,14 +4,12 @@ import { Search, Trash2, User, Plus, Minus, ShoppingBag, Printer, CreditCard, Ba
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Product, CartItem, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, Category, TravelBookingCommission, CommissionMethod, CommissionStatus, OpenBill } from '../types';
-import { formatIDR, generateId, formatDate, toMySQLDate } from '../utils';
+import { formatIDR, formatNumber, generateId, formatDate, toMySQLDate } from '../utils';
 import { generatePrintInvoice, PrintInvoiceOptions } from '../utils/printHelpers';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { playBeep } from '../utils/soundEffect';
 import { PaymentQRCode } from '../components/ui/PaymentQRCode';
-
-const formatNumber = (val: number) => val.toLocaleString('id-ID');
 
 const FlyingItem = ({ item, cartRect }: { item: any, cartRect?: DOMRect }) => {
   const [animate, setAnimate] = useState(false);

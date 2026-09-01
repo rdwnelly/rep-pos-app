@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useData } from "../../../hooks/useData";
 import { StorageService } from "../../../services/storage";
 import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
+import { formatIDR, formatNumber } from "../../../utils";
 import { Plus, PlusCircle, Trash2, Info, Save, Archive, FileText, X, Printer, Eye, FolderPlus, Download, Loader2, CheckCircle2 } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -512,9 +513,9 @@ export default function BeritaAcaraPage() {
 👤 Kasir: ${currentKasir || '-'}
 📍 Lokasi: ${currentLokasi || '-'}
 
-💰 Total Pendapatan: Rp ${totalAllSales.toLocaleString('id-ID')}
-💸 Total Pengeluaran: Rp ${totalPengeluaran.toLocaleString('id-ID')}
-💵 Netto (Kas Bersih): Rp ${netto.toLocaleString('id-ID')}
+💰 Total Pendapatan: ${formatIDR(totalAllSales)}
+💸 Total Pengeluaran: ${formatIDR(totalPengeluaran)}
+💵 Netto (Kas Bersih): ${formatIDR(netto)}
 
 📄 _Dokumen PDF resmi Berita Acara telah otomatis diunduh ke perangkat Anda. Silakan lampirkan file PDF tersebut ke pesan WhatsApp Web ini._`;
 
@@ -907,7 +908,7 @@ export default function BeritaAcaraPage() {
                     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                         <div>
                             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Penjualan Tunai</p>
-                            <h3 className="text-lg font-extrabold text-slate-900 mt-1">Rp {totalSalesTunai.toLocaleString('id-ID')}</h3>
+                            <h3 className="text-lg font-extrabold text-slate-900 mt-1">{formatIDR(totalSalesTunai)}</h3>
                             <p className="text-[11px] text-slate-400 mt-0.5">Penerimaan Tunai Kasir</p>
                         </div>
                         <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
@@ -918,7 +919,7 @@ export default function BeritaAcaraPage() {
                     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                         <div>
                             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Non-Tunai / QR</p>
-                            <h3 className="text-lg font-extrabold text-purple-700 mt-1">Rp {totalSalesQR.toLocaleString('id-ID')}</h3>
+                            <h3 className="text-lg font-extrabold text-purple-700 mt-1">{formatIDR(totalSalesQR)}</h3>
                             <p className="text-[11px] text-slate-400 mt-0.5">Transfer & QRIS Bank</p>
                         </div>
                         <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
@@ -929,7 +930,7 @@ export default function BeritaAcaraPage() {
                     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                         <div>
                             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Pendapatan Kotor</p>
-                            <h3 className="text-lg font-extrabold text-emerald-600 mt-1">Rp {totalAllSales.toLocaleString('id-ID')}</h3>
+                            <h3 className="text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(totalAllSales)}</h3>
                             <p className="text-[11px] text-slate-400 mt-0.5">Tunai + Non-Tunai</p>
                         </div>
                         <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
@@ -940,7 +941,7 @@ export default function BeritaAcaraPage() {
                     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                         <div>
                             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pengeluaran Sesi</p>
-                            <h3 className="text-lg font-extrabold text-rose-600 mt-1">Rp {totalPengeluaran.toLocaleString('id-ID')}</h3>
+                            <h3 className="text-lg font-extrabold text-rose-600 mt-1">{formatIDR(totalPengeluaran)}</h3>
                             <p className="text-[11px] text-slate-400 mt-0.5">Operasional Kasir</p>
                         </div>
                         <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
@@ -951,7 +952,7 @@ export default function BeritaAcaraPage() {
                     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                         <div>
                             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Setoran Bersih (Netto)</p>
-                            <h3 className="text-lg font-extrabold text-amber-700 mt-1">Rp {netto.toLocaleString('id-ID')}</h3>
+                            <h3 className="text-lg font-extrabold text-amber-700 mt-1">{formatIDR(netto)}</h3>
                             <p className="text-[11px] text-slate-400 mt-0.5">Tunai Dikurangi Pengeluaran</p>
                         </div>
                         <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
@@ -988,8 +989,8 @@ export default function BeritaAcaraPage() {
                                                 {new Date(arch.date).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}
                                             </td>
                                             <td className="p-3.5 font-bold text-slate-800">{arch.title}</td>
-                                            <td className="p-3.5 text-emerald-600 font-extrabold whitespace-nowrap">Rp {arch.totalIncome?.toLocaleString('id-ID')}</td>
-                                            <td className="p-3.5 text-rose-600 font-extrabold whitespace-nowrap">Rp {arch.totalExpense?.toLocaleString('id-ID')}</td>
+                                            <td className="p-3.5 text-emerald-600 font-extrabold whitespace-nowrap">{formatIDR(arch.totalIncome)}</td>
+                                            <td className="p-3.5 text-rose-600 font-extrabold whitespace-nowrap">{formatIDR(arch.totalExpense)}</td>
                                             <td className="p-3.5 text-center whitespace-nowrap">
                                                 <div className="flex justify-center gap-1.5">
                                                     <button onClick={() => setViewingArchive(arch)} className="px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-semibold border border-amber-200 flex items-center gap-1" title="Lihat Detail">
@@ -1430,7 +1431,7 @@ export default function BeritaAcaraPage() {
                                                     <input 
                                                         type="text" 
                                                         className="editable-cell text-right" 
-                                                        value={row.tunai} 
+                                                        value={row.tunai ? (isNaN(Number(row.tunai)) ? row.tunai : formatNumber(row.tunai)) : ''} 
                                                         onChange={(e) => handleSalesRowChange(idx, 'tunai', e.target.value)} 
                                                         placeholder="0"
                                                         readOnly={!!viewingArchive}
@@ -1440,23 +1441,23 @@ export default function BeritaAcaraPage() {
                                                     <input 
                                                         type="text" 
                                                         className="editable-cell text-right text-red-700/80" 
-                                                        value={row.hppTunai} 
+                                                        value={row.hppTunai ? (isNaN(Number(row.hppTunai)) ? row.hppTunai : formatNumber(row.hppTunai)) : ''} 
                                                         onChange={(e) => handleSalesRowChange(idx, 'hppTunai', e.target.value)} 
                                                         placeholder="0"
                                                         readOnly={!!viewingArchive}
                                                     />
                                                 </td>
                                                 <td className="text-right font-medium text-green-700 bg-slate-50/50 pr-1">
-                                                    {isRowEmpty ? '' : keuntungan.toLocaleString('id-ID')}
+                                                    {isRowEmpty ? '' : formatIDR(keuntungan)}
                                                 </td>
                                             </tr>
                                         );
                                     })}
                                     <tr className="bg-[#f5e6d3] font-bold">
                                         <td colSpan={2} className="text-right">TOTAL PENJUALAN (TUNAI)</td>
-                                        <td className="text-right">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
-                                        <td className="text-right text-red-700">Rp {totalModalTunai.toLocaleString('id-ID')}</td>
-                                        <td className="text-right text-green-700 font-bold">Rp {totalLabaTunai.toLocaleString('id-ID')}</td>
+                                        <td className="text-right">{formatIDR(totalSalesTunai)}</td>
+                                        <td className="text-right text-red-700">{formatIDR(totalModalTunai)}</td>
+                                        <td className="text-right text-green-700 font-bold">{formatIDR(totalLabaTunai)}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1486,12 +1487,12 @@ export default function BeritaAcaraPage() {
                                         <td style={{ width: '8%' }} className="text-center">1</td>
                                         <td style={{ width: '52%' }}>Penjualan Tunai Hari ini</td>
                                         <td style={{ width: '40%' }} className="text-right font-medium text-green-700">
-                                            Rp {totalSalesTunai.toLocaleString('id-ID')}
+                                            {formatIDR(totalSalesTunai)}
                                         </td>
                                     </tr>
                                     <tr className="bg-[#f5e6d3] font-bold">
                                         <td colSpan={2} className="text-right">JUMLAH (1)</td>
-                                        <td className="text-right text-green-800">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
+                                        <td className="text-right text-green-800">{formatIDR(totalSalesTunai)}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1509,12 +1510,12 @@ export default function BeritaAcaraPage() {
                                         <td style={{ width: '8%' }} className="text-center">1</td>
                                         <td style={{ width: '52%' }}>Dipotong Pengeluaran (V)</td>
                                         <td style={{ width: '40%' }} className="text-right font-medium text-red-700">
-                                            - Rp {totalPengeluaran.toLocaleString('id-ID')}
+                                            - {formatIDR(totalPengeluaran)}
                                         </td>
                                     </tr>
                                     <tr className="bg-[#fee2e2] font-bold text-red-950">
                                         <td colSpan={2} className="text-right">JUMLAH (2)</td>
-                                        <td className="text-right text-red-700">- Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
+                                        <td className="text-right text-red-700">- {formatIDR(totalPengeluaran)}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1531,16 +1532,16 @@ export default function BeritaAcaraPage() {
                                     <tr>
                                         <td style={{ width: '8%' }} className="text-center">1</td>
                                         <td style={{ width: '52%' }}>Setoran Bruto</td>
-                                        <td style={{ width: '40%' }} className="text-right font-medium">Rp {totalSalesTunai.toLocaleString('id-ID')}</td>
+                                        <td style={{ width: '40%' }} className="text-right font-medium">{formatIDR(totalSalesTunai)}</td>
                                     </tr>
                                     <tr>
                                         <td className="text-center">2</td>
                                         <td>Dipotong Pengeluaran (V)</td>
-                                        <td className="text-right font-medium text-red-700">- Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
+                                        <td className="text-right font-medium text-red-700">- {formatIDR(totalPengeluaran)}</td>
                                     </tr>
                                     <tr className="bg-[#dcfce7] font-extrabold text-green-950">
                                         <td colSpan={2} className="text-right">NETTO (UANG FISIK KASIR)</td>
-                                        <td className="text-right font-mono text-green-800 text-[10px]">Rp {netto.toLocaleString('id-ID')}</td>
+                                        <td className="text-right font-mono text-green-800 text-[10px]">{formatIDR(netto)}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1576,7 +1577,7 @@ export default function BeritaAcaraPage() {
                                                     <input 
                                                         type="text" 
                                                         className="editable-cell text-right" 
-                                                        value={row.qr} 
+                                                        value={row.qr ? (isNaN(Number(row.qr)) ? row.qr : formatNumber(row.qr)) : ''} 
                                                         onChange={(e) => handleSalesRowChange(idx, 'qr', e.target.value)} 
                                                         placeholder="0"
                                                         readOnly={!!viewingArchive}
@@ -1586,23 +1587,23 @@ export default function BeritaAcaraPage() {
                                                     <input 
                                                         type="text" 
                                                         className="editable-cell text-right text-red-700/80" 
-                                                        value={row.hppQR} 
+                                                        value={row.hppQR ? (isNaN(Number(row.hppQR)) ? row.hppQR : formatNumber(row.hppQR)) : ''} 
                                                         onChange={(e) => handleSalesRowChange(idx, 'hppQR', e.target.value)} 
                                                         placeholder="0"
                                                         readOnly={!!viewingArchive}
                                                     />
                                                 </td>
                                                 <td className="text-right font-medium text-blue-700 bg-slate-50/50 pr-1">
-                                                    {isRowEmpty ? '' : keuntungan.toLocaleString('id-ID')}
+                                                    {isRowEmpty ? '' : formatIDR(keuntungan)}
                                                 </td>
                                             </tr>
                                         );
                                     })}
                                     <tr className="bg-[#e0f2fe] font-bold">
                                         <td colSpan={2} className="text-right">TOTAL PENJUALAN (QR)</td>
-                                        <td className="text-right">Rp {totalSalesQR.toLocaleString('id-ID')}</td>
-                                        <td className="text-right text-red-700">Rp {totalModalQR.toLocaleString('id-ID')}</td>
-                                        <td className="text-right text-blue-700 font-bold">Rp {totalLabaQR.toLocaleString('id-ID')}</td>
+                                        <td className="text-right">{formatIDR(totalSalesQR)}</td>
+                                        <td className="text-right text-red-700">{formatIDR(totalModalQR)}</td>
+                                        <td className="text-right text-blue-700 font-bold">{formatIDR(totalLabaQR)}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1620,25 +1621,25 @@ export default function BeritaAcaraPage() {
                                     <tr>
                                         <td style={{ width: '8%' }} className="text-center">1</td>
                                         <td style={{ width: '52%' }}>Keuntungan Laba Penjualan (Tunai)</td>
-                                        <td style={{ width: '40%' }} className="text-right font-medium text-green-700">Rp {totalLabaTunai.toLocaleString('id-ID')}</td>
+                                        <td style={{ width: '40%' }} className="text-right font-medium text-green-700">{formatIDR(totalLabaTunai)}</td>
                                     </tr>
                                     <tr>
                                         <td className="text-center">2</td>
                                         <td>Keuntungan Laba Penjualan (QR)</td>
-                                        <td className="text-right font-medium text-blue-700">Rp {totalLabaQR.toLocaleString('id-ID')}</td>
+                                        <td className="text-right font-medium text-blue-700">{formatIDR(totalLabaQR)}</td>
                                     </tr>
                                     <tr className="bg-slate-100 font-bold">
                                         <td colSpan={2} className="text-right">TOTAL LABA KOTOR</td>
-                                        <td className="text-right font-mono">Rp {(totalLabaTunai + totalLabaQR).toLocaleString('id-ID')}</td>
+                                        <td className="text-right font-mono">{formatIDR(totalLabaTunai + totalLabaQR)}</td>
                                     </tr>
                                     <tr>
                                         <td className="text-center">3</td>
                                         <td>Dipotong Beban Pengeluaran (V)</td>
-                                        <td className="text-right font-medium text-red-700">- Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
+                                        <td className="text-right font-medium text-red-700">- {formatIDR(totalPengeluaran)}</td>
                                     </tr>
                                     <tr className="bg-[#fef08a] font-extrabold text-amber-950">
                                         <td colSpan={2} className="text-right">KEUNTUNGAN BERSIH (NETTO)</td>
-                                        <td className="text-right font-mono text-amber-900 text-[10px]">Rp {totalLabaNetto.toLocaleString('id-ID')}</td>
+                                        <td className="text-right font-mono text-amber-900 text-[10px]">{formatIDR(totalLabaNetto)}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1686,7 +1687,7 @@ export default function BeritaAcaraPage() {
                                                     <input 
                                                         type="text" 
                                                         className="editable-cell text-right font-mono font-bold text-red-700" 
-                                                        value={row.amount ? (isNaN(Number(row.amount)) ? row.amount : Number(row.amount).toLocaleString('id-ID')) : ''} 
+                                                        value={row.amount ? (isNaN(Number(row.amount)) ? row.amount : formatNumber(row.amount)) : ''} 
                                                         onChange={(e) => handleExpenseRowChange(idx, 'amount', e.target.value)} 
                                                         placeholder="0"
                                                         readOnly={!!viewingArchive}
@@ -1709,7 +1710,7 @@ export default function BeritaAcaraPage() {
                                     })()}
                                     <tr className="bg-[#fee2e2] font-extrabold text-red-950">
                                         <td colSpan={!viewingArchive ? 2 : 2} className="text-right uppercase">TOTAL PENGELUARAN</td>
-                                        <td className="text-right text-red-700 font-bold font-mono">Rp {totalPengeluaran.toLocaleString('id-ID')}</td>
+                                        <td className="text-right text-red-700 font-bold font-mono">{formatIDR(totalPengeluaran)}</td>
                                         {!viewingArchive && <td className="print:hidden"></td>}
                                     </tr>
                                 </tbody>
@@ -1800,14 +1801,14 @@ export default function BeritaAcaraPage() {
                                                 <td className="text-center font-mono text-slate-600">{rowIdx + 1}</td>
                                                 <td className="font-semibold text-slate-800 p-1 px-1.5 leading-tight">{row.keterangan}</td>
                                                 <td className="text-center font-mono text-slate-700 p-1 px-1 leading-tight">{row.qty || '1'}</td>
-                                                <td className="text-right font-mono text-slate-700 p-1 px-1.5 leading-tight">{row.harga ? Number(row.harga).toLocaleString('id-ID') : '-'}</td>
-                                                <td className="text-right font-mono font-bold text-red-700 p-1 px-1.5 leading-tight">{row.total ? Number(row.total).toLocaleString('id-ID') : '-'}</td>
+                                                <td className="text-right font-mono text-slate-700 p-1 px-1.5 leading-tight">{row.harga ? formatIDR(row.harga) : '-'}</td>
+                                                <td className="text-right font-mono font-bold text-red-700 p-1 px-1.5 leading-tight">{row.total ? formatIDR(row.total) : '-'}</td>
                                             </tr>
                                         ))}
                                         <tr className="bg-[#fee2e2] font-extrabold text-red-950 border-t border-slate-300">
                                             <td colSpan={4} className="text-right uppercase px-2 py-0.5 text-[8px]">SUBTOTAL ({categoryCleanName})</td>
                                             <td className="text-right font-mono text-red-700 font-black p-1 px-1.5 text-[8.5px]">
-                                                {colTotal > 0 ? `Rp ${colTotal.toLocaleString('id-ID')}` : 'Rp 0'}
+                                                {colTotal > 0 ? formatIDR(colTotal) : 'Rp 0'}
                                             </td>
                                         </tr>
                                     </tbody>
@@ -1853,7 +1854,7 @@ export default function BeritaAcaraPage() {
                                 {/* Grand Total Footer */}
                                 <div className="border border-red-300 bg-[#fee2e2] rounded p-2 flex justify-between items-center text-xs font-extrabold text-red-950 mb-4">
                                     <span className="uppercase tracking-wider">TOTAL KESELURUHAN PENGELUARAN (VI. URAIAN OPERASIONAL)</span>
-                                    <span className="font-mono text-sm text-red-700 font-black">Rp {totalPengeluaran.toLocaleString('id-ID')}</span>
+                                    <span className="font-mono text-sm text-red-700 font-black">{formatIDR(totalPengeluaran)}</span>
                                 </div>
 
                                 {/* Page 2 Validation Signatures */}
