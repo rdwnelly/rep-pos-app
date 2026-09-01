@@ -6,8 +6,12 @@ import { ApiService } from "./api";
 type ChangeListener = (entity?: string) => void;
 const listeners: ChangeListener[] = [];
 
-const notifyListeners = (entity?: string) => {
+export const notifyListeners = (entity?: string) => {
   listeners.forEach(l => l(entity));
+};
+
+export const notifyDataChange = (entity?: string) => {
+  notifyListeners(entity);
 };
 
 export const subscribeToChanges = (listener: ChangeListener) => {
@@ -19,6 +23,12 @@ export const subscribeToChanges = (listener: ChangeListener) => {
 };
 
 export const StorageService = {
+  notifyChange: (entity?: string) => {
+    notifyListeners(entity);
+  },
+  refreshAll: () => {
+    notifyListeners();
+  },
   init: async () => {
     // No initialization needed for direct API usage
     console.log("StorageService initialized in Fully MySQL mode");
@@ -146,6 +156,9 @@ export const StorageService = {
     return cleaned;
   },
   saveProduct: async (product: Product) => {
+    if (product.categoryName?.trim().toLowerCase() === 'umum') {
+      product.categoryName = 'Toko / Souvenir';
+    }
     if (!product.id) await ApiService.saveProduct(product);
     else await ApiService.updateProduct(product);
     notifyListeners('products');

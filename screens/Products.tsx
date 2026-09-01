@@ -54,19 +54,59 @@ export const Products: React.FC = () => {
   // --- PRODUCT ACTIONS ---
 
   const handleSaveProduct = async () => {
-    if (!formData.name || !formData.price) {
-      alert("Nama produk dan harga eceran wajib diisi!");
+    // 1. Validasi Nama Produk
+    if (!formData.name || !formData.name.trim()) {
+      alert("Nama produk wajib diisi!");
       return;
     }
-    if (!formData.sku) {
-      alert("SKU wajib diisi! Silakan scan barcode atau gunakan tombol generate.");
+
+    // 2. Validasi Kode SKU / Barcode
+    if (!formData.sku || !formData.sku.trim()) {
+      alert("Kode SKU / Barcode wajib diisi! Silakan scan barcode atau gunakan tombol generate.");
+      return;
+    }
+
+    // 3. Validasi Kategori Produk (Wajib dipilih kategori resmi)
+    if (!formData.categoryId || !formData.categoryId.trim()) {
+      alert("Kategori produk wajib dipilih! Silakan pilih salah satu kategori yang tersedia pada pilihan kategori.");
+      return;
+    }
+
+    const availableCategories = categories.filter(c => c && c.name && c.name.trim().toLowerCase() !== 'umum');
+    const selectedCat = availableCategories.find(c => c.id === formData.categoryId);
+    if (!selectedCat || !selectedCat.name || selectedCat.name.trim().toLowerCase() === 'umum') {
+      alert("Kategori produk yang dipilih tidak valid. Silakan pilih kategori resmi yang tersedia.");
+      return;
+    }
+
+    // 4. Validasi Satuan Produk
+    if (!formData.unit || !formData.unit.trim()) {
+      alert("Satuan produk wajib diisi (Contoh: Pcs, Box, Porsi, dll)!");
+      return;
+    }
+
+    // 5. Validasi Stok Awal
+    if (formData.stock === undefined || formData.stock === null || isNaN(Number(formData.stock)) || Number(formData.stock) < 0) {
+      alert("Stok awal wajib diisi dengan angka minimal 0!");
+      return;
+    }
+
+    // 6. Validasi HPP (Harga Modal)
+    if (formData.hpp === undefined || formData.hpp === null || isNaN(Number(formData.hpp)) || Number(formData.hpp) < 0) {
+      alert("HPP (Harga Modal) wajib diisi dengan nominal angka minimal 0!");
+      return;
+    }
+
+    // 7. Validasi Harga Jual (Eceran)
+    if (!formData.price || isNaN(Number(formData.price)) || Number(formData.price) <= 0) {
+      alert("Harga jual wajib diisi dengan nominal lebih dari Rp 0!");
       return;
     }
 
     // Cegah duplikat saat mode tambah baru (bukan edit)
     if (!editingId) {
       const skuExists = products.some(
-        p => p.sku.trim().toLowerCase() === formData.sku!.trim().toLowerCase()
+        p => p.sku && p.sku.trim().toLowerCase() === formData.sku!.trim().toLowerCase()
       );
       if (skuExists) {
         alert(`Produk dengan SKU "${formData.sku}" sudah ada!\nGunakan tombol Edit untuk mengubah produk yang sudah ada.`);
@@ -74,7 +114,7 @@ export const Products: React.FC = () => {
       }
 
       const nameExists = products.some(
-        p => p.name.trim().toLowerCase() === formData.name!.trim().toLowerCase()
+        p => p.name && p.name.trim().toLowerCase() === formData.name!.trim().toLowerCase()
       );
       if (nameExists) {
         const confirmAnyway = confirm(
@@ -84,14 +124,16 @@ export const Products: React.FC = () => {
       }
     }
 
-    const selectedCat = categories.find(c => c.id === formData.categoryId);
-
     const payload = {
       ...formData,
       id: editingId || undefined,
-      categoryName: selectedCat?.name || '',
-      categoryId: formData.categoryId || '',
-      image: formData.image || ''
+      categoryName: selectedCat.name.trim(),
+      categoryId: selectedCat.id,
+      image: formData.image || '',
+      stock: Number(formData.stock) || 0,
+      hpp: Number(formData.hpp) || 0,
+      price: Number(formData.price) || 0,
+      unit: formData.unit.trim()
     } as Product;
 
     await StorageService.saveProduct(payload);
@@ -403,17 +445,17 @@ export const Products: React.FC = () => {
           return val;
         };
 
-        const existingId = getValue(colMap.id); // If ID exists in CSV, try to use it
-
-        const catName = (getValue(colMap.category) as string) || 'Import';
-        const foundCat = categories.find(c => c.name.toLowerCase() === catName.toLowerCase());
+        const existingId = getValue(colMap.id);
+        const rawCatName = (getValue(colMap.category) as string) || '';
+        const validCatName = (!rawCatName || rawCatName.trim().toLowerCase() === 'umum') ? 'Toko / Souvenir' : rawCatName.trim();
+        const foundCat = categories.find(c => c && c.name && c.name.toLowerCase() === validCatName.toLowerCase()) || categories[0];
 
         newProducts.push({
           id: (existingId as string) || generateSKU(), // Use existing ID if present (update), else generate
           name: getValue(colMap.name) as string,
           sku: (getValue(colMap.sku) as string) || generateSKU(),
-          categoryId: foundCat ? foundCat.id : '', // Map found category ID
-          categoryName: catName,
+          categoryId: foundCat ? foundCat.id : '',
+          categoryName: foundCat ? foundCat.name : validCatName,
           unit: (getValue(colMap.unit) as string) || 'Pcs',
           stock: getValue(colMap.stock, 'int') as number,
           hpp: getValue(colMap.hpp, 'float') as number,
@@ -817,35 +859,47 @@ export const Products: React.FC = () => {
               </div>
 
               <div className="col-span-2 md:col-span-1">
-                <label htmlFor="productName" className="block text-sm font-medium text-slate-700 mb-1">Nama Produk</label>
-                <input id="productName" name="productName" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.name ?? ''} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Contoh: Keripik..." />
+                <label htmlFor="productName" className="block text-sm font-medium text-slate-700 mb-1">
+                  Nama Produk <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <input id="productName" name="productName" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.name ?? ''} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Contoh: Keripik Singkong..." />
               </div>
               <div className="col-span-2 md:col-span-1">
-                <label htmlFor="sku" className="block text-sm font-medium text-slate-700 mb-1">Kode SKU / Barcode</label>
+                <label htmlFor="sku" className="block text-sm font-medium text-slate-700 mb-1">
+                  Kode SKU / Barcode <span className="text-rose-500 font-bold">*</span>
+                </label>
                 <div className="flex gap-2">
                   <input id="sku" name="sku" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none font-mono" value={formData.sku ?? ''} onChange={e => setFormData({ ...formData, sku: e.target.value })} placeholder="Scan atau ketik..." />
                   <button onClick={handleGenerateCode} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg" title="Generate Code"><Barcode size={20} /></button>
                 </div>
               </div>
               <div className="col-span-2 md:col-span-1">
-                <label htmlFor="unit" className="block text-sm font-medium text-slate-700 mb-1">Satuan</label>
-                <input id="unit" name="unit" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.unit || 'Pcs'} onChange={e => setFormData({ ...formData, unit: e.target.value })} placeholder="Pcs, Kg, Box..." />
-              </div>
-              <div className="col-span-2 md:col-span-1">
-                <label htmlFor="category" className="block text-sm font-medium text-slate-700 mb-1">Kategori</label>
+                <label htmlFor="category" className="block text-sm font-medium text-slate-700 mb-1">
+                  Kategori Produk <span className="text-rose-500 font-bold">*</span>
+                </label>
                 <select
                   id="category"
                   name="category"
-                  className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white"
+                  className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white font-medium"
                   value={formData.categoryId ?? ''}
                   onChange={e => setFormData({ ...formData, categoryId: e.target.value })}
                 >
-                  <option value="">-- Pilih Kategori --</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  <option value="">-- Pilih Kategori (Wajib) --</option>
+                  {categories
+                    .filter(c => c && c.name && c.name.trim().toLowerCase() !== 'umum')
+                    .map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div className="col-span-2 md:col-span-1">
-                <label htmlFor="stock" className="block text-sm font-medium text-slate-700 mb-1">Stok Awal</label>
+                <label htmlFor="unit" className="block text-sm font-medium text-slate-700 mb-1">
+                  Satuan Produk <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <input id="unit" name="unit" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.unit || 'Pcs'} onChange={e => setFormData({ ...formData, unit: e.target.value })} placeholder="Pcs, Box, Porsi, dll..." />
+              </div>
+              <div className="col-span-2 md:col-span-1">
+                <label htmlFor="stock" className="block text-sm font-medium text-slate-700 mb-1">
+                  Stok Awal <span className="text-rose-500 font-bold">*</span>
+                </label>
                 <input id="stock" name="stock" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.stock ?? ''} onChange={e => handleNumericInput('stock', e.target.value)} />
               </div>
 
@@ -855,13 +909,12 @@ export const Products: React.FC = () => {
                   <p className="text-sm font-bold text-slate-800">Harga & Modal</p>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {/* Hide HPP for Cashier */}
-                  {/* Hide HPP for Cashier and Warehouse */}
-                  {/* Hide HPP removed temporarily so all roles can see it */}
-{true && (
-                    <div className="col-span-2 md:col-span-4 mb-2">
+                  {true && (
+                    <div className="col-span-2 md:col-span-2 mb-2">
                       <div className="flex items-center justify-between mb-1">
-                        <label htmlFor="hpp" className="block text-xs font-bold text-red-500">HPP (Harga Modal)</label>
+                        <label htmlFor="hpp" className="block text-xs font-bold text-red-500">
+                          HPP (Harga Modal) <span className="text-rose-500 font-bold">*</span>
+                        </label>
                         <button onClick={(e) => { e.preventDefault(); setIsHPPModalOpen(true); }} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md font-bold hover:bg-indigo-200 flex items-center gap-1 transition-colors">
                           <Sparkles size={12} /> Kalkulator AI
                         </button>
@@ -873,10 +926,16 @@ export const Products: React.FC = () => {
                     </div>
                   )}
                   <div className="col-span-2 md:col-span-2">
-                    <label htmlFor="price" className="block text-xs text-slate-500 mb-1">Harga Jual</label>
-                    <input id="price" name="price" type="text" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.price ?? ''} onChange={e => handleNumericInput('price', e.target.value)} />
+                    <label htmlFor="price" className="block text-xs font-bold text-slate-700 mb-1">
+                      Harga Jual (Eceran) <span className="text-rose-500 font-bold">*</span>
+                    </label>
+                    <input id="price" name="price" type="text" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none font-semibold text-slate-900" value={formData.price ?? ''} onChange={e => handleNumericInput('price', e.target.value)} />
                   </div>
                 </div>
+              </div>
+
+              <div className="col-span-2 text-[11px] text-slate-500 flex items-center gap-1 bg-amber-50/80 p-2.5 rounded-lg border border-amber-200/60">
+                <span className="text-amber-700 font-bold">Catatan:</span> Semua kolom bertanda bintang merah (<span className="text-rose-600 font-bold">*</span>) wajib diisi lengkap sebelum produk disimpan.
               </div>
             </div>
             <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
