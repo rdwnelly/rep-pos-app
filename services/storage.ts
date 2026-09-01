@@ -364,9 +364,11 @@ export const StorageService = {
   getBeritaAcaraArchives: async (): Promise<any[]> => {
     return await ApiService.getBeritaAcaraArchives();
   },
-  saveBeritaAcaraArchive: async (archive: any) => {
+  saveBeritaAcaraArchive: async (archive: any, notify: boolean = true) => {
     await ApiService.saveBeritaAcaraArchive(archive);
-    notifyListeners('berita_acara_archives');
+    if (notify) {
+      notifyListeners('berita_acara_archives');
+    }
   },
   deleteBeritaAcaraArchive: async (id: string) => {
     await ApiService.deleteBeritaAcaraArchive(id);
