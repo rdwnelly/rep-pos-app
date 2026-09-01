@@ -23,7 +23,7 @@ const WhatsAppIcon = ({ size = 16 }) => (
 const BASE_SALES_CATEGORIES = [
     "Tiket Masuk",
     "Sewa Kostum",
-    "Toko / Souvenir",
+    "TOKO SOUVENIR",
     "Kafe & Resto",
     "Kios",
     "Paket Sopendo / Saswar / Edukasi",
@@ -35,11 +35,11 @@ const BASE_SALES_CATEGORIES = [
 // Jika kategori tidak cocok dengan pola ini, akan ditambahkan sebagai baris baru secara otomatis
 const mapCategoryNameToSalesRow = (catName) => {
     const lower = (catName || "").toLowerCase().trim();
-    if (!lower || lower === "umum" || lower === "tanpa kategori") return "Toko / Souvenir";
+    if (!lower || lower === "umum" || lower === "tanpa kategori") return "TOKO SOUVENIR";
     if (lower.includes("tiket")) return "Tiket Masuk";
     if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar") || lower === "sewa kostum keluar") return "Sewa kostum keluar";
     if (lower.includes("sewa kostum") || lower.includes("kostum")) return "Sewa Kostum";
-    if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "Toko / Souvenir";
+    if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "TOKO SOUVENIR";
     if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) return "Kafe & Resto";
     if (lower.includes("kios")) return "Kios";
     if (lower.includes("sopendo") || lower.includes("saswar") || lower.includes("edukasi")) return "Paket Sopendo / Saswar / Edukasi";
@@ -79,7 +79,7 @@ const DEFAULT_CATEGORY_OPTIONS = buildDefaultCategoryOptions(BASE_SALES_CATEGORI
 const DETAILED_EXPENSE_CONFIG = [
     { title: "VI. URAIAN PENGELUARAN (Tiket Masuk)", rows: 10 },
     { title: "VI. URAIAN PENGELUARAN (Sewa Kostum)", rows: 10 },
-    { title: "VI. URAIAN PENGELUARAN (Toko / Souvenir)", rows: 10 },
+    { title: "VI. URAIAN PENGELUARAN (TOKO SOUVENIR)", rows: 10 },
     { title: "VI. URAIAN PENGELUARAN (Pembelanjaan Café)", rows: 21 },
     { title: "VI. URAIAN PENGELUARAN (Biaya Kios)", rows: 10 },
     { title: "VI. URAIAN PENGELUARAN (Paket Sopendo / Saswar / Edukasi)", rows: 5 },
@@ -101,7 +101,7 @@ const mapCategoryToSection = (cat) => {
     if (lower.includes("tiket")) return "VI. URAIAN PENGELUARAN (Tiket Masuk)";
     if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar")) return "VI. URAIAN PENGELUARAN (Sewa kostum keluar)";
     if (lower.includes("sewa kostum") || lower.includes("kostum")) return "VI. URAIAN PENGELUARAN (Sewa Kostum)";
-    if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "VI. URAIAN PENGELUARAN (Toko / Souvenir)";
+    if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "VI. URAIAN PENGELUARAN (TOKO SOUVENIR)";
     if (lower.includes("café") || lower.includes("cafe") || lower.includes("kafe") || lower.includes("resto")) return "VI. URAIAN PENGELUARAN (Pembelanjaan Café)";
     if (lower.includes("kios")) return "VI. URAIAN PENGELUARAN (Biaya Kios)";
     if (lower.includes("sopendo") || lower.includes("saswar") || lower.includes("edukasi")) return "VI. URAIAN PENGELUARAN (Paket Sopendo / Saswar / Edukasi)";
@@ -178,11 +178,14 @@ const calculateSalesRowsForDate = (allTransactions, targetDate, salesCategories 
 
         if (Array.isArray(t.items)) {
             t.items.forEach(item => {
-                const originalCatName = item.categoryName ||
+                const originalCatName = (item.categoryName ||
                     (item.categoryId ? catIdToName[item.categoryId] : null) ||
                     (item.id ? prodIdToCatName[item.id] : null) ||
-                    'Lainnya';
-                const rowName = mapCategoryNameToSalesRow(originalCatName);
+                    '').trim();
+                
+                // Match to registered salesCategories
+                const matchedName = salesCategories.find(c => c.toLowerCase().trim() === originalCatName.toLowerCase())
+                    || (salesCategories.length > 0 ? salesCategories[0] : 'Lainnya');
 
                 let itemTotal = (Number(item.finalPrice) || Number(item.price) || 0) * (Number(item.qty) || 1);
                 let itemHpp = (Number(item.hpp) || 0) * (Number(item.qty) || 1);
@@ -192,34 +195,37 @@ const calculateSalesRowsForDate = (allTransactions, targetDate, salesCategories 
                     itemHpp = -itemHpp;
                 }
 
-                if (!salesMap[rowName]) {
-                    salesMap[rowName] = { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
+                if (!salesMap[matchedName]) {
+                    salesMap[matchedName] = { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
                 }
 
                 const isCash = t.paymentMethod === PaymentMethod.CASH || t.paymentMethod === 'CASH' || t.paymentMethod === 'TUNAI';
 
                 if (isCash) {
-                    salesMap[rowName].tunai += itemTotal;
-                    salesMap[rowName].hppTunai += itemHpp;
+                    salesMap[matchedName].tunai += itemTotal;
+                    salesMap[matchedName].hppTunai += itemHpp;
                     totalTunai += itemTotal;
                 } else {
-                    salesMap[rowName].qr += itemTotal;
-                    salesMap[rowName].hppQR += itemHpp;
+                    salesMap[matchedName].qr += itemTotal;
+                    salesMap[matchedName].hppQR += itemHpp;
                     totalQR += itemTotal;
                 }
             });
         }
     });
 
-    const rows = Object.entries(salesMap)
-        .filter(([name]) => name && name.trim().toLowerCase() !== 'umum')
-        .map(([name, vals]) => ({
-            name,
-            tunai: vals.tunai === 0 ? "" : String(vals.tunai),
-            hppTunai: vals.hppTunai === 0 ? "" : String(vals.hppTunai),
-            qr: vals.qr === 0 ? "" : String(vals.qr),
-            hppQR: vals.hppQR === 0 ? "" : String(vals.hppQR),
-        }));
+    const rows = salesCategories
+        .filter(name => name && name.trim().toLowerCase() !== 'umum')
+        .map(name => {
+            const vals = salesMap[name] || { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
+            return {
+                name,
+                tunai: vals.tunai === 0 ? "" : String(vals.tunai),
+                hppTunai: vals.hppTunai === 0 ? "" : String(vals.hppTunai),
+                qr: vals.qr === 0 ? "" : String(vals.qr),
+                hppQR: vals.hppQR === 0 ? "" : String(vals.hppQR),
+            };
+        });
 
     return { rows, totalTunai, totalQR, matchingTxCount };
 };
@@ -258,18 +264,21 @@ export default function BeritaAcaraPage() {
         new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     );
 
-    // Gabungkan kategori penjualan dasar dengan seluruh kategori penjualan dari POS master data (tanpa kategori 'Umum')
+    // Kategori penjualan murni mengikuti kategori yang terdaftar pada Kelola Kategori Master (POS)
     const allSalesCategories = useMemo(() => {
-        const list = [...BASE_SALES_CATEGORIES];
+        if (!categories || categories.length === 0) {
+            return BASE_SALES_CATEGORIES;
+        }
+        const list = [];
         categories.forEach(cat => {
             if (cat && cat.name && cat.name.trim() && cat.name.trim().toLowerCase() !== 'umum') {
-                const rowName = mapCategoryNameToSalesRow(cat.name.trim());
-                if (rowName && rowName.toLowerCase() !== 'umum' && !list.includes(rowName)) {
+                const rowName = cat.name.trim();
+                if (!list.includes(rowName)) {
                     list.push(rowName);
                 }
             }
         });
-        return list;
+        return list.length > 0 ? list : BASE_SALES_CATEGORIES;
     }, [categories]);
 
     // States for editable tables
@@ -307,23 +316,23 @@ export default function BeritaAcaraPage() {
         return defaultList;
     });
 
-    // Otomatis sinkronkan kategori master baru ke salesRows agar selalu muncul di tabel Berita Acara
+    // Otomatis sinkronkan kategori master ke salesRows (hanya tampilkan kategori yang terdaftar di Kelola Kategori Master)
     const salesCategoriesKey = useMemo(() => allSalesCategories.join(','), [allSalesCategories]);
 
     useEffect(() => {
         setSalesRows(prevRows => {
-            const existingNames = new Set(prevRows.map(r => r.name.toLowerCase().trim()));
-            const missingCats = allSalesCategories.filter(cat => !existingNames.has(cat.toLowerCase().trim()));
-            if (missingCats.length === 0) return prevRows;
+            const prevMap = new Map(prevRows.map(r => [r.name.toLowerCase().trim(), r]));
 
-            const newRowsToAdd = missingCats.map(name => ({
-                name,
-                tunai: "",
-                hppTunai: "",
-                qr: "",
-                hppQR: ""
-            }));
-            return [...prevRows, ...newRowsToAdd];
+            // Bangun baris penjualan murni berdasarkan kategori master saat ini
+            const updatedRows = allSalesCategories.map(catName => {
+                const lower = catName.toLowerCase().trim();
+                if (prevMap.has(lower)) {
+                    return { ...prevMap.get(lower), name: catName };
+                }
+                return { name: catName, tunai: "", hppTunai: "", qr: "", hppQR: "" };
+            });
+
+            return updatedRows;
         });
     }, [salesCategoriesKey]);
 
@@ -349,6 +358,58 @@ export default function BeritaAcaraPage() {
     const [customExpenses, setCustomExpenses] = useState([
         { id: Date.now(), category: '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
     ]);
+
+    // Live listener untuk perubahan/rename nama kategori dari Master Data POS
+    useEffect(() => {
+        const handleCategoryRenamed = (e) => {
+            const { oldName, newName } = e.detail || {};
+            if (!oldName || !newName || oldName.toLowerCase().trim() === newName.toLowerCase().trim()) return;
+            const oldLower = oldName.toLowerCase().trim();
+
+            // 1. Update salesRows
+            setSalesRows(prev => prev.map(r => {
+                if (r && r.name && r.name.toLowerCase().trim() === oldLower) {
+                    return { ...r, name: newName };
+                }
+                return r;
+            }));
+
+            // 2. Update categoryOptions
+            setCategoryOptions(prev => prev.map(opt => {
+                const clean = opt.replace(/^\d+\)\s*/, '').toLowerCase().trim();
+                if (clean === oldLower) {
+                    const numMatch = opt.match(/^(\d+\)\s*)/);
+                    return numMatch ? `${numMatch[1]}${newName}` : newName;
+                }
+                return opt;
+            }));
+
+            // 3. Update customExpenses
+            setCustomExpenses(prev => prev.map(item => {
+                if (item && item.category) {
+                    const clean = item.category.replace(/^\d+\)\s*/, '').toLowerCase().trim();
+                    if (clean === oldLower) {
+                        const numMatch = item.category.match(/^(\d+\)\s*)/);
+                        return { ...item, category: numMatch ? `${numMatch[1]}${newName}` : newName };
+                    }
+                }
+                return item;
+            }));
+
+            // 4. Update expenseRows
+            setExpenseRows(prev => prev.map(r => {
+                if (r && r.name && r.name.toLowerCase().trim() === oldLower) {
+                    return { ...r, name: newName };
+                }
+                return r;
+            }));
+        };
+
+        window.addEventListener('category_renamed', handleCategoryRenamed);
+        return () => {
+            window.removeEventListener('category_renamed', handleCategoryRenamed);
+        };
+    }, []);
 
     const [catatan, setCatatan] = useState("");
 
@@ -510,17 +571,11 @@ export default function BeritaAcaraPage() {
                 }
             }
 
-            // Gabungkan seluruh kategori master (termasuk kategori baru) ke draft
+            // Saring dan petakan murni ke kategori master aktif (allSalesCategories)
             const existingMap = new Map(baseRows.map(r => [r.name.toLowerCase().trim(), r]));
             const mergedSalesRows = allSalesCategories.map(name => {
                 const found = existingMap.get(name.toLowerCase().trim());
-                return found || { name, tunai: "", hppTunai: "", qr: "", hppQR: "" };
-            });
-            baseRows.forEach(r => {
-                if (!allSalesCategories.some(c => c.toLowerCase().trim() === r.name.toLowerCase().trim()) &&
-                    !mergedSalesRows.some(mr => mr.name.toLowerCase().trim() === r.name.toLowerCase().trim())) {
-                    mergedSalesRows.push(r);
-                }
+                return found ? { ...found, name } : { name, tunai: "", hppTunai: "", qr: "", hppQR: "" };
             });
             setSalesRows(mergedSalesRows);
 
@@ -619,19 +674,20 @@ export default function BeritaAcaraPage() {
             // 2. Notify storage change listeners to update any active hooks
             notifyListeners();
 
-            // 3. Build dynamic categories list
-            const dynamicSalesCats = [...BASE_SALES_CATEGORIES];
+            // 3. Build dynamic categories list strictly from fresh master categories
+            const dynamicSalesCats = [];
             (freshCats || []).forEach(cat => {
-                if (cat && cat.name && cat.name.trim()) {
-                    const rowName = mapCategoryNameToSalesRow(cat.name.trim());
+                if (cat && cat.name && cat.name.trim() && cat.name.trim().toLowerCase() !== 'umum') {
+                    const rowName = cat.name.trim();
                     if (!dynamicSalesCats.includes(rowName)) {
                         dynamicSalesCats.push(rowName);
                     }
                 }
             });
+            const finalSalesCats = dynamicSalesCats.length > 0 ? dynamicSalesCats : BASE_SALES_CATEGORIES;
 
             // 4. Calculate fresh sales rows
-            const calculation = calculateSalesRowsForDate(freshTx, tanggal, dynamicSalesCats, freshCats, freshProds);
+            const calculation = calculateSalesRowsForDate(freshTx, tanggal, finalSalesCats, freshCats, freshProds);
             setSalesRows(calculation.rows);
 
             // 5. Match Cashflow / Expenses

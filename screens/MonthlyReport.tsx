@@ -41,7 +41,7 @@ const OPEX_CATEGORIES = [
 const BASE_SALES_CATEGORIES = [
     "Tiket Masuk",
     "Sewa Kostum",
-    "Toko / Souvenir",
+    "TOKO SOUVENIR",
     "Kafe & Resto",
     "Kios",
     "Paket Sopendo / Saswar / Edukasi",
@@ -63,11 +63,11 @@ const parseSafeDate = (d: any): Date => {
 // Helper to map category name to standardized display name
 const mapCategoryNameToSalesRow = (catName: string): string => {
     const lower = (catName || '').toLowerCase().trim();
-    if (!lower || lower === "umum" || lower === "tanpa kategori") return "Toko / Souvenir";
+    if (!lower || lower === "umum" || lower === "tanpa kategori") return "TOKO SOUVENIR";
     if (lower.includes("tiket")) return "Tiket Masuk";
     if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar") || lower === "sewa kostum keluar") return "Sewa kostum keluar";
     if (lower.includes("sewa kostum") || lower.includes("kostum")) return "Sewa Kostum";
-    if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "Toko / Souvenir";
+    if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "TOKO SOUVENIR";
     if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) return "Kafe & Resto";
     if (lower.includes("kios")) return "Kios";
     if (lower.includes("sopendo") || lower.includes("saswar") || lower.includes("edukasi")) return "Paket Sopendo / Saswar / Edukasi";
@@ -371,38 +371,24 @@ export const MonthlyReport: React.FC = () => {
             txCount: number;
         }>();
 
-        // Initialize base categories
-        BASE_SALES_CATEGORIES.forEach(name => {
-            catMap.set(name, {
-                name,
-                tunai: 0,
-                hppTunai: 0,
-                nonTunai: 0,
-                hppNonTunai: 0,
-                tempo: 0,
-                hppTempo: 0,
-                itemsSold: 0,
-                txCount: 0
-            });
-        });
+        // Initialize strictly from master categories (categories)
+        const targetCategories = (categories && categories.length > 0)
+            ? categories.filter(c => c && c.name && c.name.trim() && c.name.trim().toLowerCase() !== 'umum').map(c => c.name.trim())
+            : BASE_SALES_CATEGORIES;
 
-        // Initialize master categories (exclude 'umum')
-        categories.forEach(c => {
-            if (c && c.name && c.name.trim() && c.name.trim().toLowerCase() !== 'umum') {
-                const mappedName = mapCategoryNameToSalesRow(c.name.trim());
-                if (mappedName && mappedName.toLowerCase() !== 'umum' && !catMap.has(mappedName)) {
-                    catMap.set(mappedName, {
-                        name: mappedName,
-                        tunai: 0,
-                        hppTunai: 0,
-                        nonTunai: 0,
-                        hppNonTunai: 0,
-                        tempo: 0,
-                        hppTempo: 0,
-                        itemsSold: 0,
-                        txCount: 0
-                    });
-                }
+        targetCategories.forEach(name => {
+            if (!catMap.has(name)) {
+                catMap.set(name, {
+                    name,
+                    tunai: 0,
+                    hppTunai: 0,
+                    nonTunai: 0,
+                    hppNonTunai: 0,
+                    tempo: 0,
+                    hppTempo: 0,
+                    itemsSold: 0,
+                    txCount: 0
+                });
             }
         });
 
@@ -417,8 +403,9 @@ export const MonthlyReport: React.FC = () => {
             const seenInTx = new Set<string>();
 
             (t.items || []).forEach(item => {
-                const rawName = item.categoryName || 'Lain-lain';
-                const rowName = mapCategoryNameToSalesRow(rawName);
+                const rawName = (item.categoryName || '').trim();
+                const matchedMaster = targetCategories.find(c => c.toLowerCase() === rawName.toLowerCase());
+                const rowName = matchedMaster || (targetCategories.length > 0 ? targetCategories[0] : 'Lainnya');
 
                 if (!catMap.has(rowName)) {
                     catMap.set(rowName, {
