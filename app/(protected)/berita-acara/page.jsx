@@ -19,10 +19,9 @@ const WhatsAppIcon = ({ size = 16 }) => (
 );
 
 // Kategori penjualan dasar yang selalu muncul (urutan tampilan default)
-// Tiket Masuk dan Sewa Kostum kini dipisah menjadi 2 kategori berbeda
+// Tiket Masuk dan Sewa Kostum digabungkan ke kategori "Taman Etnik"
 const BASE_SALES_CATEGORIES = [
-    "Tiket Masuk",
-    "Sewa Kostum",
+    "Taman Etnik",
     "TOKO SOUVENIR",
     "Kafe & Resto",
     "Kios",
@@ -32,13 +31,12 @@ const BASE_SALES_CATEGORIES = [
 ];
 
 // Mapping dari categoryName (lowercase) ke nama tampilan pada Berita Acara
-// Jika kategori tidak cocok dengan pola ini, akan ditambahkan sebagai baris baru secara otomatis
+// Tiket Masuk dan Sewa Kostum digabung ke kategori "Taman Etnik"
 const mapCategoryNameToSalesRow = (catName) => {
     const lower = (catName || "").toLowerCase().trim();
     if (!lower || lower === "umum" || lower === "tanpa kategori") return "TOKO SOUVENIR";
-    if (lower.includes("tiket")) return "Tiket Masuk";
     if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar") || lower === "sewa kostum keluar") return "Sewa kostum keluar";
-    if (lower.includes("sewa kostum") || lower.includes("kostum")) return "Sewa Kostum";
+    if (lower.includes("taman etnik") || lower.includes("taman") || lower.includes("tiket") || lower.includes("sewa kostum") || lower.includes("kostum")) return "Taman Etnik";
     if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "TOKO SOUVENIR";
     if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) return "Kafe & Resto";
     if (lower.includes("kios")) return "Kios";
@@ -77,8 +75,7 @@ const buildDefaultCategoryOptions = (salesCategories = BASE_SALES_CATEGORIES) =>
 const DEFAULT_CATEGORY_OPTIONS = buildDefaultCategoryOptions(BASE_SALES_CATEGORIES);
 
 const DETAILED_EXPENSE_CONFIG = [
-    { title: "VI. URAIAN PENGELUARAN (Tiket Masuk)", rows: 10 },
-    { title: "VI. URAIAN PENGELUARAN (Sewa Kostum)", rows: 10 },
+    { title: "VI. URAIAN PENGELUARAN (Taman Etnik)", rows: 10 },
     { title: "VI. URAIAN PENGELUARAN (TOKO SOUVENIR)", rows: 10 },
     { title: "VI. URAIAN PENGELUARAN (Pembelanjaan Café)", rows: 21 },
     { title: "VI. URAIAN PENGELUARAN (Biaya Kios)", rows: 10 },
@@ -98,9 +95,8 @@ const DETAILED_EXPENSE_CONFIG = [
 const mapCategoryToSection = (cat) => {
     if (!cat) return "VI. URAIAN PENGELUARAN (Lain-lain)";
     const lower = cat.toLowerCase().trim();
-    if (lower.includes("tiket")) return "VI. URAIAN PENGELUARAN (Tiket Masuk)";
     if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar")) return "VI. URAIAN PENGELUARAN (Sewa kostum keluar)";
-    if (lower.includes("sewa kostum") || lower.includes("kostum")) return "VI. URAIAN PENGELUARAN (Sewa Kostum)";
+    if (lower.includes("taman etnik") || lower.includes("taman") || lower.includes("tiket") || lower.includes("sewa kostum") || lower.includes("kostum")) return "VI. URAIAN PENGELUARAN (Taman Etnik)";
     if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "VI. URAIAN PENGELUARAN (TOKO SOUVENIR)";
     if (lower.includes("café") || lower.includes("cafe") || lower.includes("kafe") || lower.includes("resto")) return "VI. URAIAN PENGELUARAN (Pembelanjaan Café)";
     if (lower.includes("kios")) return "VI. URAIAN PENGELUARAN (Biaya Kios)";
@@ -183,8 +179,11 @@ const calculateSalesRowsForDate = (allTransactions, targetDate, salesCategories 
                     (item.id ? prodIdToCatName[item.id] : null) ||
                     '').trim();
                 
+                const mappedRowName = mapCategoryNameToSalesRow(originalCatName);
+                
                 // Match to registered salesCategories
-                const matchedName = salesCategories.find(c => c.toLowerCase().trim() === originalCatName.toLowerCase())
+                const matchedName = salesCategories.find(c => c.toLowerCase().trim() === mappedRowName.toLowerCase())
+                    || salesCategories.find(c => c.toLowerCase().trim() === originalCatName.toLowerCase())
                     || (salesCategories.length > 0 ? salesCategories[0] : 'Lainnya');
 
                 let itemTotal = (Number(item.finalPrice) || Number(item.price) || 0) * (Number(item.qty) || 1);

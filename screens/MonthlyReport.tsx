@@ -39,8 +39,7 @@ const OPEX_CATEGORIES = [
 
 // Baseline categories for Berita Acara report
 const BASE_SALES_CATEGORIES = [
-    "Tiket Masuk",
-    "Sewa Kostum",
+    "Taman Etnik",
     "TOKO SOUVENIR",
     "Kafe & Resto",
     "Kios",
@@ -64,9 +63,8 @@ const parseSafeDate = (d: any): Date => {
 const mapCategoryNameToSalesRow = (catName: string): string => {
     const lower = (catName || '').toLowerCase().trim();
     if (!lower || lower === "umum" || lower === "tanpa kategori") return "TOKO SOUVENIR";
-    if (lower.includes("tiket")) return "Tiket Masuk";
     if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar") || lower === "sewa kostum keluar") return "Sewa kostum keluar";
-    if (lower.includes("sewa kostum") || lower.includes("kostum")) return "Sewa Kostum";
+    if (lower.includes("taman etnik") || lower.includes("taman") || lower.includes("tiket") || lower.includes("sewa kostum") || lower.includes("kostum")) return "Taman Etnik";
     if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "TOKO SOUVENIR";
     if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) return "Kafe & Resto";
     if (lower.includes("kios")) return "Kios";
@@ -372,9 +370,11 @@ export const MonthlyReport: React.FC = () => {
         }>();
 
         // Initialize strictly from master categories (categories)
-        const targetCategories = (categories && categories.length > 0)
-            ? categories.filter(c => c && c.name && c.name.trim() && c.name.trim().toLowerCase() !== 'umum').map(c => c.name.trim())
+        const rawMasterCategories = (categories && categories.length > 0)
+            ? categories.filter(c => c && c.name && c.name.trim() && c.name.trim().toLowerCase() !== 'umum').map(c => mapCategoryNameToSalesRow(c.name.trim()))
             : BASE_SALES_CATEGORIES;
+
+        const targetCategories = Array.from(new Set(rawMasterCategories));
 
         targetCategories.forEach(name => {
             if (!catMap.has(name)) {
@@ -404,7 +404,9 @@ export const MonthlyReport: React.FC = () => {
 
             (t.items || []).forEach(item => {
                 const rawName = (item.categoryName || '').trim();
-                const matchedMaster = targetCategories.find(c => c.toLowerCase() === rawName.toLowerCase());
+                const mappedRowName = mapCategoryNameToSalesRow(rawName);
+                const matchedMaster = targetCategories.find(c => c.toLowerCase() === mappedRowName.toLowerCase())
+                    || targetCategories.find(c => c.toLowerCase() === rawName.toLowerCase());
                 const rowName = matchedMaster || (targetCategories.length > 0 ? targetCategories[0] : 'Lainnya');
 
                 if (!catMap.has(rowName)) {
