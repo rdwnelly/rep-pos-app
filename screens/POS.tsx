@@ -255,77 +255,125 @@ export const POS: React.FC = () => {
     }
   };
 
-  const handlePrintTemporarySlip = async (bill: OpenBill) => {
-    const isBtMode = storeSettings?.useBluetoothPrinter || !!localStorage.getItem('bt_printer_paired');
+  // Browser Print Helper (uses hidden iframe to bypass popup blocker, with window.open fallback)
+  const printViaBrowser = (tx: Transaction, printOptions?: PrintInvoiceOptions) => {
+    const settings = storeSettings || ({ name: 'Kasir REP' } as StoreSettings);
+    const html = generatePrintInvoice(tx, settings, formatIDR, formatDate, printOptions);
 
-    let connected = bluetooth.isConnected;
-    if (isBtMode && !connected) {
-      connected = await bluetooth.connect({ silentOnly: true });
-    }
+    try {
+      // Prioritas 1: Gunakan hidden iframe (100% kebal dari pemblokiran popup browser)
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(iframe);
 
-    if (connected) {
-      try {
-        const options = { ...storeSettings, cashierName: bill.cashierName };
-        await bluetooth.print(generateESCPOSReceipt({
-          id: bill.billNumber,
-          date: bill.createdAt,
-          items: bill.items,
-          totalAmount: bill.totalAmount,
-          amountPaid: 0,
-          change: -bill.totalAmount,
-          paymentStatus: PaymentStatus.UNPAID,
-          paymentMethod: PaymentMethod.CASH,
-          customerName: bill.customerName,
-          customerPhone: bill.customerPhone,
-          tableNumber: bill.tableNumber,
-          cashierId: bill.cashierId,
-          cashierName: bill.cashierName,
-          discount: bill.discount,
-          discountType: bill.discountType,
-          discountAmount: bill.discountAmount
-        }, options));
-        alert(`Struk pesanan sementara Open Bill #${bill.billNumber} berhasil dicetak!`);
-        return;
-      } catch (err) {
-        alert("Gagal mencetak struk sementara via Bluetooth.");
+      const doc = iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(html);
+        doc.close();
+
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          } catch (e) {
+            console.warn('Iframe print trigger:', e);
+          }
+        }, 250);
+
+        setTimeout(() => {
+          try {
+            document.body.removeChild(iframe);
+          } catch (e) {}
+        }, 60000);
         return;
       }
+    } catch (e) {
+      console.warn('Iframe print error, falling back to window.open:', e);
     }
 
+    // Prioritas 2: Fallback ke window.open
+    const w = window.open('', '_blank', 'width=800,height=600');
+    if (!w) {
+      alert("Popup blocker mencegah cetak struk. Mohon izinkan popup untuk website ini di pengaturan browser Anda.");
+      return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+  };
+
+  const handlePrintTemporarySlip = async (bill: OpenBill) => {
+    const billTx: Transaction = {
+      id: bill.id,
+      invoiceNumber: bill.billNumber,
+      date: bill.createdAt,
+      items: bill.items,
+      totalAmount: bill.totalAmount,
+      amountPaid: 0,
+      change: 0,
+      paymentStatus: PaymentStatus.UNPAID,
+      paymentMethod: PaymentMethod.CASH,
+      customerName: bill.customerName || 'Pelanggan Umum',
+      customerPhone: bill.customerPhone,
+      tableNumber: bill.tableNumber,
+      cashierId: bill.cashierId,
+      cashierName: bill.cashierName || currentUser.name || 'Kasir',
+      discount: bill.discount,
+      discountType: bill.discountType,
+      discountAmount: bill.discountAmount,
+      paymentNote: bill.notes
+    };
+
+    const isBtMode = storeSettings?.useBluetoothPrinter || !!localStorage.getItem('bt_printer_paired');
+
     if (isBtMode) {
-      alert("Printer Bluetooth tidak terhubung. Pastikan Bluetooth & printer sudah dinyalakan.");
+      try {
+        let connected = bluetooth.isConnected;
+        if (!connected) {
+          try {
+            connected = await bluetooth.connect({ silentOnly: true });
+          } catch {
+            connected = false;
+          }
+        }
+        if (!connected) {
+          try {
+            connected = await bluetooth.connect({ silentOnly: false });
+          } catch {
+            connected = false;
+          }
+        }
+
+        if (connected) {
+          const options = { ...storeSettings, cashierName: bill.cashierName || currentUser.name || 'Kasir', isTemporarySlip: true };
+          await bluetooth.print(generateESCPOSReceipt(billTx, options));
+          alert(`Struk pesanan sementara Open Bill #${bill.billNumber} berhasil dicetak!`);
+          return;
+        }
+
+        // Jika Bluetooth tidak terhubung / dibatalkan, tawarkan cetak via browser
+        if (confirm("Printer Bluetooth tidak terhubung. Apakah Anda ingin mencetak menggunakan dialog printer browser?")) {
+          printViaBrowser(billTx, { isTemporarySlip: true });
+        }
+      } catch (err: any) {
+        console.error("[BT Printer] Cetak gagal:", err);
+        if (confirm(`Gagal mencetak struk via Bluetooth: ${err.message || 'Periksa koneksi printer.'}. Apakah Anda ingin mencetak menggunakan printer browser?`)) {
+          printViaBrowser(billTx, { isTemporarySlip: true });
+        }
+      }
       return;
     }
 
-    const w = window.open('', '', 'width=800,height=600');
-    if (w) {
-      const html = generatePrintInvoice(
-        {
-          id: bill.billNumber,
-          date: bill.createdAt,
-          items: bill.items,
-          totalAmount: bill.totalAmount,
-          amountPaid: 0,
-          change: -bill.totalAmount,
-          paymentStatus: PaymentStatus.UNPAID,
-          paymentMethod: PaymentMethod.CASH,
-          customerName: bill.customerName,
-          customerPhone: bill.customerPhone,
-          tableNumber: bill.tableNumber,
-          cashierId: bill.cashierId,
-          cashierName: bill.cashierName,
-          discount: bill.discount,
-          discountType: bill.discountType,
-          discountAmount: bill.discountAmount
-        },
-        storeSettings || { name: 'Kasir REP' } as StoreSettings,
-        formatIDR,
-        formatDate,
-        { isTemporarySlip: true }
-      );
-      w.document.write(html);
-      w.document.close();
-    }
+    // Default Browser Print
+    printViaBrowser(billTx, { isTemporarySlip: true });
   };
 
   // Settings
@@ -797,12 +845,7 @@ export const POS: React.FC = () => {
         }
 
         if (confirm("Gagal mencetak via Bluetooth. Apakah Anda ingin mencetak menggunakan dialog printer browser?")) {
-          const w = window.open('', '', 'width=800,height=600');
-          if (w) {
-            const html = generatePrintInvoice(tx, settings, formatIDR, formatDate, printOptions);
-            w.document.write(html);
-            w.document.close();
-          }
+          printViaBrowser(tx, printOptions);
         }
       } catch (error: any) {
         console.error("[BT Printer] Cetak gagal:", error);
@@ -812,15 +855,7 @@ export const POS: React.FC = () => {
     }
 
     // Default Browser Print
-    const w = window.open('', '', 'width=800,height=600');
-    if (!w) {
-      alert("Popup blocker mencegah cetak struk. Mohon izinkan popup untuk website ini.");
-      return;
-    }
-
-    const html = generatePrintInvoice(tx, settings, formatIDR, formatDate, printOptions);
-    w.document.write(html);
-    w.document.close();
+    printViaBrowser(tx, printOptions);
   };
 
   return (

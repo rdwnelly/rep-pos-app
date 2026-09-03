@@ -240,16 +240,17 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
     // A4 Content Construction
     if (isA4) {
         const bankInfo = settings.showBank && settings.bankAccount ? settings.bankAccount.replace(/\n/g, '<br/>') : '';
+        const isSlip = !!printOptions?.isTemporarySlip;
 
         return `
         <html>
             <head>
-                <title>Faktur Penjualan #${tx.invoiceNumber || tx.id.substring(0, 8)}</title>
+                <title>${isSlip ? 'Slip Pesanan Sementara (Open Bill)' : 'Faktur Penjualan'} #${tx.invoiceNumber || tx.id}</title>
                 <style>${css}</style>
             </head>
             <body>
                 <div class="print-page">
-                    <div class="header-title">FAKTUR PENJUALAN</div>
+                    <div class="header-title">${isSlip ? 'TAGIHAN SEMENTARA (OPEN BILL)' : 'FAKTUR PENJUALAN'}</div>
                     
                     <div class="header-grid">
                         <div class="store-info">
@@ -272,7 +273,7 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                         <tr>
                             <td style="border: none; padding: 0 0 2px 0; width: 50%;">
                                  <div class="info-text" style="font-size: 11pt;">
-                                    No. Faktur: ${tx.invoiceNumber || tx.id.substring(0, 8)} / ${tx.paymentStatus === 'LUNAS' ? 'Lunas' : tx.paymentStatus === 'SEBAGIAN' ? 'Sebagian' : 'Belum Lunas'}
+                                    No. ${isSlip ? 'Bill' : 'Faktur'}: ${tx.invoiceNumber || tx.id} / ${isSlip ? 'SEMENTARA (OPEN BILL)' : (tx.paymentStatus === 'LUNAS' ? 'Lunas' : tx.paymentStatus === 'SEBAGIAN' ? 'Sebagian' : 'Belum Lunas')}
                                 </div>
                             </td>
                             <td style="border: none; padding: 0 0 2px 0; text-align: right; width: 50%;">
@@ -287,7 +288,7 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
 
                     <div class="footer-container">
                         <div class="footer-left">
-                            ${bankInfo ? `
+                            ${bankInfo && !isSlip ? `
                                 <div class="payment-info">
                                     <div class="payment-info-title">Informasi Pembayaran:</div>
                                     <div style="font-size: 10pt; white-space: pre-wrap;">${bankInfo}</div>
@@ -305,12 +306,18 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                                     <strong>Catatan Retur:</strong> ${tx.returnNote}
                                 </div>
                             ` : ''}
+
+                            ${isSlip ? `
+                                <div style="margin-top: 10px; font-size: 9pt; color: #555; font-style: italic;">
+                                    * Struk ini adalah pesanan sementara / tagihan meja (Open Bill), bukan bukti pembayaran sah.
+                                </div>
+                            ` : ''}
                         </div>
                         
                         <div class="footer-right">
                              <table class="summary-table" style="width: auto;">
                                 <tr>
-                                    <td style="width: 120px;">Sub Total</td>
+                                    <td style="width: 140px;">Sub Total</td>
                                     <td style="width: 120px; text-align: right;">${formatIDR(subTotal)}</td>
                                 </tr>
                                 <tr>
@@ -318,9 +325,15 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                                     <td style="text-align: right;">${discountAmount > 0 ? formatIDR(discountAmount) : 'Rp 0'}</td>
                                 </tr>
                                 <tr>
-                                    <td style="font-weight: bold;">Total Bayar</td>
+                                    <td style="font-weight: bold;">${isSlip ? 'Total Sementara' : 'Total Bayar'}</td>
                                     <td style="text-align: right; font-weight: bold;">${formatIDR(tx.totalAmount)}</td>
                                 </tr>
+                                ${isSlip ? `
+                                <tr>
+                                    <td style="font-weight: bold; color: #b45309;">Status</td>
+                                    <td style="text-align: right; font-weight: bold; color: #b45309;">BELUM DIBAYAR (OPEN BILL)</td>
+                                </tr>
+                                ` : `
                                 <tr>
                                     <td>Bayar (${((tx.paymentMethod as string) === 'TEMPO' || tx.paymentMethod === 'BON') ? 'BON' : tx.paymentMethod})</td>
                                     <td style="text-align: right;">${formatIDR(tx.amountPaid)}</td>
@@ -335,6 +348,7 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                                     <td>Kembalian</td>
                                     <td style="text-align: right;">${formatIDR(tx.change)}</td>
                                 </tr>
+                                `}
                                 `}
                             </table>
                         </div>
@@ -354,13 +368,13 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                 
                 ${printOptions?.qrisCode && isValidQRIS(printOptions.qrisCode.trim()) ? 
                     generateQRISPrintSection(printOptions.qrisCode, tx.totalAmount, printOptions.bankName || '') :
-                    `<script>window.addEventListener('afterprint', function() { window.close(); }); window.print();</script>`
+                    `<script>window.addEventListener('afterprint', function() { window.close(); }); window.onload = function() { window.print(); }; setTimeout(function() { window.print(); }, 250);</script>`
                 }
-                <script>window.addEventListener('afterprint', function() { window.close(); });</script>
             </body>
         </html>
         `;
     } else {
+        const isSlip = !!printOptions?.isTemporarySlip;
         let headerHtml = `
             <div style="text-align: center; margin-bottom: 4px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
                 ${settings.showLogo !== false ? `<img src="/logokasir.jpg" alt="Logo" style="width: 50px; height: 50px; border-radius: 6px; margin-bottom: 3px; object-fit: cover;" />` : ''}
@@ -373,10 +387,15 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                         ${settings.showInstagram !== false && settings.instagram && settings.showTiktok !== false && settings.tiktok ? ' | ' : ''}
                         ${settings.showTiktok !== false && settings.tiktok ? `TikTok: ${settings.tiktok}` : ''}
                     </p>` : ''}
+                ${isSlip ? `
+                    <div style="text-align: center; margin: 3px 0 1px 0; font-weight: bold; font-size: 10px; border: 1px dashed #000; padding: 2px;">
+                        *** TAGIHAN SEMENTARA (OPEN BILL) ***
+                    </div>
+                ` : ''}
             </div>
             <div style="margin-bottom: 4px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
                 <table style="width: 100%; border: none; font-size: 9px; border-collapse: collapse;" cellspacing="0" cellpadding="0">
-                    <tr><td style="width: 35%; border: none; padding: 1px 0; vertical-align: top;">No. Struk</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.invoiceNumber || tx.id.substring(0, 8)}</td></tr>
+                    <tr><td style="width: 35%; border: none; padding: 1px 0; vertical-align: top;">No. ${isSlip ? 'Bill' : 'Struk'}</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.invoiceNumber || tx.id}</td></tr>
                     <tr><td style="border: none; padding: 1px 0; vertical-align: top;">Tanggal</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${formatDate(tx.date)}</td></tr>
                     <tr><td style="border: none; padding: 1px 0; vertical-align: top;">Kasir</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.cashierName}</td></tr>
                     <tr><td style="border: none; padding: 1px 0; vertical-align: top;">Pelanggan</td><td style="border: none; padding: 1px 0; vertical-align: top;">: ${tx.customerName && tx.customerName !== 'Pelanggan Umum' ? tx.customerName : 'Pelanggan Umum (walk-in)'}</td></tr>
@@ -416,11 +435,17 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                     <span>-${formatIDR(discountAmount)}</span>
                 </div>` : ''}
                 <div style="display: flex; justify-content: space-between; margin-bottom: 1px; font-size: 11px; font-weight: bold; margin-top: 3px;">
-                    <span>GRAND TOTAL</span>
+                    <span>${isSlip ? 'TOTAL SEMENTARA' : 'GRAND TOTAL'}</span>
                     <span>${formatIDR(tx.totalAmount)}</span>
                 </div>
             </div>
 
+            ${isSlip ? `
+            <div style="margin-bottom: 4px; font-size: 9px; border-bottom: 1px dashed #000; padding-bottom: 4px; text-align: center;">
+                <div style="font-weight: bold; font-size: 10px; padding: 2px 0;">STATUS: BELUM LUNAS (OPEN BILL)</div>
+                <div style="font-size: 8px; color: #555;">* Pesanan sementara, bukan bukti pembayaran sah *</div>
+            </div>
+            ` : `
             <div style="margin-bottom: 4px; font-size: 9px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 1px;">
                     <span>Metode Bayar</span>
@@ -441,18 +466,19 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                     <span>${formatIDR(Math.abs(tx.change))}</span>
                 </div>` : ''}
             </div>
+            `}
             
             <div class="footer" style="text-align: center; font-size: 9px; margin-top: 4px; padding-bottom: 0px;">
-                <p style="margin: 1px 0; font-weight: bold;">Terima kasih atas kunjungan Anda.</p>
+                ${!isSlip ? `<p style="margin: 1px 0; font-weight: bold;">Terima kasih atas kunjungan Anda.</p>` : ''}
                 <p style="margin: 1px 0; font-style: italic;">"Papua Punya Cerita, Kami Sajikan dalam Rasa"</p>
-                ${settings.showBank && bankInfo ? `<p style="margin:4px 0 0 0; text-align: left;">Info Transfer:<br/>${bankInfo}</p>` : ''}
+                ${settings.showBank && bankInfo && !isSlip ? `<p style="margin:4px 0 0 0; text-align: left;">Info Transfer:<br/>${bankInfo}</p>` : ''}
             </div>
         `;
 
         return `
         <html>
             <head>
-                <title>Nota #${tx.id.substring(0, 8)}</title>
+                <title>${isSlip ? 'Slip Open Bill' : 'Nota'} #${tx.invoiceNumber || tx.id}</title>
                 <style>${css}</style>
             </head>
             <body>
@@ -463,9 +489,8 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
                 </div>
                 ${printOptions?.qrisCode && isValidQRIS(printOptions.qrisCode.trim()) ?
                     generateQRISPrintSection(printOptions.qrisCode, tx.totalAmount, printOptions.bankName || '') :
-                    `<script>window.addEventListener('afterprint', function() { window.close(); }); window.print();</script>`
+                    `<script>window.addEventListener('afterprint', function() { window.close(); }); window.onload = function() { window.print(); }; setTimeout(function() { window.print(); }, 250);</script>`
                 }
-                <script>window.addEventListener('afterprint', function() { window.close(); });</script>
             </body>
         </html>
         `;

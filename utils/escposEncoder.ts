@@ -118,7 +118,7 @@ const formatIDR = (val: number | string | null | undefined): string => {
     return 'Rp ' + formatNumber(val);
 };
 
-export const generateESCPOSReceipt = (tx: Transaction, settings: StoreSettings): Uint8Array => {
+export const generateESCPOSReceipt = (tx: Transaction, settings: StoreSettings & { isTemporarySlip?: boolean }): Uint8Array => {
     const encoder = new EscPosEncoder();
     const width = settings.printerType === '80mm' ? 48 : 32;
 
@@ -142,10 +142,20 @@ export const generateESCPOSReceipt = (tx: Transaction, settings: StoreSettings):
         encoder.textLine(`TikTok: ${settings.tiktok}`);
     }
     
-    encoder.line('-', width)
-        .alignLeft()
+    if (settings.isTemporarySlip) {
+        encoder.line('=', width)
+            .alignCenter()
+            .bold(true)
+            .textLine('TAGIHAN SEMENTARA / OPEN BILL')
+            .bold(false)
+            .line('=', width);
+    } else {
+        encoder.line('-', width);
+    }
+
+    encoder.alignLeft()
         .textLine(`Tgl  : ${formatDateWithTime(tx.date)}`)
-        .textLine(`No   : ${tx.invoiceNumber || tx.id.substring(0, 8)}`)
+        .textLine(`No   : ${tx.invoiceNumber || tx.id}`)
         .textLine(`Kasir: ${tx.cashierName}`)
         .textLine(`Plg  : ${tx.customerName && tx.customerName !== 'Pelanggan Umum' ? tx.customerName : 'Pelanggan Umum (walk-in)'}`)
         .textLine(`HP   : ${tx.customerPhone || '-'}`)
@@ -168,19 +178,34 @@ export const generateESCPOSReceipt = (tx: Transaction, settings: StoreSettings):
     const discountAmount = tx.discountAmount || 0;
     const subTotal = tx.totalAmount + discountAmount;
 
-    encoder.tableRow('Subtotal', formatIDR(subTotal), width);
-    if (discountAmount > 0) {
-        encoder.tableRow('Diskon', `-${formatIDR(discountAmount)}`, width);
-    }
-    encoder.bold(true).tableRow('TOTAL', formatIDR(tx.totalAmount), width).bold(false);
-    
-    const methodLabel = ((tx.paymentMethod as string) === 'TEMPO' || tx.paymentMethod === 'BON') ? 'BON' : tx.paymentMethod;
-    encoder.tableRow(`Bayar (${methodLabel})`, formatIDR(tx.amountPaid), width);
-    
-    if (tx.change >= 0) {
-        encoder.tableRow('Kembalian', formatIDR(tx.change), width);
+    if (settings.isTemporarySlip) {
+        encoder.tableRow('Subtotal', formatIDR(subTotal), width);
+        if (discountAmount > 0) {
+            encoder.tableRow('Diskon', `-${formatIDR(discountAmount)}`, width);
+        }
+        encoder.bold(true).tableRow('TOTAL SEMENTARA', formatIDR(tx.totalAmount), width).bold(false);
+        encoder.line('-', width);
+        encoder.alignCenter()
+            .bold(true)
+            .textLine('STATUS: BELUM LUNAS (OPEN BILL)')
+            .bold(false)
+            .textLine('* Pesanan Sementara / Belum Bayar *')
+            .textLine('* Bukan Bukti Pembayaran Sah *');
     } else {
-        encoder.tableRow('Sisa Utang', formatIDR(Math.abs(tx.change)), width);
+        encoder.tableRow('Subtotal', formatIDR(subTotal), width);
+        if (discountAmount > 0) {
+            encoder.tableRow('Diskon', `-${formatIDR(discountAmount)}`, width);
+        }
+        encoder.bold(true).tableRow('TOTAL', formatIDR(tx.totalAmount), width).bold(false);
+        
+        const methodLabel = ((tx.paymentMethod as string) === 'TEMPO' || tx.paymentMethod === 'BON') ? 'BON' : tx.paymentMethod;
+        encoder.tableRow(`Bayar (${methodLabel})`, formatIDR(tx.amountPaid), width);
+        
+        if (tx.change >= 0) {
+            encoder.tableRow('Kembalian', formatIDR(tx.change), width);
+        } else {
+            encoder.tableRow('Sisa Utang', formatIDR(Math.abs(tx.change)), width);
+        }
     }
 
     encoder.newline()
@@ -193,8 +218,8 @@ export const generateESCPOSReceipt = (tx: Transaction, settings: StoreSettings):
         encoder.textLine(settings.footerMessage);
     }
 
-    // Buka cash drawer jika diaktifkan di settings
-    if (settings.openCashDrawer) {
+    // Buka cash drawer jika diaktifkan di settings dan bukan temporary slip
+    if (settings.openCashDrawer && !settings.isTemporarySlip) {
         encoder.openCashDrawer(0); // Pin 2 (drawer 1)
         // Beberapa cash drawer menggunakan pin 5, kirim juga untuk kompatibilitas
         encoder.openCashDrawer(1); // Pin 5 (drawer 2)
