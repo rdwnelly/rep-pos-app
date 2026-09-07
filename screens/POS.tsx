@@ -127,6 +127,9 @@ export const POS: React.FC = () => {
     setDiscountType('FIXED');
     setSelectedTravelAgentId('');
     setPaymentNote('');
+    setAmountPaid('');
+    setPaymentMethod(PaymentMethod.CASH);
+    setSelectedBankId('');
     setOpenBillTableInput('');
     setOpenBillNameInput('');
     setOpenBillPhoneInput('');
@@ -242,6 +245,9 @@ export const POS: React.FC = () => {
     setDiscountType(bill.discountType || 'FIXED');
     setSelectedTravelAgentId(bill.travelAgentId || '');
     setPaymentNote(bill.notes || '');
+    setAmountPaid('');
+    setPaymentMethod(PaymentMethod.CASH);
+    setSelectedBankId('');
     setShowOpenBillsModal(false);
   };
 
@@ -557,7 +563,9 @@ export const POS: React.FC = () => {
       }
     }
 
-    let paid = parseFloat(amountPaid) || 0;
+    let paid = (paymentMethod === PaymentMethod.TRANSFER || paymentMethod === PaymentMethod.QRIS)
+      ? (reopenTx ? reopenDeficit : totalAmount)
+      : (parseFloat(amountPaid) || 0);
 
     // Validation: Check for zero price items
     const zeroPriceItems = cart.filter(item => item.finalPrice === 0);
@@ -591,10 +599,12 @@ export const POS: React.FC = () => {
     // Reopen Transaction Checkout Mode
     if (reopenTx) {
       const selectedBank = banks.find(b => b.id === selectedBankId);
-      const paid = parseFloat(amountPaid) || 0;
+      const paid = (paymentMethod === PaymentMethod.TRANSFER || paymentMethod === PaymentMethod.QRIS)
+        ? reopenDeficit
+        : (parseFloat(amountPaid) || 0);
       const totalPaid = reopenPreviousPaid + paid;
 
-      if (totalPaid < totalAmount && paymentMethod !== PaymentMethod.TEMPO && paymentMethod !== PaymentMethod.BON) {
+      if (totalPaid < totalAmount && paymentMethod !== PaymentMethod.TEMPO && paymentMethod !== PaymentMethod.BON && paymentMethod !== PaymentMethod.TRANSFER && paymentMethod !== PaymentMethod.QRIS) {
         alert(`Pembayaran kurang! Sisa kekurangan: ${formatIDR(reopenDeficit)}.`);
         return;
       }
@@ -678,7 +688,7 @@ export const POS: React.FC = () => {
     } else if ((paymentMethod === PaymentMethod.TEMPO || paymentMethod === PaymentMethod.BON) && paid > totalAmount) {
       alert('Peringatan: Jumlah pembayaran tidak boleh melebihi total harga barang untuk metode pembayaran BON / Hutang!');
       return;
-    } else if (paymentMethod !== PaymentMethod.TEMPO && paymentMethod !== PaymentMethod.BON && paid < totalAmount) {
+    } else if (paymentMethod !== PaymentMethod.TEMPO && paymentMethod !== PaymentMethod.BON && paymentMethod !== PaymentMethod.TRANSFER && paymentMethod !== PaymentMethod.QRIS && paid < totalAmount) {
       alert('Pembayaran kurang!');
       return;
     }
@@ -789,20 +799,10 @@ export const POS: React.FC = () => {
       // Delete Open Bill if this transaction was from an Open Bill
       if (activeOpenBillId) {
         await StorageService.deleteOpenBill(activeOpenBillId);
-        setActiveOpenBillId(null);
       }
 
       // Reset
-      setCart([]);
-      setAmountPaid('');
-      setDiscount(0);
-      setDiscountType('FIXED');
-      setPaymentNote('');
-      setSelectedBankId('');
-      setSelectedCustomerId('');
-      setSelectedTravelAgentId('');
-      setCustomerName('Pelanggan Umum');
-      setTableNumber('');
+      resetCartAndState();
       setShowPaymentModal(false);
       searchInputRef.current?.focus();
       setShowSuccessModal(true);
@@ -1570,6 +1570,7 @@ export const POS: React.FC = () => {
                           alert("Pilih rekening bank tujuan terlebih dahulu!");
                           return;
                         }
+                        setAmountPaid(reopenTx ? reopenDeficit.toString() : totalAmount.toString());
                         setShowQrisModal(true);
                       } else {
                         handleCheckout();

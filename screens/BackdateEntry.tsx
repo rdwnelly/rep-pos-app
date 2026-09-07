@@ -159,9 +159,11 @@ export const BackdateEntry: React.FC<BackdateEntryProps> = ({ currentUser }) => 
     if (cart.length === 0) { setErrorMsg('Keranjang masih kosong!'); return; }
     if (!manualReason.trim()) { setErrorMsg('Alasan Susulan wajib diisi!'); return; }
     if (!backdateTime) { setErrorMsg('Tanggal & waktu wajib dipilih.'); return; }
-    const paid = parseFloat(amountPaid) || 0;
+    const paid = (paymentMethod === PaymentMethod.TRANSFER || paymentMethod === PaymentMethod.QRIS) && !amountPaid
+      ? totalAmount
+      : (parseFloat(amountPaid) || 0);
     const isDebt = paymentMethod === PaymentMethod.TEMPO || paymentMethod === PaymentMethod.BON;
-    if (!isDebt && paid < totalAmount) { setErrorMsg(`Pembayaran kurang! Total: ${formatIDR(totalAmount)}`); return; }
+    if (!isDebt && paymentMethod !== PaymentMethod.TRANSFER && paymentMethod !== PaymentMethod.QRIS && paid < totalAmount) { setErrorMsg(`Pembayaran kurang! Total: ${formatIDR(totalAmount)}`); return; }
     if (paymentMethod === PaymentMethod.TRANSFER && !selectedBankId) { setErrorMsg('Pilih rekening bank!'); return; }
     const status = isDebt ? (paid > 0 ? PaymentStatus.PARTIAL : PaymentStatus.UNPAID) : PaymentStatus.PAID;
     const selectedBank = banks.find(b => b.id === selectedBankId);
