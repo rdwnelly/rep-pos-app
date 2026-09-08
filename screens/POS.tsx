@@ -949,36 +949,42 @@ export const POS: React.FC = () => {
           </div>
         </div>
 
-        {/* Product Cards Grid - Ultra Compact 1x1 3-Column Mobile Layout */}
-        <div className="flex-1 overflow-y-auto p-1 sm:p-3 grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-3 content-start pb-28 lg:pb-3 touch-scroll">
+        {/* Product Cards Grid - Clear Legible Multi-Line Layout */}
+        <div className="flex-1 overflow-y-auto p-2 sm:p-3.5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3.5 content-start pb-28 lg:pb-3 touch-scroll">
           {visibleProducts.map(product => (
             <button
               key={product.id}
               onClick={(e) => addToCart(product, e)}
-              className="group flex flex-col justify-between items-start text-left bg-white border border-slate-200 rounded-lg sm:rounded-2xl p-1 sm:p-2.5 hover:shadow-md hover:border-amber-500/60 transition-all active:scale-95 relative overflow-hidden"
+              className="group flex flex-col justify-between items-start text-left bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-2 sm:p-2.5 hover:shadow-md hover:border-amber-500/60 transition-all active:scale-95 relative overflow-hidden cursor-pointer"
+              title={product.name}
             >
-              <div className="w-full aspect-square bg-slate-50 rounded-md sm:rounded-xl mb-1 sm:mb-2 overflow-hidden relative border border-slate-100 flex items-center justify-center">
+              <div className="w-full aspect-square bg-slate-50 rounded-lg sm:rounded-xl mb-1.5 sm:mb-2 overflow-hidden relative border border-slate-100 flex items-center justify-center shrink-0">
                 {product.image && !product.image.includes('picsum.photos') ? (
                   <img src={product.image} alt={product.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-amber-50/50 text-amber-600">
-                    <ImageIcon className="text-amber-400 w-4 h-4 sm:w-8 sm:h-8" />
+                    <ImageIcon className="text-amber-400 w-6 h-6 sm:w-8 sm:h-8" />
                   </div>
                 )}
-                <span className={`absolute bottom-0.5 right-0.5 sm:bottom-1.5 sm:right-1.5 text-[7px] sm:text-[10px] font-extrabold px-1 sm:px-2 py-0.2 rounded-full backdrop-blur-md shadow-sm ${product.stock <= 5 ? 'bg-rose-600/90 text-white' : 'bg-slate-900/80 text-white'
+                <span className={`absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 text-[8px] sm:text-[10px] font-extrabold px-1.5 sm:px-2 py-0.5 rounded-full backdrop-blur-md shadow-xs ${product.stock <= 5 ? 'bg-rose-600/90 text-white' : 'bg-slate-900/80 text-white'
                   }`}>
                   {product.stock} {product.unit || 'Pcs'}
                 </span>
               </div>
 
-              <div className="w-full">
-                <h4 className="font-bold text-slate-800 truncate text-[9px] sm:text-xs h-3.5 sm:h-7 leading-tight">{product.name}</h4>
-                <div className="mt-0.5 sm:mt-1 flex items-center justify-between">
-                  <span className="font-extrabold text-amber-700 text-[9px] sm:text-xs">
+              <div className="w-full flex-1 flex flex-col justify-between">
+                <h4
+                  className="font-bold text-slate-800 text-xs sm:text-[13px] leading-snug line-clamp-2 min-h-[2rem] sm:min-h-[2.4rem] mb-1 group-hover:text-amber-700 transition-colors"
+                  title={product.name}
+                >
+                  {product.name}
+                </h4>
+                <div className="mt-auto pt-1 flex items-center justify-between border-t border-slate-100">
+                  <span className="font-extrabold text-amber-700 text-xs sm:text-sm">
                     {product.price === 0 ? 'Rp 0' : formatIDR(product.price)}
                   </span>
-                  <span className="p-0.5 bg-amber-50 text-amber-700 rounded group-hover:bg-amber-600 group-hover:text-white transition-colors">
-                    <Plus className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" />
+                  <span className="p-1 sm:p-1.5 bg-amber-50 text-amber-700 rounded-lg group-hover:bg-amber-600 group-hover:text-white transition-colors shrink-0">
+                    <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   </span>
                 </div>
               </div>
@@ -987,7 +993,7 @@ export const POS: React.FC = () => {
           {/* Sentinel for Infinite Scroll */}
           {visibleProducts.length < filteredProducts.length && (
             <div ref={loadMoreRef} className="col-span-full h-10 flex items-center justify-center text-slate-400 text-xs">
-              Loading more...
+              Memuat lebih banyak...
             </div>
           )}
         </div>
@@ -1379,15 +1385,17 @@ export const POS: React.FC = () => {
               </div>
 
               {/* Sisi Kanan: Input Pembayaran & Numpad */}
-              <div className="w-full md:w-7/12 p-6 flex flex-col bg-white overflow-y-auto">
-                <div className="flex justify-between items-center mb-6 shrink-0">
+              <div className="w-full md:w-7/12 flex flex-col bg-white overflow-hidden max-h-[90vh]">
+                {/* Header (Fixed) */}
+                <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 shrink-0">
                   <h3 className="text-xl font-bold text-slate-800">Detail Pembayaran</h3>
-                  <button onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
+                  <button onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors cursor-pointer">
                     <X size={20} />
                   </button>
                 </div>
 
-                <div className="space-y-5 flex-1 shrink-0">
+                {/* Scrollable Form Body */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4.5 touch-scroll">
                   {/* Customer & Phone & Table */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
@@ -1437,7 +1445,7 @@ export const POS: React.FC = () => {
                           setSelectedBankId('');
                           if (paymentNote === 'BON Pembelian Barang (Hutang)') setPaymentNote('');
                         }}
-                        className={`p-3 rounded-xl border-2 text-sm font-bold flex flex-col items-center gap-1.5 transition-all ${paymentMethod === PaymentMethod.CASH ? 'border-primary bg-primary/5 text-primary shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
+                        className={`p-3 rounded-xl border-2 text-sm font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${paymentMethod === PaymentMethod.CASH ? 'border-primary bg-primary/5 text-primary shadow-xs' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
                       >
                         <Banknote size={22} /> TUNAI
                       </button>
@@ -1447,7 +1455,7 @@ export const POS: React.FC = () => {
                           setAmountPaid(totalAmount.toString());
                           if (paymentNote === 'BON Pembelian Barang (Hutang)') setPaymentNote('');
                         }}
-                        className={`p-3 rounded-xl border-2 text-sm font-bold flex flex-col items-center gap-1.5 transition-all ${paymentMethod === PaymentMethod.TRANSFER ? 'border-primary bg-primary/5 text-primary shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
+                        className={`p-3 rounded-xl border-2 text-sm font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${paymentMethod === PaymentMethod.TRANSFER ? 'border-primary bg-primary/5 text-primary shadow-xs' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
                       >
                         <CreditCard size={22} /> TRANSFER
                       </button>
@@ -1458,7 +1466,7 @@ export const POS: React.FC = () => {
                           setAmountPaid('0');
                           setSelectedBankId('');
                         }}
-                        className={`p-3 rounded-xl border-2 text-sm font-bold flex flex-col items-center gap-1.5 transition-all ${(paymentMethod === PaymentMethod.TEMPO || paymentMethod === PaymentMethod.BON) ? 'border-primary bg-primary/5 text-primary shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
+                        className={`p-3 rounded-xl border-2 text-sm font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${(paymentMethod === PaymentMethod.TEMPO || paymentMethod === PaymentMethod.BON) ? 'border-primary bg-primary/5 text-primary shadow-xs' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
                       >
                         <Receipt size={22} /> BON / HUTANG
                       </button>
@@ -1506,38 +1514,41 @@ export const POS: React.FC = () => {
 
                         {/* Quick Cash Buttons */}
                         <div className="grid grid-cols-4 gap-2 mt-2">
-                          <button onClick={() => setAmountPaid(totalAmount.toString())} className="py-2 bg-primary/10 text-primary font-bold rounded-lg text-sm hover:bg-primary/20 transition-colors">Uang Pas</button>
-                          <button onClick={() => setAmountPaid((parseInt(amountPaid || '0') + 50000).toString())} className="py-2 bg-slate-100 text-slate-700 font-bold rounded-lg text-sm hover:bg-slate-200 transition-colors">+50k</button>
-                          <button onClick={() => setAmountPaid((parseInt(amountPaid || '0') + 100000).toString())} className="py-2 bg-slate-100 text-slate-700 font-bold rounded-lg text-sm hover:bg-slate-200 transition-colors">+100k</button>
-                          <button onClick={() => setAmountPaid('')} className="py-2 bg-red-100 text-red-600 font-bold rounded-lg text-sm hover:bg-red-200 transition-colors">Clear</button>
+                          <button onClick={() => setAmountPaid(totalAmount.toString())} className="py-2 bg-primary/10 text-primary font-bold rounded-lg text-sm hover:bg-primary/20 transition-colors cursor-pointer">Uang Pas</button>
+                          <button onClick={() => setAmountPaid((parseInt(amountPaid || '0') + 50000).toString())} className="py-2 bg-slate-100 text-slate-700 font-bold rounded-lg text-sm hover:bg-slate-200 transition-colors cursor-pointer">+50k</button>
+                          <button onClick={() => setAmountPaid((parseInt(amountPaid || '0') + 100000).toString())} className="py-2 bg-slate-100 text-slate-700 font-bold rounded-lg text-sm hover:bg-slate-200 transition-colors cursor-pointer">+100k</button>
+                          <button onClick={() => setAmountPaid('')} className="py-2 bg-red-100 text-red-600 font-bold rounded-lg text-sm hover:bg-red-200 transition-colors cursor-pointer">Clear</button>
                         </div>
                       </div>
 
                       {/* Numeric Keypad */}
                       <div className="grid grid-cols-3 gap-2 select-none">
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-                          <button key={num} onClick={() => setAmountPaid(prev => (prev === '0' || !prev ? num.toString() : prev + num))} className="py-3 text-xl font-bold bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors">
+                          <button key={num} onClick={() => setAmountPaid(prev => (prev === '0' || !prev ? num.toString() : prev + num))} className="py-3 text-xl font-bold bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors cursor-pointer">
                             {num}
                           </button>
                         ))}
-                        <button onClick={() => setAmountPaid(prev => prev ? prev + '000' : '0')} className="py-3 text-xl font-bold bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors">000</button>
-                        <button onClick={() => setAmountPaid(prev => (prev === '0' || !prev ? '0' : prev + '0'))} className="py-3 text-xl font-bold bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors">0</button>
-                        <button onClick={() => setAmountPaid(prev => prev.slice(0, -1))} className="py-3 text-xl font-bold bg-slate-100 border border-slate-200 rounded-xl hover:bg-slate-200 active:bg-slate-300 transition-colors flex justify-center items-center">
+                        <button onClick={() => setAmountPaid(prev => prev ? prev + '000' : '0')} className="py-3 text-xl font-bold bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors cursor-pointer">000</button>
+                        <button onClick={() => setAmountPaid(prev => (prev === '0' || !prev ? '0' : prev + '0'))} className="py-3 text-xl font-bold bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors cursor-pointer">0</button>
+                        <button onClick={() => setAmountPaid(prev => prev.slice(0, -1))} className="py-3 text-xl font-bold bg-slate-100 border border-slate-200 rounded-xl hover:bg-slate-200 active:bg-slate-300 transition-colors flex justify-center items-center cursor-pointer">
                           ⌫
                         </button>
                       </div>
                     </div>
                   )}
 
-                  {/* Notes */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Catatan</label>
+                  {/* Notes (Fully visible & clean) */}
+                  <div className="pt-1">
+                    <label htmlFor="modalPaymentNote" className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">
+                      Catatan Transaksi (Opsional)
+                    </label>
                     <div className="relative">
-                      <StickyNote size={18} className="absolute left-3.5 top-3.5 text-slate-400" />
+                      <StickyNote size={18} className="absolute left-3.5 top-3 text-slate-400" />
                       <input
+                        id="modalPaymentNote"
                         type="text"
-                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                        placeholder="Catatan opsional..."
+                        className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-xs sm:text-sm font-medium text-slate-800 placeholder:text-slate-400"
+                        placeholder="Tambahkan catatan jika ada..."
                         value={paymentNote}
                         onChange={e => setPaymentNote(e.target.value)}
                       />
@@ -1546,23 +1557,23 @@ export const POS: React.FC = () => {
 
                   {/* Summary / Change */}
                   {(paymentMethod === PaymentMethod.CASH) && parseFloat(amountPaid) >= totalAmount && (
-                    <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex justify-between items-center animate-fade-in mt-2">
+                    <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex justify-between items-center animate-fade-in">
                       <span className="text-emerald-700 font-bold uppercase tracking-wider text-sm">Kembalian</span>
                       <span className="text-2xl font-black text-emerald-600">{formatIDR(parseFloat(amountPaid) - totalAmount)}</span>
                     </div>
                   )}
 
                   {(paymentMethod === PaymentMethod.TEMPO || paymentMethod === PaymentMethod.BON || (paymentMethod === PaymentMethod.CASH && parseFloat(amountPaid) < totalAmount)) && (
-                    <div className="p-4 bg-orange-50 rounded-xl border border-orange-200 flex justify-between items-center animate-fade-in mt-2">
+                    <div className="p-4 bg-orange-50 rounded-xl border border-orange-200 flex justify-between items-center animate-fade-in">
                       <span className="text-orange-700 font-bold uppercase tracking-wider text-sm">Sisa Hutang BON</span>
                       <span className="text-2xl font-black text-orange-600">{formatIDR(totalAmount - (parseFloat(amountPaid) || 0))}</span>
                     </div>
                   )}
                 </div>
 
-                {/* Floating Footer Action */}
-                <div className="sticky bottom-0 bg-white pt-4 pb-2 border-t border-slate-200 flex gap-3 shrink-0 mt-auto shadow-[0_-12px_24px_rgba(0,0,0,0.12)] -mx-6 -mb-6 p-6 z-30 rounded-b-2xl">
-                  <button onClick={() => setShowPaymentModal(false)} className="px-6 py-3.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition-colors">Batal</button>
+                {/* Fixed Footer Action */}
+                <div className="p-4 sm:p-6 bg-white border-t border-slate-200 flex gap-3 shrink-0 shadow-lg z-20">
+                  <button onClick={() => setShowPaymentModal(false)} className="px-6 py-3.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition-colors cursor-pointer">Batal</button>
                   <button
                     onClick={() => {
                       if (paymentMethod === PaymentMethod.TRANSFER) {

@@ -8,7 +8,7 @@ import { formatIDR, formatNumber } from "../../../utils";
 import {
     Plus, PlusCircle, Trash2, Info, Save, Archive, FileText, X, Printer, Eye,
     FolderPlus, Download, Loader2, CheckCircle2, RefreshCw, AlertCircle, Sparkles, Check,
-    CloudUpload, CheckCheck
+    CloudUpload, CheckCheck, ArrowLeft, Calendar, User, MapPin, Lock, Search
 } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -116,25 +116,35 @@ const mapCategoryToSection = (cat) => {
 
 // Date Matching Helper (Timezone-safe & format-safe)
 const isTransactionOnDate = (t, targetDate) => {
-    if (!t || !t.date || !targetDate) return false;
-    const rawDateStr = typeof t.date === 'string' ? t.date : '';
-    const tDateOnly = rawDateStr.slice(0, 10);
-    if (tDateOnly === targetDate) return true;
+    if (!t || !targetDate) return false;
+    const dateVal = t.date || t.createdAt;
+    if (!dateVal) return false;
 
-    const tDate = new Date(rawDateStr.includes('T') ? rawDateStr : rawDateStr.replace(' ', 'T'));
-    if (isNaN(tDate.getTime())) return false;
+    if (typeof dateVal === 'string') {
+        const cleanStr = dateVal.trim();
+        // Exact prefix match: "2026-09-07" matches "2026-09-07 14:30:00" or "2026-09-07T14:30:00" or "2026-09-07"
+        if (cleanStr.startsWith(targetDate)) return true;
 
-    const year = tDate.getFullYear();
-    const month = String(tDate.getMonth() + 1).padStart(2, '0');
-    const day = String(tDate.getDate()).padStart(2, '0');
-    const localDateOnly = `${year}-${month}-${day}`;
-    if (localDateOnly === targetDate) return true;
-
-    const startDate = new Date(targetDate);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(targetDate);
-    endDate.setHours(23, 59, 59, 999);
-    return tDate >= startDate && tDate <= endDate;
+        const parsed = new Date(cleanStr.includes('T') ? cleanStr : cleanStr.replace(' ', 'T'));
+        if (!isNaN(parsed.getTime())) {
+            const y = parsed.getFullYear();
+            const m = String(parsed.getMonth() + 1).padStart(2, '0');
+            const d = String(parsed.getDate()).padStart(2, '0');
+            if (`${y}-${m}-${d}` === targetDate) return true;
+        }
+    } else if (dateVal instanceof Date && !isNaN(dateVal.getTime())) {
+        const y = dateVal.getFullYear();
+        const m = String(dateVal.getMonth() + 1).padStart(2, '0');
+        const d = String(dateVal.getDate()).padStart(2, '0');
+        if (`${y}-${m}-${d}` === targetDate) return true;
+    } else if (typeof dateVal === 'object' && dateVal.seconds) {
+        const parsed = new Date(dateVal.seconds * 1000);
+        const y = parsed.getFullYear();
+        const m = String(parsed.getMonth() + 1).padStart(2, '0');
+        const d = String(parsed.getDate()).padStart(2, '0');
+        if (`${y}-${m}-${d}` === targetDate) return true;
+    }
+    return false;
 };
 
 // Pure function to calculate Sales Rows from live transactions
@@ -173,7 +183,34 @@ const calculateSalesRowsForDate = (allTransactions, targetDate, salesCategories 
         if (!isTransactionOnDate(t, targetDate)) return;
         matchingTxCount++;
 
-        if (Array.isArray(t.items)) {
+        if (Array.isArray(t.items) && t.items.length > 0) {
+            // 1. Calculate raw gross item subtotal for this transaction
+            const rawSubtotal = t.items.reduce((sum, item) => {
+                const price = Number(item.finalPrice) || Number(item.price) || 0;
+                const qty = Number(item.qty) || 1;
+                return sum + (price * qty);
+            }, 0);
+
+            // 2. Determine transaction-level discount
+            let txDiscount = Number(t.discountAmount) || 0;
+            if (txDiscount === 0 && t.discount && Number(t.discount) > 0) {
+                if (t.discountType === 'PERCENTAGE') {
+                    txDiscount = (rawSubtotal * Number(t.discount)) / 100;
+                } else {
+                    txDiscount = Number(t.discount);
+                }
+            }
+            // Fallback: If discountAmount was not saved directly, check if totalAmount < rawSubtotal
+            if (txDiscount === 0 && t.totalAmount !== undefined && t.totalAmount !== null && Number(t.totalAmount) >= 0 && Number(t.totalAmount) < rawSubtotal && t.type !== TransactionType.RETURN && t.type !== 'RETURN') {
+                txDiscount = Math.max(0, rawSubtotal - Number(t.totalAmount));
+            }
+
+            // Cap discount to rawSubtotal to prevent negative revenue
+            txDiscount = Math.min(txDiscount, rawSubtotal);
+
+            // Ratio of net price after discount
+            const discountRatio = rawSubtotal > 0 ? (rawSubtotal - txDiscount) / rawSubtotal : 1;
+
             t.items.forEach(item => {
                 const originalCatName = (item.categoryName ||
                     (item.categoryId ? catIdToName[item.categoryId] : null) ||
@@ -187,19 +224,21 @@ const calculateSalesRowsForDate = (allTransactions, targetDate, salesCategories 
                     || salesCategories.find(c => c.toLowerCase().trim() === originalCatName.toLowerCase())
                     || (salesCategories.length > 0 ? salesCategories[0] : 'Lainnya');
 
-                let itemTotal = (Number(item.finalPrice) || Number(item.price) || 0) * (Number(item.qty) || 1);
+                const rawItemPrice = (Number(item.finalPrice) || Number(item.price) || 0) * (Number(item.qty) || 1);
+                let itemTotal = rawItemPrice * discountRatio;
                 let itemHpp = (Number(item.hpp) || 0) * (Number(item.qty) || 1);
 
                 if (t.type === TransactionType.RETURN || t.type === 'RETURN') {
-                    itemTotal = -itemTotal;
-                    itemHpp = -itemHpp;
+                    itemTotal = -Math.abs(itemTotal);
+                    itemHpp = -Math.abs(itemHpp);
                 }
 
                 if (!salesMap[matchedName]) {
                     salesMap[matchedName] = { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
                 }
 
-                const isCash = t.paymentMethod === PaymentMethod.CASH || t.paymentMethod === 'CASH' || t.paymentMethod === 'TUNAI';
+                const methodStr = (t.paymentMethod || '').toString().toUpperCase();
+                const isCash = methodStr === 'CASH' || methodStr === 'TUNAI' || t.paymentMethod === PaymentMethod.CASH;
 
                 if (isCash) {
                     salesMap[matchedName].tunai += itemTotal;
@@ -218,16 +257,25 @@ const calculateSalesRowsForDate = (allTransactions, targetDate, salesCategories 
         .filter(name => name && name.trim().toLowerCase() !== 'umum')
         .map(name => {
             const vals = salesMap[name] || { tunai: 0, hppTunai: 0, qr: 0, hppQR: 0 };
+            const roundTunai = Math.round(vals.tunai);
+            const roundHppTunai = Math.round(vals.hppTunai);
+            const roundQR = Math.round(vals.qr);
+            const roundHppQR = Math.round(vals.hppQR);
             return {
                 name,
-                tunai: vals.tunai === 0 ? "" : String(vals.tunai),
-                hppTunai: vals.hppTunai === 0 ? "" : String(vals.hppTunai),
-                qr: vals.qr === 0 ? "" : String(vals.qr),
-                hppQR: vals.hppQR === 0 ? "" : String(vals.hppQR),
+                tunai: roundTunai === 0 ? "" : String(roundTunai),
+                hppTunai: roundHppTunai === 0 ? "" : String(roundHppTunai),
+                qr: roundQR === 0 ? "" : String(roundQR),
+                hppQR: roundHppQR === 0 ? "" : String(roundHppQR),
             };
         });
 
-    return { rows, totalTunai, totalQR, matchingTxCount };
+    return { 
+        rows, 
+        totalTunai: Math.round(totalTunai), 
+        totalQR: Math.round(totalQR), 
+        matchingTxCount 
+    };
 };
 
 // Helper to format date into readable Indonesian period name automatically
@@ -256,13 +304,29 @@ export default function BeritaAcaraPage() {
     const archives = useData(() => StorageService.getBeritaAcaraArchives(), [], 'berita_acara_archives') || [];
     const [activeTab, setActiveTab] = useState("input");
     const [viewingArchive, setViewingArchive] = useState(null);
+    const [archiveSearchQuery, setArchiveSearchQuery] = useState("");
 
-    // Sync state
+    const filteredArchives = useMemo(() => {
+        if (!archiveSearchQuery.trim()) return archives;
+        const q = archiveSearchQuery.toLowerCase().trim();
+        return (archives || []).filter(arch =>
+            (arch.title && arch.title.toLowerCase().includes(q)) ||
+            (arch.date && arch.date.includes(q)) ||
+            (arch.kasir && arch.kasir.toLowerCase().includes(q)) ||
+            (arch.periode && arch.periode.toLowerCase().includes(q))
+        );
+    }, [archives, archiveSearchQuery]);
+
+    // Sync state for live form
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncFeedback, setSyncFeedback] = useState(null);
     const [lastSyncedTime, setLastSyncedTime] = useState(() =>
         new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     );
+
+    // Sync state for selected archive
+    const [isSyncingArchive, setIsSyncingArchive] = useState(false);
+    const [archiveSyncFeedback, setArchiveSyncFeedback] = useState(null);
 
     // Kategori penjualan murni mengikuti kategori yang terdaftar pada Kelola Kategori Master (POS)
     const allSalesCategories = useMemo(() => {
@@ -332,6 +396,9 @@ export default function BeritaAcaraPage() {
                 return { name: catName, tunai: "", hppTunai: "", qr: "", hppQR: "" };
             });
 
+            if (JSON.stringify(prevRows) === JSON.stringify(updatedRows)) {
+                return prevRows;
+            }
             return updatedRows;
         });
     }, [salesCategoriesKey]);
@@ -414,6 +481,7 @@ export default function BeritaAcaraPage() {
     const [catatan, setCatatan] = useState("");
 
     const loadedDateRef = useRef(null);
+    const isHydratingRef = useRef(false);
     const lastLocalEditTimeRef = useRef(0);
 
     // Compute default sales rows from transactions for current `tanggal`
@@ -427,11 +495,6 @@ export default function BeritaAcaraPage() {
     const getMatchingCashflowsForDate = (allCashflows, targetDate) => {
         if (!targetDate || !Array.isArray(allCashflows)) return [];
 
-        const startDate = new Date(targetDate);
-        startDate.setHours(0, 0, 0, 0);
-        const endDate = new Date(targetDate);
-        endDate.setHours(23, 59, 59, 999);
-
         return allCashflows.filter(c => {
             if (!c) return false;
             // Match Cash OUT (expenses / pengeluaran kas)
@@ -439,10 +502,31 @@ export default function BeritaAcaraPage() {
             const isOut = typeStr === 'OUT' || typeStr === 'EXPENSE' || typeStr === 'KAS_KELUAR' || typeStr === CashFlowType.OUT;
             if (!isOut) return false;
 
-            const rawDateStr = typeof c.date === 'string' ? c.date : '';
-            const cDateOnly = rawDateStr.slice(0, 10);
-            const cDate = new Date(rawDateStr.replace(' ', 'T'));
-            return cDateOnly === targetDate || (!isNaN(cDate.getTime()) && cDate >= startDate && cDate <= endDate);
+            const dateVal = c.date || c.createdAt;
+            if (!dateVal) return false;
+            if (typeof dateVal === 'string') {
+                const cleanStr = dateVal.trim();
+                if (cleanStr.startsWith(targetDate)) return true;
+                const parsed = new Date(cleanStr.includes('T') ? cleanStr : cleanStr.replace(' ', 'T'));
+                if (!isNaN(parsed.getTime())) {
+                    const y = parsed.getFullYear();
+                    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                    const d = String(parsed.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}` === targetDate;
+                }
+            } else if (dateVal instanceof Date && !isNaN(dateVal.getTime())) {
+                const y = dateVal.getFullYear();
+                const m = String(dateVal.getMonth() + 1).padStart(2, '0');
+                const d = String(dateVal.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}` === targetDate;
+            } else if (typeof dateVal === 'object' && dateVal.seconds) {
+                const parsed = new Date(dateVal.seconds * 1000);
+                const y = parsed.getFullYear();
+                const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                const d = String(parsed.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}` === targetDate;
+            }
+            return false;
         });
     };
 
@@ -512,8 +596,8 @@ export default function BeritaAcaraPage() {
     useEffect(() => {
         if (!tanggal || viewingArchive) return;
         if (loadedDateRef.current === tanggal) return;
-        loadedDateRef.current = tanggal;
 
+        isHydratingRef.current = true;
         let isCancelled = false;
 
         const hydrateData = async () => {
@@ -542,7 +626,6 @@ export default function BeritaAcaraPage() {
                 return Array.isArray(items) && items.some(c => (c.keterangan && c.keterangan.trim()) || Number(c.total) > 0 || Number(c.harga) > 0);
             };
 
-            // Prefer cloudArchive if it exists and has real expenses or is newer than local draft
             const draftUpdatedAt = loadedDraft?.updatedAt || 0;
             const cloudUpdatedAt = cloudArchive?.updatedAt || 0;
 
@@ -553,10 +636,14 @@ export default function BeritaAcaraPage() {
                 }
             }
 
+            // Calculate live POS sales rows for this exact date
+            const liveCalc = calculateSalesRowsForDate(transactions, tanggal, allSalesCategories, categories, products);
+            const liveMap = new Map(liveCalc.rows.map(r => [r.name.toLowerCase().trim(), r]));
+
             if (source) {
-                if (source.kasir !== undefined && source.kasir !== "") setKasir(source.kasir);
-                if (source.lokasi !== undefined && source.lokasi !== "") setLokasi(source.lokasi);
-                if (source.catatan !== undefined && source.catatan !== "") setCatatan(source.catatan);
+                setKasir(source.kasir || "");
+                setLokasi(source.lokasi || "Aimas - Klamono KM 21, Kabupaten Sorong, Papua Barat Daya");
+                setCatatan(source.catatan || "");
 
                 // Custom Expenses: prioritize non-empty customExpenses with actual data
                 if (hasRealCustomExpenses(source.customExpenses)) {
@@ -564,7 +651,6 @@ export default function BeritaAcaraPage() {
                 } else if (cloudArchive && hasRealCustomExpenses(cloudArchive.customExpenses)) {
                     setCustomExpenses(cloudArchive.customExpenses);
                 } else {
-                    // If draft/archive is empty or placeholder, check cashflows for this date
                     const matchingExpenses = getMatchingCashflowsForDate(cashflows, tanggal);
                     if (matchingExpenses.length > 0) {
                         setCustomExpenses(matchingExpenses.map((c, idx) => ({
@@ -582,31 +668,44 @@ export default function BeritaAcaraPage() {
                     }
                 }
 
-                // Sales Rows: if live computed sales from transactions has positive values, use it to ensure no data is missed!
-                const hasComputedSales = computedSalesRows.some(r => Number(r.tunai) > 0 || Number(r.qr) > 0);
-                let baseRows = computedSalesRows;
-                if (Array.isArray(source.salesRows) && source.salesRows.length > 0) {
-                    const hasManualSales = source.salesRows.some(r => Number(r.tunai) > 0 || Number(r.qr) > 0);
-                    if (!hasComputedSales && hasManualSales) {
-                        baseRows = source.salesRows;
-                    }
-                }
-
-                // Saring dan petakan murni ke kategori master aktif (allSalesCategories)
-                const existingMap = new Map(baseRows.map(r => [r.name.toLowerCase().trim(), r]));
+                // Sales Rows: Live POS sales always takes precedence for categories with POS transactions
+                const sourceMap = new Map((source.salesRows || []).map(r => [r.name.toLowerCase().trim(), r]));
                 const mergedSalesRows = allSalesCategories.map(name => {
-                    const found = existingMap.get(name.toLowerCase().trim());
-                    return found ? { ...found, name } : { name, tunai: "", hppTunai: "", qr: "", hppQR: "" };
+                    const lower = name.toLowerCase().trim();
+                    const liveRow = liveMap.get(lower);
+                    const sourceRow = sourceMap.get(lower);
+
+                    const hasLiveTunai = Number(liveRow?.tunai) > 0;
+                    const hasLiveQR = Number(liveRow?.qr) > 0;
+
+                    return {
+                        name,
+                        tunai: hasLiveTunai ? liveRow.tunai : (sourceRow?.tunai || ""),
+                        hppTunai: hasLiveTunai ? liveRow.hppTunai : (sourceRow?.hppTunai || ""),
+                        qr: hasLiveQR ? liveRow.qr : (sourceRow?.qr || ""),
+                        hppQR: hasLiveQR ? liveRow.hppQR : (sourceRow?.hppQR || "")
+                    };
                 });
                 setSalesRows(mergedSalesRows);
 
                 // Expense Rows:
                 if (Array.isArray(source.expenseRows) && source.expenseRows.length > 0) {
                     setExpenseRows(source.expenseRows);
+                } else {
+                    setExpenseRows([
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" }
+                    ]);
                 }
             } else {
                 // Completely fresh date with no draft/archive:
-                setSalesRows(computedSalesRows);
+                setKasir("");
+                setCatatan("");
+                setSalesRows(liveCalc.rows);
 
                 // Check cashflows for this date
                 const matchingExpenses = getMatchingCashflowsForDate(cashflows, tanggal);
@@ -623,16 +722,61 @@ export default function BeritaAcaraPage() {
                     setCustomExpenses([
                         { id: Date.now(), category: categoryOptions[0] || '1) Taman Etnik', keterangan: '', qty: '', harga: '', total: '' }
                     ]);
+                    setExpenseRows([
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" },
+                        { name: "", amount: "" }
+                    ]);
                 }
             }
+
+            loadedDateRef.current = tanggal;
+            isHydratingRef.current = false;
         };
 
         hydrateData();
 
         return () => {
             isCancelled = true;
+            isHydratingRef.current = false;
         };
     }, [tanggal, viewingArchive]);
+
+    // Live Reactivity: Auto-update sales rows when transactions list changes
+    useEffect(() => {
+        if (!tanggal || viewingArchive || isHydratingRef.current || loadedDateRef.current !== tanggal) return;
+
+        const liveCalc = calculateSalesRowsForDate(transactions, tanggal, allSalesCategories, categories, products);
+        const liveMap = new Map(liveCalc.rows.map(r => [r.name.toLowerCase().trim(), r]));
+
+        setSalesRows(prevRows => {
+            const prevMap = new Map(prevRows.map(r => [r.name.toLowerCase().trim(), r]));
+            const nextRows = allSalesCategories.map(name => {
+                const lower = name.toLowerCase().trim();
+                const liveRow = liveMap.get(lower);
+                const prevRow = prevMap.get(lower);
+
+                const hasLiveTunai = Number(liveRow?.tunai) > 0;
+                const hasLiveQR = Number(liveRow?.qr) > 0;
+
+                return {
+                    name,
+                    tunai: hasLiveTunai ? liveRow.tunai : (prevRow?.tunai || ""),
+                    hppTunai: hasLiveTunai ? liveRow.hppTunai : (prevRow?.hppTunai || ""),
+                    qr: hasLiveQR ? liveRow.qr : (prevRow?.qr || ""),
+                    hppQR: hasLiveQR ? liveRow.hppQR : (prevRow?.hppQR || "")
+                };
+            });
+
+            if (JSON.stringify(prevRows) === JSON.stringify(nextRows)) {
+                return prevRows;
+            }
+            return nextRows;
+        });
+    }, [transactions, categories, products, tanggal, salesCategoriesKey, viewingArchive]);
 
     // Real-time Cloud Synchronization from Firebase Firestore (Multi-user sync)
     useEffect(() => {
@@ -872,13 +1016,101 @@ export default function BeritaAcaraPage() {
         }
     };
 
+    // Archive Synchronization Handler: Re-syncs the selected archive with any backdated POS transactions
+    const handleSyncArchiveData = async () => {
+        if (!viewingArchive || !viewingArchive.date) return;
+        const archDate = viewingArchive.date;
+        try {
+            setIsSyncingArchive(true);
+            setArchiveSyncFeedback(null);
+
+            // 1. Fetch fresh data directly from backend
+            const [freshTx, freshCats, freshCf, freshProds, freshArchList] = await Promise.all([
+                StorageService.getTransactions(),
+                StorageService.getCategories(),
+                StorageService.getCashFlow(),
+                StorageService.getProducts(),
+                StorageService.getBeritaAcaraArchives()
+            ]);
+
+            // 2. Notify storage change listeners
+            notifyListeners();
+
+            // 3. Build dynamic sales categories strictly from master categories
+            const dynamicSalesCats = [];
+            (freshCats || []).forEach(cat => {
+                if (cat && cat.name && cat.name.trim() && cat.name.trim().toLowerCase() !== 'umum') {
+                    const rowName = cat.name.trim();
+                    if (!dynamicSalesCats.includes(rowName)) {
+                        dynamicSalesCats.push(rowName);
+                    }
+                }
+            });
+            const finalSalesCats = dynamicSalesCats.length > 0 ? dynamicSalesCats : BASE_SALES_CATEGORIES;
+
+            // 4. Calculate fresh sales rows for the archive's date
+            const calculation = calculateSalesRowsForDate(freshTx, archDate, finalSalesCats, freshCats, freshProds);
+
+            // 5. Compute new totals
+            const totalTunai = calculation.totalTunai;
+            const totalQR = calculation.totalQR;
+            const totalInc = totalTunai + totalQR;
+            const expRows = viewingArchive.expenseRows || [];
+            const totalExp = expRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+            const cleanNetto = totalInc - totalExp;
+
+            // 6. Build updated archive object
+            const nowTimestamp = Date.now();
+            const updatedArchive = {
+                ...viewingArchive,
+                salesRows: calculation.rows,
+                totalIncome: totalInc,
+                totalExpense: totalExp,
+                totalClean: cleanNetto,
+                updatedAt: nowTimestamp,
+                lastSyncedAt: new Date().toISOString()
+            };
+
+            // 7. Save to Firestore & localStorage
+            await StorageService.saveBeritaAcaraArchive(updatedArchive, true);
+            try {
+                localStorage.setItem(`rep_ba_draft_${archDate}`, JSON.stringify(updatedArchive));
+            } catch (e) { }
+
+            // 8. Update local viewingArchive state
+            setViewingArchive(updatedArchive);
+
+            const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const dateFmt = new Date(archDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+            setArchiveSyncFeedback({
+                type: 'success',
+                title: 'Sinkronisasi Data POS Arsip Berhasil!',
+                message: `Data transaksi susulan/perubahan POS untuk tanggal ${dateFmt} berhasil disinkronkan ke dalam dokumen arsip ini.`,
+                details: `Ditemukan ${calculation.matchingTxCount} transaksi penjualan (Tunai: ${formatIDR(calculation.totalTunai)}, Non-Tunai: ${formatIDR(calculation.totalQR)}).`,
+                time: nowStr,
+                txCount: calculation.matchingTxCount
+            });
+        } catch (err) {
+            console.error("Error syncing archive POS data:", err);
+            setArchiveSyncFeedback({
+                type: 'error',
+                title: 'Gagal Menyinkronkan Data POS Arsip',
+                message: 'Terjadi kesalahan saat menyinkronkan data: ' + (err.message || err),
+                time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            });
+        } finally {
+            setIsSyncingArchive(false);
+        }
+    };
+
     const [autoSaveStatus, setAutoSaveStatus] = useState("idle");
 
     // Auto-save Berita Acara to localStorage (immediate) & StorageService (debounced)
     useEffect(() => {
         if (viewingArchive) return;
         if (!tanggal) return;
-        if (loadedDateRef.current !== tanggal) return; // Prevent saving unhydrated initial state over real data
+        if (isHydratingRef.current || loadedDateRef.current !== tanggal) return; // Prevent saving unhydrated initial state over real data
 
         const totalTunai = salesRows.reduce((sum, row) => sum + (Number(row.tunai) || 0), 0);
         const totalQR = salesRows.reduce((sum, row) => sum + (Number(row.qr) || 0), 0);
@@ -1136,17 +1368,72 @@ export default function BeritaAcaraPage() {
             const fileName = `Berita_Acara_${currentTanggal}.pdf`;
             pdf.save(fileName);
 
-            const textMessage =
-                `*BERITA ACARA REKAPAN PENJUALAN & PENGELUARAN*
-📅 Tanggal: ${currentTanggal}
-👤 Kasir: ${currentKasir || '-'}
-📍 Lokasi: ${currentLokasi || '-'}
+            const tanggalFormatted = currentPeriode || currentTanggal;
 
-💰 Total Pendapatan: ${formatIDR(totalAllSales)}
-💸 Total Pengeluaran: ${formatIDR(totalPengeluaran)}
-💵 Netto (Kas Bersih): ${formatIDR(netto)}
+            // Rincian per kategori penjualan aktif (> 0)
+            const activeSalesLines = currentSalesRows
+                .filter(row => (Number(row.tunai) || 0) > 0 || (Number(row.qr) || 0) > 0)
+                .map(row => {
+                    const tVal = Number(row.tunai) || 0;
+                    const qVal = Number(row.qr) || 0;
+                    const tot = tVal + qVal;
+                    let detailParts = [];
+                    if (tVal > 0) detailParts.push(`Tunai: ${formatIDR(tVal)}`);
+                    if (qVal > 0) detailParts.push(`QR/Non-Tunai: ${formatIDR(qVal)}`);
+                    return `  • *${row.name}*: ${formatIDR(tot)} (${detailParts.join(' | ')})`;
+                });
 
-📄 _Dokumen PDF resmi Berita Acara telah otomatis diunduh ke perangkat Anda. Silakan lampirkan file PDF tersebut ke pesan WhatsApp Web ini._`;
+            // Rincian pengeluaran kasir aktif (> 0)
+            const activeExpenseLines = currentExpenseRows
+                .filter(row => (row.name && row.name.trim()) || (Number(row.amount) || 0) > 0)
+                .map(row => `  • ${row.name || 'Operasional'}: ${formatIDR(Number(row.amount) || 0)}`);
+
+            const messageLines = [
+                `*LAPORAN BERITA ACARA TUTUP KASIR*`,
+                `*Kepada Yth: Pimpinan / Owner*`,
+                `━━━━━━━━━━━━━━━━━━━━`,
+                `📅 *Hari/Tanggal:* ${tanggalFormatted}`,
+                `📍 *Lokasi/Cabang:* ${currentLokasi || 'Toko Utama'}`,
+                `👤 *Kasir Bertugas:* ${currentKasir || '-'}`,
+                `━━━━━━━━━━━━━━━━━━━━`,
+                ``,
+                `📊 *RINGKASAN OMSET & PENDAPATAN*`,
+                `  💵 Penjualan Tunai: *${formatIDR(totalSalesTunai)}*`,
+                `  📱 Penjualan QRIS / Non-Tunai: *${formatIDR(totalSalesQR)}*`,
+                `  👉 *TOTAL OMSET KOTOR: ${formatIDR(totalAllSales)}*`,
+            ];
+
+            if (activeSalesLines.length > 0) {
+                messageLines.push(``);
+                messageLines.push(`📦 *RINCIAN PENJUALAN PER KATEGORI:*`);
+                messageLines.push(...activeSalesLines);
+            }
+
+            messageLines.push(``);
+            messageLines.push(`💸 *PENGELUARAN OPERASIONAL KASIR*`);
+            messageLines.push(`  👉 *Total Pengeluaran: ${formatIDR(totalPengeluaran)}*`);
+            if (activeExpenseLines.length > 0) {
+                messageLines.push(...activeExpenseLines);
+            }
+
+            messageLines.push(``);
+            messageLines.push(`━━━━━━━━━━━━━━━━━━━━`);
+            messageLines.push(`💰 *SETORAN KAS BERSIH (NETTO)*`);
+            messageLines.push(`👉 *TOTAL FISIK KAS WAJIB SETOR: ${formatIDR(netto)}*`);
+            messageLines.push(`_(Penjualan Tunai ${formatIDR(totalSalesTunai)} - Pengeluaran ${formatIDR(totalPengeluaran)})_`);
+            messageLines.push(`━━━━━━━━━━━━━━━━━━━━`);
+
+            if (currentCatatan && currentCatatan.trim()) {
+                messageLines.push(``);
+                messageLines.push(`📝 *Catatan Kasir:*`);
+                messageLines.push(`"${currentCatatan.trim()}"`);
+            }
+
+            messageLines.push(``);
+            messageLines.push(`_Laporan ini dibuat otomatis melalui Aplikasi POS._`);
+            messageLines.push(`_Demikian laporan harian ini disampaikan. Terima kasih._`);
+
+            const textMessage = messageLines.join('\n');
 
             const encodedText = encodeURIComponent(textMessage);
             const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -1209,29 +1496,35 @@ export default function BeritaAcaraPage() {
                     localStorage.removeItem(`rep_ba_draft_${toDelete.date}`);
                 } catch (e) { }
             }
-            if (viewingArchive?.id === id) setViewingArchive(null);
+            if (viewingArchive?.id === id) {
+                setViewingArchive(null);
+                setActiveTab("archives");
+            }
         }
     };
 
     const handleArchiveDownloadPdf = (arch) => {
         setViewingArchive(arch);
+        setActiveTab("view_archive");
         setTimeout(() => {
             handleDownloadPdf();
-        }, 150);
+        }, 200);
     };
 
     const handleArchivePrint = (arch) => {
         setViewingArchive(arch);
+        setActiveTab("view_archive");
         setTimeout(() => {
             handlePrint();
-        }, 150);
+        }, 200);
     };
 
     const handleArchiveShareWhatsApp = (arch) => {
         setViewingArchive(arch);
+        setActiveTab("view_archive");
         setTimeout(() => {
             handleShareWhatsApp();
-        }, 150);
+        }, 200);
     };
 
     const currentTanggal = viewingArchive ? viewingArchive.date : tanggal;
@@ -1490,6 +1783,673 @@ export default function BeritaAcaraPage() {
     const netto = totalSalesTunai - totalPengeluaran;
     const totalLabaNetto = (totalProfitTunai + totalProfitQR) - totalPengeluaran;
 
+    // Helper to render official printable 2-page A4 document
+    const renderPrintableDocument = (isReadOnly = false) => {
+        return (
+            <div className="w-full overflow-x-auto no-scrollbar pb-8 print:pb-0 bg-slate-100/60 print:bg-transparent py-4 print:py-0">
+                <style>{`
+            .no-scrollbar::-webkit-scrollbar,
+            .no-scrollbar::-webkit-scrollbar-thumb,
+            .no-scrollbar::-webkit-scrollbar-track {
+                display: none !important;
+                width: 0 !important;
+                height: 0 !important;
+                background: transparent !important;
+            }
+            .no-scrollbar {
+                -ms-overflow-style: none !important;
+                scrollbar-width: none !important;
+            }
+            @media print {
+                @page {
+                    size: A4 portrait;
+                    margin: 5mm;
+                }
+                html, body {
+                    height: auto !important;
+                    min-height: 100% !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                    background: white !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+                .page-break {
+                    page-break-before: always !important;
+                    break-before: page !important;
+                    height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    border: none !important;
+                    display: block !important;
+                }
+                .print-page {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    box-shadow: none !important;
+                    border: none !important;
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                }
+                #berita-acara-page-1 {
+                    page-break-after: always !important;
+                    break-after: page !important;
+                }
+                #berita-acara-page-2 {
+                    page-break-before: always !important;
+                    break-before: page !important;
+                }
+                input, textarea {
+                    border: none !important;
+                    box-shadow: none !important;
+                    outline: none !important;
+                    background: transparent !important;
+                }
+            }
+            .brown-header {
+                background-color: #8B4513 !important;
+                color: white !important;
+                font-weight: bold;
+                padding: 3px 6px;
+                font-size: 9.5px;
+                line-height: 1.3;
+            }
+            .report-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 8.5px;
+                table-layout: fixed;
+            }
+            .report-table th, .report-table td {
+                border: 1px solid #94a3b8;
+                padding: 2.5px 3.5px;
+                line-height: 1.25;
+                vertical-align: middle;
+                box-sizing: border-box;
+            }
+            .report-table th {
+                background-color: #f1f5f9;
+                text-align: center;
+                font-weight: 700;
+                color: #0f172a;
+                font-size: 8px;
+            }
+            .editable-cell {
+                width: 100%;
+                background: transparent;
+                border: none !important;
+                outline: none !important;
+                font-family: inherit;
+                font-size: 8.5px;
+                line-height: 1.25;
+                color: inherit;
+                padding: 0 !important;
+                margin: 0 !important;
+                box-sizing: border-box;
+                vertical-align: middle;
+            }
+            .editable-cell:focus {
+                background: #fef08a;
+            }
+        `}</style>
+
+                {/* ======================================================== */}
+                {/* HALAMAN 1: BERITA ACARA UTAMA (A4 PORTRAIT) */}
+                {/* ======================================================== */}
+                <div id="berita-acara-page-1" className="print-page bg-white mx-auto text-black w-[210mm] max-w-full p-6 print:p-0 shadow-lg mb-8 print:mb-0 box-border">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b-2 border-amber-900 pb-2 mb-3">
+                        <div className="w-1/4">
+                            <img src="/logokasir.jpg" alt="Logo" style={{ height: '55px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
+                        </div>
+                        <div className="w-3/4 text-center">
+                            <h1 className="text-lg font-bold uppercase tracking-wider mb-0.5">BERITA ACARA</h1>
+                            <h2 className="text-xs font-bold uppercase">LAPORAN PENJUALAN DAN PENGELUARAN</h2>
+                            <h3 className="text-xs font-bold text-amber-900 italic">RUMAH ETNIK PAPUA - WISATA BUDAYA PAPUA</h3>
+                        </div>
+                    </div>
+
+                    {/* Section I */}
+                    <div className="mb-3">
+                        <div className="brown-header">I. IDENTITAS LAPORAN</div>
+                        <div className="grid grid-cols-2 gap-4 mt-1.5 px-2 text-xs font-medium">
+                            <div>
+                                <div className="flex items-center mb-1">
+                                    <span className="w-16 shrink-0">Date</span>
+                                    <span className="mr-2">:</span>
+                                    <div className="flex-1 border-b border-black pb-0.5 font-semibold text-gray-900">{currentTanggal ? currentTanggal.split("-").reverse().join("/") : ''}</div>
+                                </div>
+                                <div className="flex items-center">
+                                    <span className="w-16 shrink-0">Periode</span>
+                                    <span className="mr-2">:</span>
+                                    <div className="flex-1 border-b border-black pb-0.5 font-semibold text-gray-900">{currentPeriode}</div>
+                                </div>
+                            </div>
+                            <div>
+                                <div className="flex items-center mb-1">
+                                    <span className="w-16 shrink-0">Kasir</span>
+                                    <span className="mr-2">:</span>
+                                    <div className="flex-1 pb-0.5 font-semibold text-gray-900">{currentKasir || '-'}</div>
+                                </div>
+                                <div className="flex items-center">
+                                    <span className="w-16 shrink-0">Lokasi</span>
+                                    <span className="mr-2">:</span>
+                                    <div className="flex-1 pb-0.5 font-semibold text-gray-900">{currentLokasi || '-'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section II & III - Berdampingan (Side by Side) */}
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                        {/* Section II - Tunai */}
+                        <div>
+                            <div className="brown-header flex justify-between items-center">
+                                <span>II. LAPORAN PENJUALAN (TUNAI)</span>
+                                <button
+                                    type="button"
+                                    onClick={isReadOnly ? handleSyncArchiveData : () => handleSyncData({ syncCashflow: false })}
+                                    disabled={isReadOnly ? isSyncingArchive : isSyncing}
+                                    className="print:hidden text-[8px] bg-amber-950/70 hover:bg-amber-950 text-amber-100 px-1.5 py-0.5 rounded flex items-center gap-1 font-normal transition-colors cursor-pointer"
+                                    title="Sinkronkan data penjualan tunai dari POS (termasuk transaksi susulan)"
+                                >
+                                    <RefreshCw size={9} className={(isReadOnly ? isSyncingArchive : isSyncing) ? "animate-spin" : ""} />
+                                    <span>Sinkron POS</span>
+                                </button>
+                            </div>
+                            <table className="report-table">
+                                <thead>
+                                    <tr>
+                                        <th style={{ width: '6%' }}>No</th>
+                                        <th style={{ width: '38%' }}>Sumber Pendapatan</th>
+                                        <th style={{ width: '18%' }}>Pendapatan</th>
+                                        <th style={{ width: '18%' }}>Modal</th>
+                                        <th style={{ width: '20%' }}>Keuntungan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {currentSalesRows.map((row, idx) => {
+                                        const pendapatan = Number(row.tunai) || 0;
+                                        const modal = Number(row.hppTunai) || 0;
+                                        const keuntungan = pendapatan - modal;
+                                        const isRowEmpty = !row.tunai && !row.hppTunai;
+                                        return (
+                                            <tr key={`sales-${idx}`}>
+                                                <td className="text-center">{idx + 1}</td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        className={`editable-cell ${isReadOnly ? 'cursor-default' : ''}`}
+                                                        value={row.name}
+                                                        onChange={!isReadOnly ? (e) => handleSalesRowChange(idx, 'name', e.target.value) : undefined}
+                                                        readOnly={isReadOnly}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        className={`editable-cell text-right ${isReadOnly ? 'cursor-default' : ''}`}
+                                                        value={row.tunai ? (isNaN(Number(row.tunai)) ? row.tunai : formatNumber(row.tunai)) : ''}
+                                                        onChange={!isReadOnly ? (e) => handleSalesRowChange(idx, 'tunai', e.target.value) : undefined}
+                                                        placeholder={isReadOnly ? '-' : '0'}
+                                                        readOnly={isReadOnly}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        className={`editable-cell text-right text-red-700/80 ${isReadOnly ? 'cursor-default' : ''}`}
+                                                        value={row.hppTunai ? (isNaN(Number(row.hppTunai)) ? row.hppTunai : formatNumber(row.hppTunai)) : ''}
+                                                        onChange={!isReadOnly ? (e) => handleSalesRowChange(idx, 'hppTunai', e.target.value) : undefined}
+                                                        placeholder={isReadOnly ? '-' : '0'}
+                                                        readOnly={isReadOnly}
+                                                    />
+                                                </td>
+                                                <td className="text-right font-medium text-green-700 bg-slate-50/50 pr-1">
+                                                    {isRowEmpty ? '' : formatIDR(keuntungan)}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    <tr className="bg-[#f5e6d3] font-bold">
+                                        <td colSpan={2} className="text-right">TOTAL PENJUALAN (TUNAI)</td>
+                                        <td className="text-right">{formatIDR(totalSalesTunai)}</td>
+                                        <td className="text-right text-red-700">{formatIDR(totalModalTunai)}</td>
+                                        <td className="text-right text-green-700 font-bold">{formatIDR(totalLabaTunai)}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            {!isReadOnly && (
+                                <button
+                                    onClick={addSalesRow}
+                                    className="mt-1 text-[9px] text-amber-800 hover:text-amber-950 font-bold flex items-center gap-1 print:hidden"
+                                >
+                                    <PlusCircle size={10} /> Tambah Baris Penjualan
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Section III - Setoran Tunai Kasir */}
+                        <div>
+                            <div className="brown-header">III. LAPORAN SETORAN TUNAI KASIR</div>
+                            <table className="report-table">
+                                <thead>
+                                    <tr>
+                                        <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
+                                            1. Total Pendapatan Penjualan Tunai
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style={{ width: '8%' }} className="text-center">1</td>
+                                        <td style={{ width: '52%' }}>Penjualan Tunai Hari ini</td>
+                                        <td style={{ width: '40%' }} className="text-right font-medium text-green-700">
+                                            {formatIDR(totalSalesTunai)}
+                                        </td>
+                                    </tr>
+                                    <tr className="bg-[#f5e6d3] font-bold">
+                                        <td colSpan={2} className="text-right">JUMLAH (1)</td>
+                                        <td className="text-right text-green-800">{formatIDR(totalSalesTunai)}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <table className="report-table mt-1.5">
+                                <thead>
+                                    <tr>
+                                        <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
+                                            2. Pengeluaran Operasional Toko Hari ini
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style={{ width: '8%' }} className="text-center">1</td>
+                                        <td style={{ width: '52%' }}>Dipotong Pengeluaran (V)</td>
+                                        <td style={{ width: '40%' }} className="text-right font-medium text-red-700">
+                                            - {formatIDR(totalPengeluaran)}
+                                        </td>
+                                    </tr>
+                                    <tr className="bg-[#fee2e2] font-bold text-red-950">
+                                        <td colSpan={2} className="text-right">JUMLAH (2)</td>
+                                        <td className="text-right text-red-700">- {formatIDR(totalPengeluaran)}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <table className="report-table mt-1.5">
+                                <thead>
+                                    <tr>
+                                        <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
+                                            3. SETORAN FISIK (TUNAI) = (1 - 2)
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style={{ width: '8%' }} className="text-center">1</td>
+                                        <td style={{ width: '52%' }}>Setoran Bruto</td>
+                                        <td style={{ width: '40%' }} className="text-right font-medium">{formatIDR(totalSalesTunai)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="text-center">2</td>
+                                        <td>Dipotong Pengeluaran (V)</td>
+                                        <td className="text-right font-medium text-red-700">- {formatIDR(totalPengeluaran)}</td>
+                                    </tr>
+                                    <tr className="bg-[#dcfce7] font-extrabold text-green-950">
+                                        <td colSpan={2} className="text-right">NETTO (UANG FISIK KASIR)</td>
+                                        <td className="text-right font-mono text-green-800 text-[10px]">{formatIDR(netto)}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Section IV & V - Berdampingan (Side by Side) */}
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                        {/* Section IV - QR Code */}
+                        <div>
+                            <div className="brown-header flex justify-between items-center">
+                                <span>IV. LAPORAN PENJUALAN (NON-TUNAI / QR)</span>
+                                <button
+                                    type="button"
+                                    onClick={isReadOnly ? handleSyncArchiveData : () => handleSyncData({ syncCashflow: false })}
+                                    disabled={isReadOnly ? isSyncingArchive : isSyncing}
+                                    className="print:hidden text-[8px] bg-amber-950/70 hover:bg-amber-950 text-amber-100 px-1.5 py-0.5 rounded flex items-center gap-1 font-normal transition-colors cursor-pointer"
+                                    title="Sinkronkan data penjualan non-tunai dari POS (termasuk transaksi susulan)"
+                                >
+                                    <RefreshCw size={9} className={(isReadOnly ? isSyncingArchive : isSyncing) ? "animate-spin" : ""} />
+                                    <span>Sinkron POS</span>
+                                </button>
+                            </div>
+                            <table className="report-table">
+                                <thead>
+                                    <tr>
+                                        <th style={{ width: '6%' }}>No</th>
+                                        <th style={{ width: '38%' }}>Sumber Pendapatan</th>
+                                        <th style={{ width: '18%' }}>Pendapatan</th>
+                                        <th style={{ width: '18%' }}>Modal</th>
+                                        <th style={{ width: '20%' }}>Keuntungan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {currentSalesRows.map((row, idx) => {
+                                        const pendapatan = Number(row.qr) || 0;
+                                        const modal = Number(row.hppQR) || 0;
+                                        const keuntungan = pendapatan - modal;
+                                        const isRowEmpty = !row.qr && !row.hppQR;
+                                        return (
+                                            <tr key={`sales-qr-${idx}`}>
+                                                <td className="text-center">{idx + 1}</td>
+                                                <td className="font-medium text-gray-800">{row.name}</td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        className={`editable-cell text-right ${isReadOnly ? 'cursor-default' : ''}`}
+                                                        value={row.qr ? (isNaN(Number(row.qr)) ? row.qr : formatNumber(row.qr)) : ''}
+                                                        onChange={!isReadOnly ? (e) => handleSalesRowChange(idx, 'qr', e.target.value) : undefined}
+                                                        placeholder={isReadOnly ? '-' : '0'}
+                                                        readOnly={isReadOnly}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        className={`editable-cell text-right text-red-700/80 ${isReadOnly ? 'cursor-default' : ''}`}
+                                                        value={row.hppQR ? (isNaN(Number(row.hppQR)) ? row.hppQR : formatNumber(row.hppQR)) : ''}
+                                                        onChange={!isReadOnly ? (e) => handleSalesRowChange(idx, 'hppQR', e.target.value) : undefined}
+                                                        placeholder={isReadOnly ? '-' : '0'}
+                                                        readOnly={isReadOnly}
+                                                    />
+                                                </td>
+                                                <td className="text-right font-medium text-blue-700 bg-slate-50/50 pr-1">
+                                                    {isRowEmpty ? '' : formatIDR(keuntungan)}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    <tr className="bg-[#e0f2fe] font-bold">
+                                        <td colSpan={2} className="text-right">TOTAL PENJUALAN (QR)</td>
+                                        <td className="text-right">{formatIDR(totalSalesQR)}</td>
+                                        <td className="text-right text-red-700">{formatIDR(totalModalQR)}</td>
+                                        <td className="text-right text-blue-700 font-bold">{formatIDR(totalLabaQR)}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            {/* Rekapitulasi Laba Rugi Penjualan */}
+                            <table className="report-table mt-2">
+                                <thead>
+                                    <tr>
+                                        <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
+                                            2. REKAPITULASI LABA PENJUALAN (NETTO PROFIT)
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style={{ width: '8%' }} className="text-center">1</td>
+                                        <td style={{ width: '52%' }}>Keuntungan Laba Penjualan (Tunai)</td>
+                                        <td style={{ width: '40%' }} className="text-right font-medium text-green-700">{formatIDR(totalLabaTunai)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="text-center">2</td>
+                                        <td>Keuntungan Laba Penjualan (QR)</td>
+                                        <td className="text-right font-medium text-blue-700">{formatIDR(totalLabaQR)}</td>
+                                    </tr>
+                                    <tr className="bg-slate-100 font-bold">
+                                        <td colSpan={2} className="text-right">TOTAL LABA KOTOR</td>
+                                        <td className="text-right font-mono">{formatIDR(totalLabaTunai + totalLabaQR)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="text-center">3</td>
+                                        <td>Dipotong Beban Pengeluaran (V)</td>
+                                        <td className="text-right font-medium text-red-700">- {formatIDR(totalPengeluaran)}</td>
+                                    </tr>
+                                    <tr className="bg-[#fef08a] font-extrabold text-amber-950">
+                                        <td colSpan={2} className="text-right">KEUNTUNGAN BERSIH (NETTO)</td>
+                                        <td className="text-right font-mono text-amber-900 text-[10px]">{formatIDR(totalLabaNetto)}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Section V - Pengeluaran */}
+                        <div>
+                            <div className="brown-header">V. LAPORAN PENGELUARAN</div>
+                            <table className="report-table">
+                                <thead>
+                                    <tr>
+                                        <th style={{ width: '8%' }}>No</th>
+                                        <th style={{ width: '58%' }}>KATEGORI PENGELUARAN</th>
+                                        <th style={{ width: '28%' }}>Jumlah (Rp)</th>
+                                        {!isReadOnly && <th style={{ width: '6%' }} className="print:hidden">Aksi</th>}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(() => {
+                                        const activeRows = currentExpenseRows.filter(r => (r.name && r.name.trim()) || (Number(r.amount) > 0));
+                                        if (activeRows.length === 0) {
+                                            return (
+                                                <tr>
+                                                    <td colSpan={!isReadOnly ? 4 : 3} className="p-3 text-center text-slate-400 italic text-[9px] print:text-[6.5pt]">
+                                                        Belum ada catatan pengeluaran operasional (biaya) yang terinput pada hari ini.
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
+
+                                        return activeRows.map((row, idx) => (
+                                            <tr key={`expense-${idx}`}>
+                                                <td className="text-center font-mono">{idx + 1}</td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        className={`editable-cell ${isReadOnly ? 'cursor-default' : ''}`}
+                                                        value={row.name}
+                                                        onChange={!isReadOnly ? (e) => handleExpenseRowChange(idx, 'name', e.target.value) : undefined}
+                                                        placeholder={isReadOnly ? '-' : 'Tulis kategori pengeluaran...'}
+                                                        readOnly={isReadOnly}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        className={`editable-cell text-right font-mono font-bold text-red-700 ${isReadOnly ? 'cursor-default' : ''}`}
+                                                        value={row.amount ? (isNaN(Number(row.amount)) ? row.amount : formatNumber(row.amount)) : ''}
+                                                        onChange={!isReadOnly ? (e) => handleExpenseRowChange(idx, 'amount', e.target.value) : undefined}
+                                                        placeholder={isReadOnly ? '-' : '0'}
+                                                        readOnly={isReadOnly}
+                                                    />
+                                                </td>
+                                                {!isReadOnly && (
+                                                    <td className="text-center print:hidden p-0.5">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => deleteExpenseRow(idx)}
+                                                            className="text-red-500 hover:text-red-700 p-0.5 rounded hover:bg-red-50"
+                                                            title="Hapus Baris Ini"
+                                                        >
+                                                            <Trash2 size={11} />
+                                                        </button>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        ));
+                                    })()}
+                                    <tr className="bg-[#fee2e2] font-extrabold text-red-950">
+                                        <td colSpan={2} className="text-right uppercase">TOTAL PENGELUARAN</td>
+                                        <td className="text-right text-red-700 font-bold font-mono">{formatIDR(totalPengeluaran)}</td>
+                                        {!isReadOnly && <td className="print:hidden"></td>}
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Signatures */}
+                    <div className="flex justify-between text-xs mt-4 mb-4 px-8 font-medium">
+                        <div className="text-center">
+                            <p className="mb-8">Dibuat oleh,<br />Kasir / Administrasi</p>
+                            <p className="font-bold">(&nbsp;&nbsp;{currentKasir || '........................................'}&nbsp;&nbsp;)</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="mb-8">Sorong, {currentTanggal ? currentTanggal.split("-").reverse().join("/") : '...../...../.........'}<br />Mengetahui,<br />Staff Keuangan</p>
+                            <p>( ................................................. )</p>
+                        </div>
+                    </div>
+
+                    {/* Catatan */}
+                    <div className="text-xs font-bold flex gap-2 items-start border-t border-gray-200 pt-2">
+                        <span className="shrink-0 pt-0.5">CATATAN :</span>
+                        <textarea
+                            className={`flex-1 outline-none min-h-[36px] resize-none border border-gray-200 rounded p-1 text-xs print:border-none print:p-0 ${isReadOnly ? 'cursor-default' : ''}`}
+                            value={isReadOnly ? (currentCatatan || "") : catatan}
+                            onChange={!isReadOnly ? (e) => setCatatan(e.target.value) : undefined}
+                            placeholder={isReadOnly ? '-' : 'Tambahkan catatan khusus laporan di sini...'}
+                            readOnly={isReadOnly}
+                        />
+                    </div>
+                </div>
+
+                {/* ======================================================== */}
+                {/* HALAMAN 2: LAMPIRAN VI. URAIAN PENGELUARAN (A4 PORTRAIT) */}
+                {/* ======================================================== */}
+                {(() => {
+                    const allSectionTitles = [
+                        ...DETAILED_EXPENSE_CONFIG.map(c => c.title),
+                        ...Object.keys(derivedDetailedExpensesCurrent).filter(t => !DETAILED_EXPENSE_CONFIG.some(c => c.title === t))
+                    ];
+
+                    const activeTables = allSectionTitles.map(title => {
+                        const allRows = derivedDetailedExpensesCurrent[title] || [];
+                        const validRows = allRows.filter(r => (r.keterangan && r.keterangan.trim()) || Number(r.total) > 0 || Number(r.harga) > 0);
+                        return {
+                            config: { title },
+                            dataRows: validRows
+                        };
+                    }).filter(t => t.dataRows && t.dataRows.length > 0);
+
+                    if (activeTables.length === 0) return null;
+
+                    const leftTables = [];
+                    const rightTables = [];
+                    let leftRows = 0;
+                    let rightRows = 0;
+
+                    activeTables.forEach(t => {
+                        const weight = t.dataRows.length + 3; // +3 for headers/total row
+                        if (leftRows <= rightRows) {
+                            leftTables.push(t);
+                            leftRows += weight;
+                        } else {
+                            rightTables.push(t);
+                            rightRows += weight;
+                        }
+                    });
+
+                    const renderTable = (t) => {
+                        const colTotal = t.dataRows.reduce((sum, row) => sum + (Number(row.total) || 0), 0);
+                        const categoryCleanName = t.config.title.replace(/^VI\.\s*URAIAN\s*PENGELUARAN\s*\(?/i, '').replace(/\)?$/, '').trim() || t.config.title;
+                        return (
+                            <div key={t.config.title} className="w-full border border-slate-300 rounded overflow-hidden shadow-2xs mb-2.5 break-inside-avoid">
+                                <div className="brown-header text-[9.5px] text-center font-bold uppercase tracking-wider py-1">
+                                    POS: {categoryCleanName.toUpperCase()}
+                                </div>
+                                <table className="report-table">
+                                    <thead>
+                                        <tr>
+                                            <th style={{ width: '8%' }} className="text-center">NO</th>
+                                            <th style={{ width: '44%' }} className="text-left px-1.5">KETERANGAN</th>
+                                            <th style={{ width: '12%' }} className="text-center">QTY</th>
+                                            <th style={{ width: '18%' }} className="text-right px-1.5">HARGA (Rp)</th>
+                                            <th style={{ width: '18%' }} className="text-right px-1.5">TOTAL (Rp)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {t.dataRows.map((row, rowIdx) => (
+                                            <tr key={`row-${t.config.title}-${rowIdx}`} className="odd:bg-white even:bg-slate-50/70">
+                                                <td className="text-center font-mono text-slate-600">{rowIdx + 1}</td>
+                                                <td className="font-semibold text-slate-800 p-1 px-1.5 leading-tight">{row.keterangan}</td>
+                                                <td className="text-center font-mono text-slate-700 p-1 px-1 leading-tight">{row.qty || '1'}</td>
+                                                <td className="text-right font-mono text-slate-700 p-1 px-1.5 leading-tight">{row.harga ? formatIDR(row.harga) : '-'}</td>
+                                                <td className="text-right font-mono font-bold text-red-700 p-1 px-1.5 leading-tight">{row.total ? formatIDR(row.total) : '-'}</td>
+                                            </tr>
+                                        ))}
+                                        <tr className="bg-[#fee2e2] font-extrabold text-red-950 border-t border-slate-300">
+                                            <td colSpan={4} className="text-right uppercase px-2 py-0.5 text-[8px]">SUBTOTAL ({categoryCleanName})</td>
+                                            <td className="text-right font-mono text-red-700 font-black p-1 px-1.5 text-[8.5px]">
+                                                {colTotal > 0 ? formatIDR(colTotal) : 'Rp 0'}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        );
+                    };
+
+                    return (
+                        <>
+                            <div className="page-break"></div>
+                            <div id="berita-acara-page-2" className="print-page bg-white mx-auto text-black w-[210mm] max-w-full p-6 print:p-0 shadow-lg mb-8 print:mb-0 box-border">
+                                {/* Formal Page 2 Header */}
+                                <div className="flex items-center justify-between border-b-2 border-amber-900 pb-2 mb-3">
+                                    <div className="w-1/4">
+                                        <img src="/logokasir.jpg" alt="Logo" style={{ height: '48px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
+                                    </div>
+                                    <div className="w-3/4 text-center">
+                                        <h1 className="text-base font-bold uppercase tracking-wider mb-0.5">BERITA ACARA - LAMPIRAN</h1>
+                                        <h2 className="text-xs font-bold uppercase text-amber-900">VI. URAIAN RINCIAN PENGELUARAN OPERASIONAL</h2>
+                                        <h3 className="text-[10px] font-medium text-gray-600">RUMAH ETNIK PAPUA - WISATA BUDAYA PAPUA</h3>
+                                    </div>
+                                </div>
+
+                                {/* Sub-bar Info */}
+                                <div className="bg-amber-50/80 border border-amber-200 rounded px-3 py-1.5 mb-3 flex justify-between items-center text-[10px] font-medium text-gray-800">
+                                    <div><strong>Tanggal:</strong> {currentTanggal ? currentTanggal.split("-").reverse().join("/") : ''}</div>
+                                    <div><strong>Periode:</strong> {currentPeriode}</div>
+                                    <div><strong>Kasir:</strong> {currentKasir || '-'}</div>
+                                    <div><strong>Lokasi:</strong> {currentLokasi || '-'}</div>
+                                </div>
+
+                                {/* 2 Column Layout */}
+                                <div className="flex gap-x-4 items-start w-full mb-4">
+                                    <div className="w-1/2 flex flex-col">
+                                        {leftTables.map(renderTable)}
+                                    </div>
+                                    <div className="w-1/2 flex flex-col">
+                                        {rightTables.map(renderTable)}
+                                    </div>
+                                </div>
+
+                                {/* Grand Total Footer */}
+                                <div className="border border-red-300 bg-[#fee2e2] rounded p-2 flex justify-between items-center text-xs font-extrabold text-red-950 mb-4">
+                                    <span className="uppercase tracking-wider">TOTAL KESELURUHAN PENGELUARAN (VI. URAIAN OPERASIONAL)</span>
+                                    <span className="font-mono text-sm text-red-700 font-black">{formatIDR(totalPengeluaran)}</span>
+                                </div>
+
+                                {/* Page 2 Validation Signatures */}
+                                <div className="flex justify-between text-xs mt-6 px-8 font-medium">
+                                    <div className="text-center">
+                                        <p className="mb-8">Dibuat oleh,<br />Kasir / Administrasi</p>
+                                        <p className="font-bold">(&nbsp;&nbsp;{currentKasir || '........................................'}&nbsp;&nbsp;)</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="mb-8">Sorong, {currentTanggal ? currentTanggal.split("-").reverse().join("/") : '...../...../.........'}<br />Mengetahui,<br />Staff Keuangan</p>
+                                        <p>( ................................................. )</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    );
+                })()}
+            </div>
+        );
+    };
+
     return (
         <div className="min-h-screen print:min-h-0 print:h-auto print:overflow-visible bg-slate-100 p-2 md:p-6 lg:p-8 print:bg-white print:p-0">
             {/* Header Title & Navigation Bar (Hidden on Print) */}
@@ -1502,7 +2462,7 @@ export default function BeritaAcaraPage() {
                     <p className="text-slate-500 text-sm mt-1">Rekapitulasi resmi pendapatan penjualan, pengeluaran operasional, dan setoran kasir</p>
                 </div>
 
-                <div className="flex gap-2 py-1 px-1 bg-white border border-slate-200 rounded-xl shadow-sm">
+                <div className="flex flex-wrap gap-2 py-1 px-1 bg-white border border-slate-200 rounded-xl shadow-sm">
                     <button
                         onClick={() => { setActiveTab('input'); setViewingArchive(null); }}
                         className={`flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-lg transition-all ${activeTab === 'input' && !viewingArchive
@@ -1513,161 +2473,99 @@ export default function BeritaAcaraPage() {
                         <Plus size={15} /> Form Berita Acara
                     </button>
                     <button
-                        onClick={() => setActiveTab('archives')}
-                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-lg transition-all ${activeTab === 'archives' || viewingArchive
+                        onClick={() => { setActiveTab('archives'); setViewingArchive(null); }}
+                        className={`flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-lg transition-all ${activeTab === 'archives' && !viewingArchive
                             ? 'bg-amber-600 text-white shadow-md'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                             }`}
                     >
                         <Archive size={15} /> Daftar Arsip ({archives.length})
                     </button>
+                    {(activeTab === 'view_archive' || viewingArchive) && viewingArchive && (
+                        <div className="flex items-center bg-amber-600 text-white rounded-lg shadow-md pl-3 pr-1.5 py-1 text-xs font-bold gap-1.5 animate-fadeIn">
+                            <span className="flex items-center gap-1 truncate max-w-[140px] sm:max-w-[200px]">
+                                <Eye size={13} /> {viewingArchive.title || viewingArchive.date}
+                            </span>
+                            <button
+                                onClick={() => {
+                                    setViewingArchive(null);
+                                    setActiveTab('archives');
+                                }}
+                                className="p-1 hover:bg-amber-700 rounded-md transition-colors text-white"
+                                title="Tutup Tampilan Arsip"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* Metric Summary Cards Banner (Hidden on Print) */}
+            {/* ======================================================== */}
+            {/* VIEW 1: FORM BERITA ACARA (LIVE DATE ENTRY) */}
+            {/* ======================================================== */}
             {activeTab === 'input' && !viewingArchive && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 mb-6 print:hidden">
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Penjualan Tunai</p>
-                            <h3 className="text-lg font-extrabold text-slate-900 mt-1">{formatIDR(totalSalesTunai)}</h3>
-                            <p className="text-[11px] text-slate-400 mt-0.5">Penerimaan Tunai Kasir</p>
-                        </div>
-                        <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
-                            <FileText size={22} />
-                        </div>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Non-Tunai / QR</p>
-                            <h3 className="text-lg font-extrabold text-purple-700 mt-1">{formatIDR(totalSalesQR)}</h3>
-                            <p className="text-[11px] text-slate-400 mt-0.5">Transfer & QRIS Bank</p>
-                        </div>
-                        <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
-                            <Info size={22} />
-                        </div>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Pendapatan Kotor</p>
-                            <h3 className="text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(totalAllSales)}</h3>
-                            <p className="text-[11px] text-slate-400 mt-0.5">Tunai + Non-Tunai</p>
-                        </div>
-                        <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
-                            <CheckCircle2 size={22} />
-                        </div>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pengeluaran Sesi</p>
-                            <h3 className="text-lg font-extrabold text-rose-600 mt-1">{formatIDR(totalPengeluaran)}</h3>
-                            <p className="text-[11px] text-slate-400 mt-0.5">Operasional Kasir</p>
-                        </div>
-                        <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
-                            <Trash2 size={22} />
-                        </div>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Setoran Bersih (Netto)</p>
-                            <h3 className="text-lg font-extrabold text-amber-700 mt-1">{formatIDR(netto)}</h3>
-                            <p className="text-[11px] text-slate-400 mt-0.5">Tunai Dikurangi Pengeluaran</p>
-                        </div>
-                        <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
-                            <Save size={22} />
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'archives' && !viewingArchive && (
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 print:hidden">
-                    <h2 className="text-lg font-bold mb-4 text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2">
-                        <Archive size={18} className="text-amber-600" />
-                        Daftar Arsip Rekapan Berita Acara
-                    </h2>
-                    {archives.length === 0 ? (
-                        <p className="text-slate-400 py-12 text-center text-xs italic">Belum ada arsip Berita Acara yang tersimpan.</p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs border-collapse">
-                                <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-100">
-                                    <tr>
-                                        <th className="p-3.5">Tanggal Arsip</th>
-                                        <th className="p-3.5">Judul Berita Acara</th>
-                                        <th className="p-3.5">Total Pendapatan</th>
-                                        <th className="p-3.5">Total Pengeluaran</th>
-                                        <th className="p-3.5 text-center">Aksi Dokumen</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {archives.map(arch => (
-                                        <tr key={arch.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
-                                                {new Date(arch.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                            </td>
-                                            <td className="p-3.5 font-bold text-slate-800">{arch.title}</td>
-                                            <td className="p-3.5 text-emerald-600 font-extrabold whitespace-nowrap">{formatIDR(arch.totalIncome)}</td>
-                                            <td className="p-3.5 text-rose-600 font-extrabold whitespace-nowrap">{formatIDR(arch.totalExpense)}</td>
-                                            <td className="p-3.5 text-center whitespace-nowrap">
-                                                <div className="flex justify-center gap-1.5">
-                                                    <button onClick={() => setViewingArchive(arch)} className="px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-semibold border border-amber-200 flex items-center gap-1" title="Lihat Detail">
-                                                        <Eye size={13} /> Lihat
-                                                    </button>
-                                                    <button onClick={() => handleArchiveDownloadPdf(arch)} disabled={isGeneratingPdf} className="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-[11px] font-semibold border border-blue-200 flex items-center gap-1" title="Download PDF">
-                                                        {isGeneratingPdf && viewingArchive?.id === arch.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} PDF
-                                                    </button>
-                                                    <button onClick={() => handleArchivePrint(arch)} className="px-2 py-1 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-lg text-[11px] font-semibold border border-slate-200 flex items-center gap-1" title="Cetak Dokumen">
-                                                        <Printer size={13} /> Cetak
-                                                    </button>
-                                                    <button onClick={() => handleArchiveShareWhatsApp(arch)} disabled={isGeneratingPdf} className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold border border-emerald-200 flex items-center gap-1" title="Kirim Dokumen via WhatsApp Web">
-                                                        <WhatsAppIcon size={13} /> WA Web
-                                                    </button>
-                                                    <button onClick={() => handleDeleteArchive(arch.id)} className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg" title="Hapus Arsip">
-                                                        <Trash2 size={15} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {(activeTab === 'input' || viewingArchive) && (
-                <>
-                    {viewingArchive && (
-                        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden shadow-sm">
+                <div className="space-y-6">
+                    {/* Metric Summary Cards Banner (Live Form) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 print:hidden">
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                             <div>
-                                <h3 className="font-bold text-amber-900 flex items-center gap-2 text-sm"><Eye size={18} /> Sedang Melihat Arsip: {viewingArchive.title}</h3>
-                                <p className="text-xs text-amber-700 mt-1">Mode Read-Only. Untuk mengubah data, silakan kembali ke tab Form Berita Acara.</p>
+                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Penjualan Tunai</p>
+                                <h3 className="text-lg font-extrabold text-slate-900 mt-1">{formatIDR(totalSalesTunai)}</h3>
+                                <p className="text-[11px] text-slate-400 mt-0.5">Penerimaan Tunai Kasir</p>
                             </div>
-                            <div className="flex flex-wrap gap-2 items-center shrink-0">
-                                <button onClick={handleDownloadPdf} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
-                                    {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Download PDF
-                                </button>
-                                <button onClick={handleShareWhatsApp} disabled={isGeneratingPdf} className="px-3.5 py-2 bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors" title="Ekspor PDF Dokumen & Otomatis Buka WhatsApp Web">
-                                    {isGeneratingPdf ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />} WhatsApp Web
-                                </button>
-                                <button onClick={handlePrint} className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-colors">
-                                    <Printer size={14} /> Cetak
-                                </button>
-                                <button onClick={() => setViewingArchive(null)} className="p-2 bg-amber-200 hover:bg-amber-300 text-amber-800 rounded-xl transition-colors">
-                                    <X size={18} />
-                                </button>
+                            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                                <FileText size={22} />
                             </div>
                         </div>
-                    )}
 
-                    {/* Control Panel (Hidden on Print) */}
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 mb-6 print:hidden flex flex-wrap gap-4 items-end text-xs">
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Non-Tunai / QR</p>
+                                <h3 className="text-lg font-extrabold text-purple-700 mt-1">{formatIDR(totalSalesQR)}</h3>
+                                <p className="text-[11px] text-slate-400 mt-0.5">Transfer & QRIS Bank</p>
+                            </div>
+                            <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
+                                <Info size={22} />
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Pendapatan Kotor</p>
+                                <h3 className="text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(totalAllSales)}</h3>
+                                <p className="text-[11px] text-slate-400 mt-0.5">Tunai + Non-Tunai</p>
+                            </div>
+                            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                                <CheckCircle2 size={22} />
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pengeluaran Sesi</p>
+                                <h3 className="text-lg font-extrabold text-rose-600 mt-1">{formatIDR(totalPengeluaran)}</h3>
+                                <p className="text-[11px] text-slate-400 mt-0.5">Operasional Kasir</p>
+                            </div>
+                            <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                                <Trash2 size={22} />
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Setoran Bersih (Netto)</p>
+                                <h3 className="text-lg font-extrabold text-amber-700 mt-1">{formatIDR(netto)}</h3>
+                                <p className="text-[11px] text-slate-400 mt-0.5">Tunai Dikurangi Pengeluaran</p>
+                            </div>
+                            <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                                <Save size={22} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Control Panel (Live Form) */}
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 print:hidden flex flex-wrap gap-4 items-end text-xs">
                         <div>
                             <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Tanggal Laporan</label>
                             <input
@@ -1746,9 +2644,9 @@ export default function BeritaAcaraPage() {
                         </div>
                     </div>
 
-                    {/* Sync Feedback Notification Banner (Hidden on Print) */}
+                    {/* Sync Feedback Notification Banner */}
                     {syncFeedback && (
-                        <div className={`p-4 rounded-2xl border mb-6 print:hidden shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-all duration-300 ${
+                        <div className={`p-4 rounded-2xl border print:hidden shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-all duration-300 ${
                             syncFeedback.type === 'success' ? 'bg-emerald-50/95 border-emerald-200 text-emerald-950' :
                             syncFeedback.type === 'error' ? 'bg-rose-50/95 border-rose-200 text-rose-950' :
                             'bg-blue-50/95 border-blue-200 text-blue-950'
@@ -1796,8 +2694,8 @@ export default function BeritaAcaraPage() {
                         </div>
                     )}
 
-                    {/* Modern Expense Input Section (Hidden on Print) */}
-                    <div className="bg-white p-5 rounded-2xl shadow-sm mb-6 print:hidden border border-slate-200">
+                    {/* Modern Expense Input Section */}
+                    <div className="bg-white p-5 rounded-2xl shadow-sm print:hidden border border-slate-200">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
                             <div>
                                 <div className="flex flex-wrap items-center gap-2">
@@ -1981,671 +2879,329 @@ export default function BeritaAcaraPage() {
                         </div>
                     </div>
 
-                    {/* Printable Area */}
-                    <div className="w-full overflow-x-auto no-scrollbar pb-8 print:pb-0 bg-slate-100/60 print:bg-transparent py-4 print:py-0">
-                        <style>{`
-                    .no-scrollbar::-webkit-scrollbar,
-                    .no-scrollbar::-webkit-scrollbar-thumb,
-                    .no-scrollbar::-webkit-scrollbar-track {
-                        display: none !important;
-                        width: 0 !important;
-                        height: 0 !important;
-                        background: transparent !important;
-                    }
-                    .no-scrollbar {
-                        -ms-overflow-style: none !important;
-                        scrollbar-width: none !important;
-                    }
-                    @media print {
-                        @page {
-                            size: A4 portrait;
-                            margin: 5mm;
-                        }
-                        html, body {
-                            height: auto !important;
-                            min-height: 100% !important;
-                            -webkit-print-color-adjust: exact !important;
-                            print-color-adjust: exact !important;
-                            background: white !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                        }
-                        .page-break {
-                            page-break-before: always !important;
-                            break-before: page !important;
-                            height: 0 !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            border: none !important;
-                            display: block !important;
-                        }
-                        .print-page {
-                            width: 100% !important;
-                            max-width: 100% !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            box-shadow: none !important;
-                            border: none !important;
-                            page-break-inside: avoid !important;
-                            break-inside: avoid !important;
-                        }
-                        #berita-acara-page-1 {
-                            page-break-after: always !important;
-                            break-after: page !important;
-                        }
-                        #berita-acara-page-2 {
-                            page-break-before: always !important;
-                            break-before: page !important;
-                        }
-                        input, textarea {
-                            border: none !important;
-                            box-shadow: none !important;
-                            outline: none !important;
-                            background: transparent !important;
-                        }
-                    }
-                    .brown-header {
-                        background-color: #8B4513 !important;
-                        color: white !important;
-                        font-weight: bold;
-                        padding: 3px 6px;
-                        font-size: 9.5px;
-                        line-height: 1.3;
-                    }
-                    .report-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        font-size: 8.5px;
-                        table-layout: fixed;
-                    }
-                    .report-table th, .report-table td {
-                        border: 1px solid #94a3b8;
-                        padding: 2.5px 3.5px;
-                        line-height: 1.25;
-                        vertical-align: middle;
-                        box-sizing: border-box;
-                    }
-                    .report-table th {
-                        background-color: #f1f5f9;
-                        text-align: center;
-                        font-weight: 700;
-                        color: #0f172a;
-                        font-size: 8px;
-                    }
-                    .editable-cell {
-                        width: 100%;
-                        background: transparent;
-                        border: none !important;
-                        outline: none !important;
-                        font-family: inherit;
-                        font-size: 8.5px;
-                        line-height: 1.25;
-                        color: inherit;
-                        padding: 0 !important;
-                        margin: 0 !important;
-                        box-sizing: border-box;
-                        vertical-align: middle;
-                    }
-                    .editable-cell:focus {
-                        background: #fef08a;
-                    }
-                `}</style>
+                    {/* Printable Document Preview Area (Editable Live Form) */}
+                    {renderPrintableDocument(false)}
+                </div>
+            )}
 
-                        {/* ======================================================== */}
-                        {/* HALAMAN 1: BERITA ACARA UTAMA (A4 PORTRAIT) */}
-                        {/* ======================================================== */}
-                        <div id="berita-acara-page-1" className="print-page bg-white mx-auto text-black w-[210mm] max-w-full p-6 print:p-0 shadow-lg mb-8 print:mb-0 box-border">
-                            {/* Header */}
-                            <div className="flex items-center justify-between border-b-2 border-amber-900 pb-2 mb-3">
-                                <div className="w-1/4">
-                                    <img src="/logokasir.jpg" alt="Logo" style={{ height: '55px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
+            {/* ======================================================== */}
+            {/* VIEW 2: DAFTAR ARSIP REKAPAN */}
+            {/* ======================================================== */}
+            {activeTab === 'archives' && !viewingArchive && (
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 print:hidden">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4 mb-4">
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <Archive size={20} className="text-amber-600" />
+                                Daftar Arsip Rekapan Berita Acara
+                            </h2>
+                            <p className="text-xs text-slate-500 mt-0.5">Seluruh arsip berita acara yang telah tersimpan secara resmi</p>
+                        </div>
+                        <div className="w-full sm:w-72 relative">
+                            <Search className="absolute left-3 top-2.5 text-slate-400" size={15} />
+                            <input
+                                type="text"
+                                placeholder="Cari tanggal, kasir, judul..."
+                                value={archiveSearchQuery}
+                                onChange={(e) => setArchiveSearchQuery(e.target.value)}
+                                className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-slate-800 font-medium"
+                            />
+                        </div>
+                    </div>
+
+                    {filteredArchives.length === 0 ? (
+                        <div className="text-center py-16 text-slate-400">
+                            <Archive size={36} className="mx-auto mb-2 text-slate-300" />
+                            <p className="text-xs italic">
+                                {archiveSearchQuery.trim() ? "Tidak ditemukan arsip yang cocok dengan pencarian." : "Belum ada arsip Berita Acara yang tersimpan."}
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto rounded-xl border border-slate-200">
+                            <table className="w-full text-left text-xs border-collapse">
+                                <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
+                                    <tr>
+                                        <th className="p-3.5">Tanggal Arsip</th>
+                                        <th className="p-3.5">Judul & Kasir</th>
+                                        <th className="p-3.5 text-right">Total Pendapatan</th>
+                                        <th className="p-3.5 text-right">Total Pengeluaran</th>
+                                        <th className="p-3.5 text-right">Kas Fisik (Netto)</th>
+                                        <th className="p-3.5 text-center">Aksi Dokumen</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {filteredArchives.map(arch => {
+                                        const income = Number(arch.totalIncome) || 0;
+                                        const expense = Number(arch.totalExpense) || 0;
+                                        const cleanNetto = arch.totalClean !== undefined ? Number(arch.totalClean) : (income - expense);
+                                        return (
+                                            <tr key={arch.id} className="hover:bg-slate-50/80 transition-colors">
+                                                <td className="p-3.5 font-semibold text-slate-800 whitespace-nowrap">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Calendar size={13} className="text-amber-600 shrink-0" />
+                                                        <span>{new Date(arch.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="p-3.5">
+                                                    <div className="font-bold text-slate-800">{arch.title}</div>
+                                                    <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                                                        <User size={11} /> {arch.kasir || 'Kasir tidak tercatat'}
+                                                    </div>
+                                                </td>
+                                                <td className="p-3.5 text-right text-emerald-600 font-extrabold whitespace-nowrap">{formatIDR(income)}</td>
+                                                <td className="p-3.5 text-right text-rose-600 font-extrabold whitespace-nowrap">{formatIDR(expense)}</td>
+                                                <td className="p-3.5 text-right text-amber-700 font-black whitespace-nowrap font-mono">{formatIDR(cleanNetto)}</td>
+                                                <td className="p-3.5 text-center whitespace-nowrap">
+                                                    <div className="flex justify-center gap-1.5">
+                                                        <button
+                                                            onClick={() => {
+                                                                setViewingArchive(arch);
+                                                                setActiveTab('view_archive');
+                                                            }}
+                                                            className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95"
+                                                            title="Buka Halaman Khusus Melihat Arsip"
+                                                        >
+                                                            <Eye size={13} /> Lihat Dokumen
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleArchiveDownloadPdf(arch)}
+                                                            disabled={isGeneratingPdf}
+                                                            className="px-2 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-[11px] font-semibold border border-blue-200 flex items-center gap-1 transition-colors"
+                                                            title="Download PDF"
+                                                        >
+                                                            {isGeneratingPdf && viewingArchive?.id === arch.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} PDF
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleArchivePrint(arch)}
+                                                            className="px-2 py-1.5 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-lg text-[11px] font-semibold border border-slate-200 flex items-center gap-1 transition-colors"
+                                                            title="Cetak Dokumen"
+                                                        >
+                                                            <Printer size={13} /> Cetak
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleArchiveShareWhatsApp(arch)}
+                                                            disabled={isGeneratingPdf}
+                                                            className="px-2 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold border border-emerald-200 flex items-center gap-1 transition-colors"
+                                                            title="Kirim Dokumen via WhatsApp Web"
+                                                        >
+                                                            <WhatsAppIcon size={13} /> WA Web
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteArchive(arch.id)}
+                                                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                                            title="Hapus Arsip"
+                                                        >
+                                                            <Trash2 size={15} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ======================================================== */}
+            {/* VIEW 3: DEDICATED ARCHIVE VIEWER (HALAMAN MELIHAT ARSIP) */}
+            {/* ======================================================== */}
+            {(activeTab === 'view_archive' || viewingArchive) && viewingArchive && (
+                <div className="space-y-6 animate-fadeIn">
+                    {/* Dedicated Archive Header & Action Bar */}
+                    <div className="bg-white border border-amber-200/90 p-5 rounded-2xl shadow-sm print:hidden">
+                        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                            <div>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <button
+                                        onClick={() => {
+                                            setViewingArchive(null);
+                                            setActiveTab('archives');
+                                        }}
+                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-amber-900 bg-slate-100 hover:bg-amber-100 px-3 py-1.5 rounded-xl transition-all border border-slate-200"
+                                    >
+                                        <ArrowLeft size={14} /> Kembali ke Daftar Arsip
+                                    </button>
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100/90 border border-amber-300 px-2.5 py-1 rounded-xl">
+                                        <Lock size={12} /> Status: Arsip Tersimpan (Read-Only)
+                                    </span>
                                 </div>
-                                <div className="w-3/4 text-center">
-                                    <h1 className="text-lg font-bold uppercase tracking-wider mb-0.5">BERITA ACARA</h1>
-                                    <h2 className="text-xs font-bold uppercase">LAPORAN PENJUALAN DAN PENGELUARAN</h2>
-                                    <h3 className="text-xs font-bold text-amber-900 italic">RUMAH ETNIK PAPUA - WISATA BUDAYA PAPUA</h3>
+                                <h2 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+                                    <FileText className="text-amber-600 shrink-0" size={22} />
+                                    <span>{viewingArchive.title || `Berita Acara - ${viewingArchive.date}`}</span>
+                                </h2>
+                                <div className="flex flex-wrap items-center gap-2.5 mt-2 text-xs text-slate-600 font-medium">
+                                    <span className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+                                        <Calendar size={13} className="text-amber-600" />
+                                        <strong>Tanggal:</strong> {new Date(viewingArchive.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                    </span>
+                                    <span className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+                                        <User size={13} className="text-blue-600" />
+                                        <strong>Kasir:</strong> {viewingArchive.kasir || '-'}
+                                    </span>
+                                    <span className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+                                        <MapPin size={13} className="text-rose-600" />
+                                        <strong>Lokasi:</strong> {viewingArchive.lokasi || '-'}
+                                    </span>
                                 </div>
                             </div>
 
-                            {/* Section I */}
-                            <div className="mb-3">
-                                <div className="brown-header">I. IDENTITAS LAPORAN</div>
-                                <div className="grid grid-cols-2 gap-4 mt-1.5 px-2 text-xs font-medium">
-                                    <div>
-                                        <div className="flex items-center mb-1">
-                                            <span className="w-16 shrink-0">Date</span>
-                                            <span className="mr-2">:</span>
-                                            <div className="flex-1 border-b border-black pb-0.5 font-semibold text-gray-900">{currentTanggal ? currentTanggal.split("-").reverse().join("/") : ''}</div>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <span className="w-16 shrink-0">Periode</span>
-                                            <span className="mr-2">:</span>
-                                            <div className="flex-1 border-b border-black pb-0.5 font-semibold text-gray-900">{currentPeriode}</div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center mb-1">
-                                            <span className="w-16 shrink-0">Kasir</span>
-                                            <span className="mr-2">:</span>
-                                            <div className="flex-1 pb-0.5 font-semibold text-gray-900">{currentKasir}</div>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <span className="w-16 shrink-0">Lokasi</span>
-                                            <span className="mr-2">:</span>
-                                            <div className="flex-1 pb-0.5 font-semibold text-gray-900">{currentLokasi}</div>
-                                        </div>
-                                    </div>
-                                </div>
+                            {/* Archive Action Buttons */}
+                            <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full lg:w-auto">
+                                <button
+                                    onClick={handleSyncArchiveData}
+                                    disabled={isSyncingArchive}
+                                    className="flex-1 lg:flex-none bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 hover:from-amber-700 hover:to-amber-900 disabled:opacity-60 text-white px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-95 shrink-0"
+                                    title="Sinkronkan data transaksi POS / transaksi susulan untuk tanggal arsip ini"
+                                >
+                                    <RefreshCw size={14} className={isSyncingArchive ? "animate-spin" : ""} />
+                                    <span>{isSyncingArchive ? "Menyinkronkan..." : "Sinkronkan Data POS"}</span>
+                                </button>
+                                <button
+                                    onClick={handleDownloadPdf}
+                                    disabled={isGeneratingPdf}
+                                    className="flex-1 lg:flex-none bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
+                                >
+                                    {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                                    Download PDF
+                                </button>
+                                <button
+                                    onClick={handleShareWhatsApp}
+                                    disabled={isGeneratingPdf}
+                                    className="flex-1 lg:flex-none bg-[#25D366] hover:bg-[#20ba5a] disabled:bg-green-300 text-white px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
+                                >
+                                    {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <WhatsAppIcon size={15} />}
+                                    WhatsApp Web
+                                </button>
+                                <button
+                                    onClick={handlePrint}
+                                    className="flex-1 lg:flex-none bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
+                                >
+                                    <Printer size={15} /> Cetak Dokumen
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setViewingArchive(null);
+                                        setActiveTab('archives');
+                                    }}
+                                    className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors shrink-0"
+                                    title="Tutup Tampilan Arsip"
+                                >
+                                    <X size={18} />
+                                </button>
                             </div>
+                        </div>
+                    </div>
 
-                            {/* Section II & III - Berdampingan (Side by Side) */}
-                            <div className="grid grid-cols-2 gap-3 mb-3">
-                                {/* Section II - Tunai */}
+                    {/* Archive Sync Feedback Notification Banner */}
+                    {archiveSyncFeedback && (
+                        <div className={`p-4 rounded-2xl border print:hidden shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-all duration-300 ${
+                            archiveSyncFeedback.type === 'success' ? 'bg-emerald-50/95 border-emerald-200 text-emerald-950' :
+                            archiveSyncFeedback.type === 'error' ? 'bg-rose-50/95 border-rose-200 text-rose-950' :
+                            'bg-blue-50/95 border-blue-200 text-blue-950'
+                        }`}>
+                            <div className="flex items-start gap-3">
+                                <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${
+                                    archiveSyncFeedback.type === 'success' ? 'bg-emerald-100 text-emerald-700' :
+                                    archiveSyncFeedback.type === 'error' ? 'bg-rose-100 text-rose-700' :
+                                    'bg-blue-100 text-blue-700'
+                                }`}>
+                                    {archiveSyncFeedback.type === 'success' ? <CheckCircle2 size={20} /> :
+                                     archiveSyncFeedback.type === 'error' ? <AlertCircle size={20} /> :
+                                     <Info size={20} />}
+                                </div>
                                 <div>
-                                    <div className="brown-header flex justify-between items-center">
-                                        <span>II. LAPORAN PENJUALAN (TUNAI)</span>
-                                        {!viewingArchive && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleSyncData({ syncCashflow: false })}
-                                                disabled={isSyncing}
-                                                className="print:hidden text-[8px] bg-amber-950/70 hover:bg-amber-950 text-amber-100 px-1.5 py-0.5 rounded flex items-center gap-1 font-normal transition-colors cursor-pointer"
-                                                title="Sinkronkan data penjualan tunai dari POS"
-                                            >
-                                                <RefreshCw size={9} className={isSyncing ? "animate-spin" : ""} />
-                                                <span>Sinkron POS</span>
-                                            </button>
-                                        )}
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="font-bold text-xs sm:text-sm">{archiveSyncFeedback.title}</h4>
+                                        <span className="text-[10px] opacity-75 font-mono">({archiveSyncFeedback.time})</span>
                                     </div>
-                                    <table className="report-table">
-                                        <thead>
-                                            <tr>
-                                                <th style={{ width: '6%' }}>No</th>
-                                                <th style={{ width: '38%' }}>Sumber Pendapatan</th>
-                                                <th style={{ width: '18%' }}>Pendapatan</th>
-                                                <th style={{ width: '18%' }}>Modal</th>
-                                                <th style={{ width: '20%' }}>Keuntungan</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {currentSalesRows.map((row, idx) => {
-                                                const pendapatan = Number(row.tunai) || 0;
-                                                const modal = Number(row.hppTunai) || 0;
-                                                const keuntungan = pendapatan - modal;
-                                                const isRowEmpty = !row.tunai && !row.hppTunai;
-                                                return (
-                                                    <tr key={`sales-${idx}`}>
-                                                        <td className="text-center">{idx + 1}</td>
-                                                        <td>
-                                                            <input
-                                                                type="text"
-                                                                className="editable-cell"
-                                                                value={row.name}
-                                                                onChange={(e) => handleSalesRowChange(idx, 'name', e.target.value)}
-                                                                readOnly={!!viewingArchive}
-                                                            />
-                                                        </td>
-                                                        <td>
-                                                            <input
-                                                                type="text"
-                                                                className="editable-cell text-right"
-                                                                value={row.tunai ? (isNaN(Number(row.tunai)) ? row.tunai : formatNumber(row.tunai)) : ''}
-                                                                onChange={(e) => handleSalesRowChange(idx, 'tunai', e.target.value)}
-                                                                placeholder="0"
-                                                                readOnly={!!viewingArchive}
-                                                            />
-                                                        </td>
-                                                        <td>
-                                                            <input
-                                                                type="text"
-                                                                className="editable-cell text-right text-red-700/80"
-                                                                value={row.hppTunai ? (isNaN(Number(row.hppTunai)) ? row.hppTunai : formatNumber(row.hppTunai)) : ''}
-                                                                onChange={(e) => handleSalesRowChange(idx, 'hppTunai', e.target.value)}
-                                                                placeholder="0"
-                                                                readOnly={!!viewingArchive}
-                                                            />
-                                                        </td>
-                                                        <td className="text-right font-medium text-green-700 bg-slate-50/50 pr-1">
-                                                            {isRowEmpty ? '' : formatIDR(keuntungan)}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                            <tr className="bg-[#f5e6d3] font-bold">
-                                                <td colSpan={2} className="text-right">TOTAL PENJUALAN (TUNAI)</td>
-                                                <td className="text-right">{formatIDR(totalSalesTunai)}</td>
-                                                <td className="text-right text-red-700">{formatIDR(totalModalTunai)}</td>
-                                                <td className="text-right text-green-700 font-bold">{formatIDR(totalLabaTunai)}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                    {!viewingArchive && (
-                                        <button
-                                            onClick={addSalesRow}
-                                            className="mt-1 text-[9px] text-amber-800 hover:text-amber-950 font-bold flex items-center gap-1 print:hidden"
-                                        >
-                                            <PlusCircle size={10} /> Tambah Baris Penjualan
-                                        </button>
+                                    <p className="text-xs mt-0.5 font-medium opacity-90">{archiveSyncFeedback.message}</p>
+                                    {archiveSyncFeedback.details && (
+                                        <p className="text-[11px] mt-1 font-semibold text-slate-700 bg-white/80 px-2.5 py-1 rounded-lg inline-block border border-slate-200/60 shadow-2xs">
+                                            {archiveSyncFeedback.details}
+                                        </p>
                                     )}
                                 </div>
-
-                                {/* Section III - Setoran Tunai Kasir */}
-                                <div>
-                                    <div className="brown-header">III. LAPORAN SETORAN TUNAI KASIR</div>
-                                    <table className="report-table">
-                                        <thead>
-                                            <tr>
-                                                <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
-                                                    1. Total Pendapatan Penjualan Tunai
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td style={{ width: '8%' }} className="text-center">1</td>
-                                                <td style={{ width: '52%' }}>Penjualan Tunai Hari ini</td>
-                                                <td style={{ width: '40%' }} className="text-right font-medium text-green-700">
-                                                    {formatIDR(totalSalesTunai)}
-                                                </td>
-                                            </tr>
-                                            <tr className="bg-[#f5e6d3] font-bold">
-                                                <td colSpan={2} className="text-right">JUMLAH (1)</td>
-                                                <td className="text-right text-green-800">{formatIDR(totalSalesTunai)}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-
-                                    <table className="report-table mt-1.5">
-                                        <thead>
-                                            <tr>
-                                                <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
-                                                    2. Pengeluaran Operasional Toko Hari ini
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td style={{ width: '8%' }} className="text-center">1</td>
-                                                <td style={{ width: '52%' }}>Dipotong Pengeluaran (V)</td>
-                                                <td style={{ width: '40%' }} className="text-right font-medium text-red-700">
-                                                    - {formatIDR(totalPengeluaran)}
-                                                </td>
-                                            </tr>
-                                            <tr className="bg-[#fee2e2] font-bold text-red-950">
-                                                <td colSpan={2} className="text-right">JUMLAH (2)</td>
-                                                <td className="text-right text-red-700">- {formatIDR(totalPengeluaran)}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-
-                                    <table className="report-table mt-1.5">
-                                        <thead>
-                                            <tr>
-                                                <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
-                                                    3. SETORAN FISIK (TUNAI) = (1 - 2)
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td style={{ width: '8%' }} className="text-center">1</td>
-                                                <td style={{ width: '52%' }}>Setoran Bruto</td>
-                                                <td style={{ width: '40%' }} className="text-right font-medium">{formatIDR(totalSalesTunai)}</td>
-                                            </tr>
-                                            <tr>
-                                                <td className="text-center">2</td>
-                                                <td>Dipotong Pengeluaran (V)</td>
-                                                <td className="text-right font-medium text-red-700">- {formatIDR(totalPengeluaran)}</td>
-                                            </tr>
-                                            <tr className="bg-[#dcfce7] font-extrabold text-green-950">
-                                                <td colSpan={2} className="text-right">NETTO (UANG FISIK KASIR)</td>
-                                                <td className="text-right font-mono text-green-800 text-[10px]">{formatIDR(netto)}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
                             </div>
+                            <button
+                                onClick={() => setArchiveSyncFeedback(null)}
+                                className="p-1.5 hover:bg-black/5 rounded-lg transition-colors text-slate-500 hover:text-slate-800 ml-auto sm:ml-0 shrink-0"
+                                title="Tutup Notifikasi"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    )}
 
-                            {/* Section IV & V - Berdampingan (Side by Side) */}
-                            <div className="grid grid-cols-2 gap-3 mb-3">
-                                {/* Section IV - QR Code */}
-                                <div>
-                                    <div className="brown-header flex justify-between items-center">
-                                        <span>IV. LAPORAN PENJUALAN (NON-TUNAI / QR)</span>
-                                        {!viewingArchive && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleSyncData({ syncCashflow: false })}
-                                                disabled={isSyncing}
-                                                className="print:hidden text-[8px] bg-amber-950/70 hover:bg-amber-950 text-amber-100 px-1.5 py-0.5 rounded flex items-center gap-1 font-normal transition-colors cursor-pointer"
-                                                title="Sinkronkan data penjualan non-tunai dari POS"
-                                            >
-                                                <RefreshCw size={9} className={isSyncing ? "animate-spin" : ""} />
-                                                <span>Sinkron POS</span>
-                                            </button>
-                                        )}
-                                    </div>
-                                    <table className="report-table">
-                                        <thead>
-                                            <tr>
-                                                <th style={{ width: '6%' }}>No</th>
-                                                <th style={{ width: '38%' }}>Sumber Pendapatan</th>
-                                                <th style={{ width: '18%' }}>Pendapatan</th>
-                                                <th style={{ width: '18%' }}>Modal</th>
-                                                <th style={{ width: '20%' }}>Keuntungan</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {currentSalesRows.map((row, idx) => {
-                                                const pendapatan = Number(row.qr) || 0;
-                                                const modal = Number(row.hppQR) || 0;
-                                                const keuntungan = pendapatan - modal;
-                                                const isRowEmpty = !row.qr && !row.hppQR;
-                                                return (
-                                                    <tr key={`sales-qr-${idx}`}>
-                                                        <td className="text-center">{idx + 1}</td>
-                                                        <td className="font-medium text-gray-800">{row.name}</td>
-                                                        <td>
-                                                            <input
-                                                                type="text"
-                                                                className="editable-cell text-right"
-                                                                value={row.qr ? (isNaN(Number(row.qr)) ? row.qr : formatNumber(row.qr)) : ''}
-                                                                onChange={(e) => handleSalesRowChange(idx, 'qr', e.target.value)}
-                                                                placeholder="0"
-                                                                readOnly={!!viewingArchive}
-                                                            />
-                                                        </td>
-                                                        <td>
-                                                            <input
-                                                                type="text"
-                                                                className="editable-cell text-right text-red-700/80"
-                                                                value={row.hppQR ? (isNaN(Number(row.hppQR)) ? row.hppQR : formatNumber(row.hppQR)) : ''}
-                                                                onChange={(e) => handleSalesRowChange(idx, 'hppQR', e.target.value)}
-                                                                placeholder="0"
-                                                                readOnly={!!viewingArchive}
-                                                            />
-                                                        </td>
-                                                        <td className="text-right font-medium text-blue-700 bg-slate-50/50 pr-1">
-                                                            {isRowEmpty ? '' : formatIDR(keuntungan)}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                            <tr className="bg-[#e0f2fe] font-bold">
-                                                <td colSpan={2} className="text-right">TOTAL PENJUALAN (QR)</td>
-                                                <td className="text-right">{formatIDR(totalSalesQR)}</td>
-                                                <td className="text-right text-red-700">{formatIDR(totalModalQR)}</td>
-                                                <td className="text-right text-blue-700 font-bold">{formatIDR(totalLabaQR)}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-
-                                    {/* Rekapitulasi Laba Rugi Penjualan */}
-                                    <table className="report-table mt-2">
-                                        <thead>
-                                            <tr>
-                                                <th colSpan={3} className="text-left font-bold text-gray-800 bg-gray-100">
-                                                    2. REKAPITULASI LABA PENJUALAN (NETTO PROFIT)
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td style={{ width: '8%' }} className="text-center">1</td>
-                                                <td style={{ width: '52%' }}>Keuntungan Laba Penjualan (Tunai)</td>
-                                                <td style={{ width: '40%' }} className="text-right font-medium text-green-700">{formatIDR(totalLabaTunai)}</td>
-                                            </tr>
-                                            <tr>
-                                                <td className="text-center">2</td>
-                                                <td>Keuntungan Laba Penjualan (QR)</td>
-                                                <td className="text-right font-medium text-blue-700">{formatIDR(totalLabaQR)}</td>
-                                            </tr>
-                                            <tr className="bg-slate-100 font-bold">
-                                                <td colSpan={2} className="text-right">TOTAL LABA KOTOR</td>
-                                                <td className="text-right font-mono">{formatIDR(totalLabaTunai + totalLabaQR)}</td>
-                                            </tr>
-                                            <tr>
-                                                <td className="text-center">3</td>
-                                                <td>Dipotong Beban Pengeluaran (V)</td>
-                                                <td className="text-right font-medium text-red-700">- {formatIDR(totalPengeluaran)}</td>
-                                            </tr>
-                                            <tr className="bg-[#fef08a] font-extrabold text-amber-950">
-                                                <td colSpan={2} className="text-right">KEUNTUNGAN BERSIH (NETTO)</td>
-                                                <td className="text-right font-mono text-amber-900 text-[10px]">{formatIDR(totalLabaNetto)}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                {/* Section V - Pengeluaran */}
-                                <div>
-                                    <div className="brown-header">V. LAPORAN PENGELUARAN</div>
-                                    <table className="report-table">
-                                        <thead>
-                                            <tr>
-                                                <th style={{ width: '8%' }}>No</th>
-                                                <th style={{ width: '58%' }}>KATEGORI PENGELUARAN</th>
-                                                <th style={{ width: '28%' }}>Jumlah (Rp)</th>
-                                                {!viewingArchive && <th style={{ width: '6%' }} className="print:hidden">Aksi</th>}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {(() => {
-                                                const activeRows = currentExpenseRows.filter(r => (r.name && r.name.trim()) || (Number(r.amount) > 0));
-                                                if (activeRows.length === 0) {
-                                                    return (
-                                                        <tr>
-                                                            <td colSpan={!viewingArchive ? 4 : 3} className="p-3 text-center text-slate-400 italic text-[9px] print:text-[6.5pt]">
-                                                                Belum ada catatan pengeluaran operasional (biaya) yang terinput pada hari ini.
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                }
-
-                                                return activeRows.map((row, idx) => (
-                                                    <tr key={`expense-${idx}`}>
-                                                        <td className="text-center font-mono">{idx + 1}</td>
-                                                        <td>
-                                                            <input
-                                                                type="text"
-                                                                className="editable-cell"
-                                                                value={row.name}
-                                                                onChange={(e) => handleExpenseRowChange(idx, 'name', e.target.value)}
-                                                                placeholder="Tulis kategori pengeluaran..."
-                                                                readOnly={!!viewingArchive}
-                                                            />
-                                                        </td>
-                                                        <td>
-                                                            <input
-                                                                type="text"
-                                                                className="editable-cell text-right font-mono font-bold text-red-700"
-                                                                value={row.amount ? (isNaN(Number(row.amount)) ? row.amount : formatNumber(row.amount)) : ''}
-                                                                onChange={(e) => handleExpenseRowChange(idx, 'amount', e.target.value)}
-                                                                placeholder="0"
-                                                                readOnly={!!viewingArchive}
-                                                            />
-                                                        </td>
-                                                        {!viewingArchive && (
-                                                            <td className="text-center print:hidden p-0.5">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => deleteExpenseRow(idx)}
-                                                                    className="text-red-500 hover:text-red-700 p-0.5 rounded hover:bg-red-50"
-                                                                    title="Hapus Baris Ini"
-                                                                >
-                                                                    <Trash2 size={11} />
-                                                                </button>
-                                                            </td>
-                                                        )}
-                                                    </tr>
-                                                ));
-                                            })()}
-                                            <tr className="bg-[#fee2e2] font-extrabold text-red-950">
-                                                <td colSpan={!viewingArchive ? 2 : 2} className="text-right uppercase">TOTAL PENGELUARAN</td>
-                                                <td className="text-right text-red-700 font-bold font-mono">{formatIDR(totalPengeluaran)}</td>
-                                                {!viewingArchive && <td className="print:hidden"></td>}
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
+                    {/* 5 Dedicated Metric Cards for this specific Archive */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 print:hidden">
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Penjualan Tunai</p>
+                                <h3 className="text-lg font-extrabold text-slate-900 mt-1">{formatIDR(totalSalesTunai)}</h3>
+                                <p className="text-[11px] text-slate-400 mt-0.5">Penerimaan Tunai Kasir</p>
                             </div>
-
-                            {/* Signatures */}
-                            <div className="flex justify-between text-xs mt-4 mb-4 px-8 font-medium">
-                                <div className="text-center">
-                                    <p className="mb-10">Dibuat oleh,<br />Kasir / Administrasi</p>
-                                    <p>( ................................................. )</p>
-                                </div>
-                                <div className="text-center">
-                                    <p className="mb-10">Sorong, ......./......../.............<br />Mengetahui,<br />Staff Keuangan</p>
-                                    <p>( ................................................. )</p>
-                                </div>
-                            </div>
-
-                            {/* Catatan */}
-                            <div className="text-xs font-bold flex gap-2 items-start border-t border-gray-200 pt-2">
-                                <span className="shrink-0 pt-0.5">CATATAN :</span>
-                                <textarea
-                                    className="flex-1 outline-none min-h-[36px] resize-none border border-gray-200 rounded p-1 text-xs print:border-none print:p-0"
-                                    value={catatan}
-                                    onChange={(e) => setCatatan(e.target.value)}
-                                />
+                            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                                <FileText size={22} />
                             </div>
                         </div>
 
-                        {/* ======================================================== */}
-                        {/* HALAMAN 2: LAMPIRAN VI. URAIAN PENGELUARAN (A4 PORTRAIT) */}
-                        {/* ======================================================== */}
-                        {(() => {
-                            const allSectionTitles = [
-                                ...DETAILED_EXPENSE_CONFIG.map(c => c.title),
-                                ...Object.keys(derivedDetailedExpensesCurrent).filter(t => !DETAILED_EXPENSE_CONFIG.some(c => c.title === t))
-                            ];
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Non-Tunai / QR</p>
+                                <h3 className="text-lg font-extrabold text-purple-700 mt-1">{formatIDR(totalSalesQR)}</h3>
+                                <p className="text-[11px] text-slate-400 mt-0.5">Transfer & QRIS Bank</p>
+                            </div>
+                            <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
+                                <Info size={22} />
+                            </div>
+                        </div>
 
-                            const activeTables = allSectionTitles.map(title => {
-                                const allRows = derivedDetailedExpensesCurrent[title] || [];
-                                const validRows = allRows.filter(r => (r.keterangan && r.keterangan.trim()) || Number(r.total) > 0 || Number(r.harga) > 0);
-                                return {
-                                    config: { title },
-                                    dataRows: validRows
-                                };
-                            }).filter(t => t.dataRows && t.dataRows.length > 0);
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Pendapatan Kotor</p>
+                                <h3 className="text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(totalAllSales)}</h3>
+                                <p className="text-[11px] text-slate-400 mt-0.5">Tunai + Non-Tunai</p>
+                            </div>
+                            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                                <CheckCircle2 size={22} />
+                            </div>
+                        </div>
 
-                            if (activeTables.length === 0) return null;
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pengeluaran Sesi</p>
+                                <h3 className="text-lg font-extrabold text-rose-600 mt-1">{formatIDR(totalPengeluaran)}</h3>
+                                <p className="text-[11px] text-slate-400 mt-0.5">Operasional Kasir</p>
+                            </div>
+                            <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                                <Trash2 size={22} />
+                            </div>
+                        </div>
 
-                            const leftTables = [];
-                            const rightTables = [];
-                            let leftRows = 0;
-                            let rightRows = 0;
-
-                            activeTables.forEach(t => {
-                                const weight = t.dataRows.length + 3; // +3 for headers/total row
-                                if (leftRows <= rightRows) {
-                                    leftTables.push(t);
-                                    leftRows += weight;
-                                } else {
-                                    rightTables.push(t);
-                                    rightRows += weight;
-                                }
-                            });
-
-                            const renderTable = (t) => {
-                                const colTotal = t.dataRows.reduce((sum, row) => sum + (Number(row.total) || 0), 0);
-                                const categoryCleanName = t.config.title.replace(/^VI\.\s*URAIAN\s*PENGELUARAN\s*\(?/i, '').replace(/\)?$/, '').trim() || t.config.title;
-                                return (
-                                    <div key={t.config.title} className="w-full border border-slate-300 rounded overflow-hidden shadow-2xs mb-2.5 break-inside-avoid">
-                                        <div className="brown-header text-[9.5px] text-center font-bold uppercase tracking-wider py-1">
-                                            POS: {categoryCleanName.toUpperCase()}
-                                        </div>
-                                        <table className="report-table">
-                                            <thead>
-                                                <tr>
-                                                    <th style={{ width: '8%' }} className="text-center">NO</th>
-                                                    <th style={{ width: '44%' }} className="text-left px-1.5">KETERANGAN</th>
-                                                    <th style={{ width: '12%' }} className="text-center">QTY</th>
-                                                    <th style={{ width: '18%' }} className="text-right px-1.5">HARGA (Rp)</th>
-                                                    <th style={{ width: '18%' }} className="text-right px-1.5">TOTAL (Rp)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {t.dataRows.map((row, rowIdx) => (
-                                                    <tr key={`row-${t.config.title}-${rowIdx}`} className="odd:bg-white even:bg-slate-50/70">
-                                                        <td className="text-center font-mono text-slate-600">{rowIdx + 1}</td>
-                                                        <td className="font-semibold text-slate-800 p-1 px-1.5 leading-tight">{row.keterangan}</td>
-                                                        <td className="text-center font-mono text-slate-700 p-1 px-1 leading-tight">{row.qty || '1'}</td>
-                                                        <td className="text-right font-mono text-slate-700 p-1 px-1.5 leading-tight">{row.harga ? formatIDR(row.harga) : '-'}</td>
-                                                        <td className="text-right font-mono font-bold text-red-700 p-1 px-1.5 leading-tight">{row.total ? formatIDR(row.total) : '-'}</td>
-                                                    </tr>
-                                                ))}
-                                                <tr className="bg-[#fee2e2] font-extrabold text-red-950 border-t border-slate-300">
-                                                    <td colSpan={4} className="text-right uppercase px-2 py-0.5 text-[8px]">SUBTOTAL ({categoryCleanName})</td>
-                                                    <td className="text-right font-mono text-red-700 font-black p-1 px-1.5 text-[8.5px]">
-                                                        {colTotal > 0 ? formatIDR(colTotal) : 'Rp 0'}
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                );
-                            };
-
-                            return (
-                                <>
-                                    <div className="page-break"></div>
-                                    <div id="berita-acara-page-2" className="print-page bg-white mx-auto text-black w-[210mm] max-w-full p-6 print:p-0 shadow-lg mb-8 print:mb-0 box-border">
-                                        {/* Formal Page 2 Header */}
-                                        <div className="flex items-center justify-between border-b-2 border-amber-900 pb-2 mb-3">
-                                            <div className="w-1/4">
-                                                <img src="/logokasir.jpg" alt="Logo" style={{ height: '48px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
-                                            </div>
-                                            <div className="w-3/4 text-center">
-                                                <h1 className="text-base font-bold uppercase tracking-wider mb-0.5">BERITA ACARA - LAMPIRAN</h1>
-                                                <h2 className="text-xs font-bold uppercase text-amber-900">VI. URAIAN RINCIAN PENGELUARAN OPERASIONAL</h2>
-                                                <h3 className="text-[10px] font-medium text-gray-600">RUMAH ETNIK PAPUA - WISATA BUDAYA PAPUA</h3>
-                                            </div>
-                                        </div>
-
-                                        {/* Sub-bar Info */}
-                                        <div className="bg-amber-50/80 border border-amber-200 rounded px-3 py-1.5 mb-3 flex justify-between items-center text-[10px] font-medium text-gray-800">
-                                            <div><strong>Tanggal:</strong> {currentTanggal ? currentTanggal.split("-").reverse().join("/") : ''}</div>
-                                            <div><strong>Periode:</strong> {currentPeriode}</div>
-                                            <div><strong>Kasir:</strong> {currentKasir || '-'}</div>
-                                            <div><strong>Lokasi:</strong> {currentLokasi || '-'}</div>
-                                        </div>
-
-                                        {/* 2 Column Layout */}
-                                        <div className="flex gap-x-4 items-start w-full mb-4">
-                                            <div className="w-1/2 flex flex-col">
-                                                {leftTables.map(renderTable)}
-                                            </div>
-                                            <div className="w-1/2 flex flex-col">
-                                                {rightTables.map(renderTable)}
-                                            </div>
-                                        </div>
-
-                                        {/* Grand Total Footer */}
-                                        <div className="border border-red-300 bg-[#fee2e2] rounded p-2 flex justify-between items-center text-xs font-extrabold text-red-950 mb-4">
-                                            <span className="uppercase tracking-wider">TOTAL KESELURUHAN PENGELUARAN (VI. URAIAN OPERASIONAL)</span>
-                                            <span className="font-mono text-sm text-red-700 font-black">{formatIDR(totalPengeluaran)}</span>
-                                        </div>
-
-                                        {/* Page 2 Validation Signatures */}
-                                        <div className="flex justify-between text-xs mt-6 px-8 font-medium">
-                                            <div className="text-center">
-                                                <p className="mb-8">Dibuat oleh,<br />Kasir / Administrasi</p>
-                                                <p className="font-bold">(&nbsp;&nbsp;{kasir || '........................................'}&nbsp;&nbsp;)</p>
-                                            </div>
-                                            <div className="text-center">
-                                                <p className="mb-8">Sorong, {tanggal.split("-").reverse().join("/")}<br />Mengetahui,<br />Staff Keuangan</p>
-                                                <p>( ................................................. )</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </>
-                            );
-                        })()}
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Setoran Bersih (Netto)</p>
+                                <h3 className="text-lg font-extrabold text-amber-700 mt-1">{formatIDR(netto)}</h3>
+                                <p className="text-[11px] text-slate-400 mt-0.5">Tunai Dikurangi Pengeluaran</p>
+                            </div>
+                            <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                                <Save size={22} />
+                            </div>
+                        </div>
                     </div>
-                </>
+
+                    {/* Notice Banner */}
+                    <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-xl text-xs text-amber-900 flex items-center gap-2.5 print:hidden shadow-2xs">
+                        <Info size={16} className="text-amber-700 shrink-0" />
+                        <span>Dokumen ini adalah arsip rekapan resmi yang telah tersimpan. Data bersifat tetap (read-only) dan siap dicetak atau diekspor ke PDF resmi.</span>
+                    </div>
+
+                    {/* Printable Document Preview (Read-Only Mode) */}
+                    {renderPrintableDocument(true)}
+                </div>
             )}
 
             {/* Category Management Modal */}

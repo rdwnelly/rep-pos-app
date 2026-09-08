@@ -1284,8 +1284,7 @@ export const MonthlyReport: React.FC = () => {
 
 _Laporan resmi dibuat oleh: ${cashierDisplayName}_
 _Tanggal cetak: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}_
-
-📄 _Dokumen PDF resmi Berita Acara telah otomatis diunduh ke perangkat Anda. Silakan lampirkan file PDF tersebut pada chat WhatsApp Web ini._`;
+_Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
 
             const encoded = encodeURIComponent(message);
             const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);

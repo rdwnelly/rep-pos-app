@@ -107,9 +107,13 @@ const deleteCollectionByDateRange = async (name: string, startDate?: string, end
 };
 
 const cleanUndefined = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
+  if (obj instanceof Date) return obj.toISOString();
   if (Array.isArray(obj)) {
     return obj.map(cleanUndefined);
-  } else if (obj !== null && typeof obj === 'object') {
+  } else if (typeof obj === 'object') {
+    if (obj.constructor && obj.constructor.name === 'FieldValue') return obj;
+    if (typeof obj.toMillis === 'function' || ('seconds' in obj && 'nanoseconds' in obj)) return obj;
     return Object.fromEntries(
       Object.entries(obj)
         .filter(([_, v]) => v !== undefined)
@@ -264,6 +268,9 @@ export const FirestoreService = {
       ...transaction,
       id: txRef.id,
       type: transaction.type || TransactionType.SALE,
+      createdAt: transaction.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      items: Array.isArray(transaction.items) ? transaction.items : [],
       paymentHistory:
         transaction.paymentHistory ??
         (transaction.amountPaid > 0
@@ -282,12 +289,18 @@ export const FirestoreService = {
     const batch = writeBatch(db);
     batch.set(txRef, cleanUndefined(txData), { merge: true });
     
-    txData.items.forEach((item) => {
-      const productRef = doc(collectionRef("products"), item.id);
-      const quantity = item.qty || 0;
-      const stockDelta = txData.type === TransactionType.RETURN ? quantity : -quantity;
-      batch.update(productRef, { stock: increment(stockDelta) });
-    });
+    if (Array.isArray(txData.items)) {
+      txData.items.forEach((item) => {
+        if (item && item.id) {
+          const productRef = doc(collectionRef("products"), item.id);
+          const quantity = Number(item.qty) || 0;
+          if (quantity !== 0) {
+            const stockDelta = txData.type === TransactionType.RETURN ? quantity : -quantity;
+            batch.set(productRef, { stock: increment(stockDelta) }, { merge: true });
+          }
+        }
+      });
+    }
 
     await batch.commit();
     return txData;

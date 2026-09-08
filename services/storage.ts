@@ -311,9 +311,14 @@ export const StorageService = {
   addTransaction: async (transaction: Transaction) => {
     const result = await ApiService.addTransaction(transaction);
     notifyListeners('transactions');
-    // Transactions also affect products (stock) and cashflow
     notifyListeners('products');
     notifyListeners('cashflow');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('transactions_updated'));
+      window.dispatchEvent(new Event('products_updated'));
+      window.dispatchEvent(new Event('cashflow_updated'));
+      window.dispatchEvent(new CustomEvent('transaction_added', { detail: result }));
+    }
     return result;
   },
   updateTransaction: async (transaction: Transaction) => {
@@ -321,6 +326,11 @@ export const StorageService = {
     notifyListeners('transactions');
     notifyListeners('products');
     notifyListeners('cashflow');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('transactions_updated'));
+      window.dispatchEvent(new Event('products_updated'));
+      window.dispatchEvent(new Event('cashflow_updated'));
+    }
   },
   deleteTransaction: async (id: string) => {
     await ApiService.deleteTransaction(id);
