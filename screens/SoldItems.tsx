@@ -92,8 +92,10 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                     return sortConfig.direction === 'asc' ? aTime - bTime : bTime - aTime;
                 }
 
-                let aVal = a[sortConfig.key as keyof typeof a];
-                let bVal = b[sortConfig.key as keyof typeof b];
+                // Properti opsional bisa undefined; disetarakan ke '' agar
+                // baris tanpa nilai tetap terurut, bukan melempar error.
+                let aVal: string | number | boolean = a[sortConfig.key as keyof typeof a] ?? '';
+                let bVal: string | number | boolean = b[sortConfig.key as keyof typeof b] ?? '';
 
                 if (typeof aVal === 'string' && typeof bVal === 'string') {
                     aVal = aVal.toLowerCase() as any;

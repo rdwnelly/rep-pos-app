@@ -3,11 +3,11 @@ import { createPortal } from 'react-dom';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Transaction, PaymentStatus, CashFlow, CashFlowType, Purchase, Supplier, PaymentMethod, CashFlow as CashFlowTypeInterface, StoreSettings, BankAccount, User, UserRole, TransactionType, PurchaseType, Category } from '../types';
-import { formatIDR, formatDate, formatDateDateOnly, formatTimeOnly, exportToCSV, generateId, exportToExcel } from '../utils';
+import { formatIDR, formatDate, formatDateDateOnly, formatTimeOnly, exportToCSV, generateId, exportToExcel, toCanonicalDate } from '../utils';
 import { generatePrintInvoice, generatePrintTransactionDetail, generatePrintPurchaseDetail, generatePrintPurchaseNote } from '../utils/printHelpers';
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
-import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet, Bluetooth, Receipt, UserCheck, Truck, DollarSign, PieChart, BookOpen, RefreshCw, Tag, Layers, CreditCard } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet, Bluetooth, Receipt, UserCheck, Truck, DollarSign, PieChart, BookOpen, RefreshCw, Tag, Layers, CreditCard, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 
 interface FinanceProps {
@@ -125,6 +125,10 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
 
     // Debt Payment State (Customer - Piutang)
     const [selectedDebt, setSelectedDebt] = useState<Transaction | null>(null);
+    // Nama pelanggan (ternormalisasi) yang riwayat BON-nya sedang dibuka.
+    const [expandedDebtors, setExpandedDebtors] = useState<Set<string>>(new Set());
+    // Form angsuran disembunyikan secara default; pelunasan penuh cukup satu tombol.
+    const [showInstallmentForm, setShowInstallmentForm] = useState(false);
     const [repaymentAmount, setRepaymentAmount] = useState('');
     const [repaymentMethod, setRepaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
     const [repaymentBankId, setRepaymentBankId] = useState('');
@@ -257,12 +261,13 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
 
         const returnedQuantities: Record<string, number> = {};
         previousReturns.forEach(ret => {
-            ret.items.forEach(item => {
+            // Purchase.items opsional — pembelian lama bisa tanpa rincian item.
+            ret.items?.forEach(item => {
                 returnedQuantities[item.id] = (returnedQuantities[item.id] || 0) + item.qty;
             });
         });
 
-        const itemsWithRemainingQty = purchase.items.map(i => {
+        const itemsWithRemainingQty = (purchase.items || []).map(i => {
             const returnedQty = returnedQuantities[i.id] || 0;
             const remainingQty = Math.max(0, i.qty - returnedQty);
 
@@ -312,7 +317,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             const cutDebtAmount = Math.min(totalReturnValue, currentDebt);
             const cashRefundAmount = totalReturnValue - cutDebtAmount;
 
-            const now = new Date().toISOString();
+            const now = toCanonicalDate();
 
             // 3. Update Transaksi Asal
             // Always update isReturned status
@@ -450,7 +455,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         const cutDebtAmount = Math.min(totalRefund, currentDebt);
         const cashRefundAmount = totalRefund - cutDebtAmount;
 
-        const now = new Date().toISOString();
+        const now = toCanonicalDate();
 
         // 3. Update Pembelian Asal (Potong Utang)
         let updatedOriginalPurchase = {
@@ -545,7 +550,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     };
 
     // Filter Logic
-    const applyDateFilter = (items: any[]) => {
+    const applyDateFilter = <T extends Record<string, any>>(items: T[]): T[] => {
         if (!startDate && !endDate) return items;
 
         return items.filter(item => {
@@ -557,7 +562,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     };
 
     // Search Logic
-    const applySearch = (items: any[], type: 'transaction' | 'purchase' | 'cashflow') => {
+    const applySearch = <T extends Record<string, any>>(items: T[], type: 'transaction' | 'purchase' | 'cashflow'): T[] => {
         if (!searchQuery.trim()) return items;
         const query = searchQuery.toLowerCase();
 
@@ -649,12 +654,12 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         return items.filter(cf => cf.paymentMethod === paymentMethodFilter);
     };
 
-    const applyCashierFilter = (items: any[], type: 'transaction' | 'purchase' | 'cashflow') => {
+    const applyCashierFilter = <T extends Record<string, any>>(items: T[], type: 'transaction' | 'purchase' | 'cashflow'): T[] => {
         // Removed to allow cashier to see all transactions in Finance views (if they have access)
         return items;
     };
 
-    const applyStatusFilter = (items: any[], type: 'transaction' | 'purchase') => {
+    const applyStatusFilter = <T extends Record<string, any>>(items: T[], type: 'transaction' | 'purchase'): T[] => {
         if (!statusFilter) return items;
 
         return items.filter(item => {
@@ -668,7 +673,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         });
     };
 
-    const applyUserFilter = (items: any[], type: 'transaction' | 'purchase' | 'cashflow') => {
+    const applyUserFilter = <T extends Record<string, any>>(items: T[], type: 'transaction' | 'purchase' | 'cashflow'): T[] => {
         if (!userFilter) return items;
 
         return items.filter(item => {
@@ -703,7 +708,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         return 0;
     };
 
-    const sortItems = (items: any[]) => {
+    const sortItems = <T extends Record<string, any>>(items: T[]): T[] => {
         if (!sortConfig) {
             return [...items].sort((a, b) => {
                 const aTime = getExactTimestamp(a);
@@ -909,7 +914,67 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     const receivables = useMemo(() => sortItems(applySearch(applyUserFilter(applyCashierFilter(transactions.filter(t => t.paymentStatus !== PaymentStatus.PAID), 'transaction'), 'transaction'), 'transaction')), [transactions, searchQuery, sortConfig, currentUser, userFilter]);
     const payables = useMemo(() => sortItems(applySearch(applyUserFilter(applyCashierFilter(purchases.filter(p => p.paymentStatus !== PaymentStatus.PAID), 'purchase'), 'purchase'), 'purchase')), [purchases, searchQuery, sortConfig, currentUser, userFilter]);
 
-    const visibleReceivables = useMemo(() => receivables.slice(0, visibleCount), [receivables, visibleCount]);
+    /**
+     * BON / piutang dikelompokkan per pelanggan.
+     *
+     * Kuncinya nama yang sudah dinormalisasi (trim + huruf kecil), supaya
+     * "Budi", "budi", dan "Budi " jatuh ke satu kelompok — sebelumnya
+     * pelanggan yang sama muncul berulang sebanyak jumlah BON-nya.
+     * Nama yang ditampilkan memakai ejaan asli yang pertama ditemui.
+     */
+    const debtorGroups = useMemo(() => {
+        const map = new Map<string, {
+            key: string;
+            name: string;
+            items: Transaction[];
+            totalBon: number;
+            totalPaid: number;
+            totalRemaining: number;
+            lastDate: string;
+        }>();
+
+        receivables.forEach(t => {
+            const nama = (t.customerName || 'Pelanggan Umum').trim();
+            const key = nama.toLowerCase() || 'pelanggan umum';
+            const sisa = t.totalAmount - t.amountPaid;
+
+            const grup = map.get(key) ?? {
+                key,
+                name: nama || 'Pelanggan Umum',
+                items: [],
+                totalBon: 0,
+                totalPaid: 0,
+                totalRemaining: 0,
+                lastDate: t.date,
+            };
+
+            grup.items.push(t);
+            grup.totalBon += t.totalAmount;
+            grup.totalPaid += t.amountPaid;
+            grup.totalRemaining += sisa;
+            if (t.date > grup.lastDate) grup.lastDate = t.date;
+
+            map.set(key, grup);
+        });
+
+        // Utang terbesar lebih dulu — itu yang paling perlu ditagih.
+        return [...map.values()].sort((a, b) => b.totalRemaining - a.totalRemaining);
+    }, [receivables]);
+
+    const visibleDebtorGroups = useMemo(
+        () => debtorGroups.slice(0, visibleCount),
+        [debtorGroups, visibleCount],
+    );
+
+    const toggleDebtor = (key: string) => {
+        setExpandedDebtors(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
+
     const visiblePayables = useMemo(() => payables.slice(0, visibleCount), [payables, visibleCount]);
 
     // Infinite Scroll Observer
@@ -936,10 +1001,67 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
 
     // --- ACTION HANDLERS ---
 
+    /**
+     * Inti pelunasan piutang pelanggan.
+     *
+     * Dibuat berparameter agar dua jalur memakai logika yang sama:
+     * form angsuran (nominal bebas) dan tombol "Lunas" satu klik. Sebelumnya
+     * logika ini membaca state komponen langsung, sehingga tombol Lunas
+     * harus menduplikasi penulisan riwayat pembayaran dan arus kas.
+     */
+    const settleCustomerDebt = async (
+        tx: Transaction,
+        pay: number,
+        method: PaymentMethod,
+        bankId: string,
+        note: string,
+    ) => {
+        const remainingDebt = tx.totalAmount - tx.amountPaid;
+        if (pay <= 0 || pay > remainingDebt) return;
+
+        const newPaid = tx.amountPaid + pay;
+        const newStatus = newPaid >= tx.totalAmount ? PaymentStatus.PAID : PaymentStatus.PARTIAL;
+        const now = toCanonicalDate();
+        const selectedBank = banks.find(b => b.id === bankId);
+
+        const updatedHistory = [...(tx.paymentHistory || [])];
+        updatedHistory.push({
+            date: now,
+            amount: pay,
+            method,
+            bankId,
+            bankName: selectedBank?.bankName,
+            note,
+        });
+
+        await StorageService.updateTransaction({
+            ...tx,
+            amountPaid: newPaid,
+            paymentStatus: newStatus,
+            // Pembayaran dibatasi maksimal sisa piutang, jadi tidak ada kembalian.
+            change: 0,
+            paymentHistory: updatedHistory,
+        });
+
+        await StorageService.addCashFlow({
+            id: '',
+            date: now,
+            type: CashFlowType.IN,
+            amount: pay,
+            category: 'Pelunasan Piutang',
+            description: `Pelunasan dari ${tx.customerName} (Tx: ${tx.id.substring(0, 6)}) via ${method}${selectedBank ? ` (${selectedBank.bankName})` : ''}`,
+            paymentMethod: method,
+            bankId,
+            bankName: selectedBank?.bankName,
+            userId: currentUser?.id,
+            userName: currentUser?.name,
+            referenceId: tx.id,
+        });
+    };
+
     const handleRepaymentCustomer = async () => {
         if (!selectedDebt) return;
         const pay = parseFloat(repaymentAmount) || 0;
-
         if (pay <= 0) return;
 
         if (repaymentMethod === PaymentMethod.TRANSFER && !repaymentBankId) {
@@ -948,64 +1070,25 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         }
 
         const remainingDebt = selectedDebt.totalAmount - selectedDebt.amountPaid;
-
         if (pay > remainingDebt) {
             alert(`Nominal pembayaran melebihi sisa piutang (${formatIDR(remainingDebt)}).`);
             return;
         }
-        const effectivePayment = Math.min(pay, remainingDebt);
-        const change = pay > remainingDebt ? pay - remainingDebt : 0;
 
-        const newPaid = selectedDebt.amountPaid + pay;
-        const newStatus = newPaid >= selectedDebt.totalAmount ? PaymentStatus.PAID : PaymentStatus.PARTIAL;
-        const now = new Date().toISOString(); // Capture exact time
-        const selectedBank = banks.find(b => b.id === repaymentBankId);
-
-        const updatedHistory = [...(selectedDebt.paymentHistory || [])];
-        updatedHistory.push({
-            date: now,
-            amount: pay,
-            method: repaymentMethod,
-            bankId: repaymentBankId,
-            bankName: selectedBank?.bankName,
-            note: repaymentNote || 'Cicilan Piutang'
-        });
-
-        const updatedTx = {
-            ...selectedDebt,
-            amountPaid: newPaid,
-            paymentStatus: newStatus,
-            change: change, // Update change for this transaction
-            paymentHistory: updatedHistory
-        };
-
-        await StorageService.updateTransaction(updatedTx);
-
-        let description = `Pelunasan dari ${selectedDebt.customerName} (Tx: ${selectedDebt.id.substring(0, 6)}) via ${repaymentMethod} ${selectedBank ? `(${selectedBank.bankName})` : ''}`;
-        if (change > 0) {
-            description += ` (Terima: ${formatIDR(pay)}, Kembali: ${formatIDR(change)})`;
-        }
-
-        await StorageService.addCashFlow({
-            id: '',
-            date: now,
-            type: CashFlowType.IN,
-            amount: effectivePayment,
-            category: 'Pelunasan Piutang',
-            description: description,
-            paymentMethod: repaymentMethod,
-            bankId: repaymentBankId,
-            bankName: selectedBank?.bankName,
-            userId: currentUser?.id,
-            userName: currentUser?.name,
-            referenceId: selectedDebt.id
-        });
+        await settleCustomerDebt(
+            selectedDebt,
+            pay,
+            repaymentMethod,
+            repaymentBankId,
+            repaymentNote || 'Cicilan Piutang',
+        );
 
         setSelectedDebt(null);
         setRepaymentAmount('');
         setRepaymentNote('');
         setRepaymentBankId('');
     };
+
 
     const handleRepaymentSupplier = async () => {
         if (!selectedPayable) return;
@@ -1026,7 +1109,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
 
         const newPaid = selectedPayable.amountPaid + pay;
         const newStatus = newPaid >= selectedPayable.totalAmount ? PaymentStatus.PAID : PaymentStatus.PARTIAL;
-        const now = new Date().toISOString(); // Capture exact time
+        const now = toCanonicalDate(); // Capture exact time
         const selectedBank = banks.find(b => b.id === payableBankId);
 
         const updatedHistory = [...(selectedPayable.paymentHistory || [])];
@@ -1117,7 +1200,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             return;
         }
 
-        const now = new Date().toISOString();
+        const now = toCanonicalDate();
 
         if (purchaseForm.paymentMethod === PaymentMethod.TRANSFER && !purchaseForm.bankId && paid > 0) {
             alert("Pilih rekening bank untuk pembayaran transfer.");
@@ -1193,7 +1276,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
 
         await StorageService.addCashFlow({
             id: '',
-            date: new Date().toISOString(),
+            date: toCanonicalDate(),
             type: cfType,
             amount,
             category: cfCategory, // Use selected category
@@ -2069,6 +2152,58 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             cancelLabel: 'Batal',
             onConfirm: handleRepaymentCustomer,
             type: 'warning'
+        });
+    };
+
+    /**
+     * Tombol "Lunas": melunasi sisa satu BON sekaligus, tunai, satu klik.
+     * Form angsuran di panel kanan tetap ada untuk pembayaran sebagian.
+     */
+    const initiateSettleFull = (tx: Transaction) => {
+        const sisa = tx.totalAmount - tx.amountPaid;
+        if (sisa <= 0) return;
+
+        setConfirmation({
+            isOpen: true,
+            title: 'Lunaskan BON ini?',
+            message: `${tx.customerName}\n${tx.invoiceNumber || '#' + tx.id.substring(0, 6)}\n\nSisa ${formatIDR(sisa)} akan dicatat LUNAS sebagai pembayaran tunai.`,
+            confirmLabel: 'Ya, Lunaskan',
+            cancelLabel: 'Batal',
+            type: 'default',
+            onConfirm: () => {
+                void settleCustomerDebt(tx, sisa, PaymentMethod.CASH, '', 'Pelunasan BON (tombol Lunas)');
+            },
+        });
+    };
+
+    /** Melunasi seluruh BON milik satu pelanggan sekaligus. */
+    const initiateSettleAllForDebtor = (nama: string, items: Transaction[]) => {
+        const belumLunas = items.filter(t => t.totalAmount - t.amountPaid > 0);
+        const sisa = belumLunas.reduce((sum, t) => sum + (t.totalAmount - t.amountPaid), 0);
+        if (sisa <= 0) return;
+
+        setConfirmation({
+            isOpen: true,
+            title: 'Lunaskan semua BON pelanggan ini?',
+            message: `${nama}\n${belumLunas.length} BON\n\nTotal ${formatIDR(sisa)} akan dicatat LUNAS sebagai pembayaran tunai.`,
+            confirmLabel: `Ya, Lunaskan ${belumLunas.length} BON`,
+            cancelLabel: 'Batal',
+            type: 'warning',
+            onConfirm: () => {
+                void (async () => {
+                    // Berurutan, bukan paralel: tiap pelunasan menulis arus kas
+                    // sendiri dan urutan riwayatnya ikut menentukan laporan.
+                    for (const tx of belumLunas) {
+                        await settleCustomerDebt(
+                            tx,
+                            tx.totalAmount - tx.amountPaid,
+                            PaymentMethod.CASH,
+                            '',
+                            'Pelunasan BON (lunaskan semua)',
+                        );
+                    }
+                })();
+            },
         });
     };
 
@@ -3127,7 +3262,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                             <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 flex justify-between items-center">
-                                <span>Daftar BON & Piutang Pelanggan ({receivables.length})</span>
+                                <span>Daftar BON &amp; Piutang Pelanggan ({debtorGroups.length} pelanggan &bull; {receivables.length} BON)</span>
                                 <span className="text-rose-600 font-extrabold">Total Sisa Piutang: {formatIDR(receivables.reduce((s, t) => s + (t.totalAmount - t.amountPaid), 0))}</span>
                             </div>
                             {searchQuery && (
@@ -3136,37 +3271,93 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 </div>
                             )}
                             <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
-                                {receivables.length === 0 && <div className="p-8 text-center text-slate-400">Tidak ada data BON / piutang pelanggan.</div>}
-                                {visibleReceivables.map(t => {
-                                    const remaining = t.totalAmount - t.amountPaid;
+                                {debtorGroups.length === 0 && <div className="p-8 text-center text-slate-400">Tidak ada data BON / piutang pelanggan.</div>}
+                                {visibleDebtorGroups.map(grup => {
+                                    const terbuka = expandedDebtors.has(grup.key);
                                     return (
-                                        <div key={t.id} className={`p-4 flex items-center justify-between cursor-pointer border-l-4 transition-colors ${selectedDebt?.id === t.id ? 'bg-amber-50/60 border-amber-500' : 'hover:bg-slate-50 border-transparent'}`} onClick={() => setSelectedDebt(t)}>
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <h4 className="font-bold text-slate-800 text-sm">{t.customerName}</h4>
-                                                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
-                                                        {((t.paymentMethod as string) === 'TEMPO' || t.paymentMethod === PaymentMethod.BON) ? 'BON' : t.paymentMethod}
-                                                    </span>
+                                        <div key={grup.key}>
+                                            {/* Baris pelanggan — ditekan untuk membuka riwayat BON-nya */}
+                                            <div
+                                                className={`p-4 flex items-center justify-between gap-3 cursor-pointer transition-colors ${terbuka ? 'bg-amber-50/60' : 'hover:bg-slate-50'}`}
+                                                onClick={() => toggleDebtor(grup.key)}
+                                            >
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    {terbuka
+                                                        ? <ChevronDown size={18} className="text-amber-600 flex-shrink-0" />
+                                                        : <ChevronRight size={18} className="text-slate-400 flex-shrink-0" />}
+                                                    <div className="min-w-0">
+                                                        <h4 className="font-bold text-slate-800 text-sm truncate">{grup.name}</h4>
+                                                        <div className="text-xs text-slate-500 mt-0.5">
+                                                            {grup.items.length} BON • terakhir {formatDateDateOnly(grup.lastDate)}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                                                    {t.invoiceNumber && <span className="font-mono text-slate-700 font-bold">{t.invoiceNumber}</span>}
-                                                    <span className="font-mono text-slate-400">#{t.id.substring(0, 6)}</span>
-                                                    <span>•</span>
-                                                    <Calendar size={12} /> {formatDate(t.date)}
-                                                </div>
-                                                <div className="text-xs text-slate-400 mt-0.5">
-                                                    {t.items?.length || 0} item barang • Kasir: {t.cashierName}
+                                                <div className="text-right flex-shrink-0">
+                                                    <p className="text-rose-600 font-extrabold text-base">{formatIDR(grup.totalRemaining)}</p>
+                                                    <p className="text-[10px] text-emerald-600 font-medium">Sudah bayar: {formatIDR(grup.totalPaid)}</p>
                                                 </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-rose-600 font-extrabold text-base">{formatIDR(remaining)}</p>
-                                                <p className="text-[11px] text-slate-400">Total BON: {formatIDR(t.totalAmount)}</p>
-                                                <p className="text-[10px] text-emerald-600 font-medium">Sudah Bayar: {formatIDR(t.amountPaid)}</p>
-                                            </div>
+
+                                            {/* Riwayat BON & Piutang pelanggan ini */}
+                                            {terbuka && (
+                                                <div className="bg-slate-50/70 border-t border-slate-100">
+                                                    {grup.items.map(t => {
+                                                        const sisa = t.totalAmount - t.amountPaid;
+                                                        return (
+                                                            <div
+                                                                key={t.id}
+                                                                className={`pl-10 pr-4 py-3 flex items-center justify-between gap-3 border-b border-slate-100 last:border-b-0 border-l-4 transition-colors ${selectedDebt?.id === t.id ? 'bg-amber-50 border-l-amber-500' : 'border-l-transparent'}`}
+                                                            >
+                                                                <div className="min-w-0 cursor-pointer" onClick={() => { setSelectedDebt(t); setShowInstallmentForm(false); }}>
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        {t.invoiceNumber
+                                                                            ? <span className="font-mono text-xs text-slate-700 font-bold">{t.invoiceNumber}</span>
+                                                                            : <span className="font-mono text-xs text-slate-400">#{t.id.substring(0, 6)}</span>}
+                                                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
+                                                                            {((t.paymentMethod as string) === 'TEMPO' || t.paymentMethod === PaymentMethod.BON) ? 'BON' : t.paymentMethod}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-1">
+                                                                        <Calendar size={11} /> {formatDate(t.date)}
+                                                                    </div>
+                                                                    <div className="text-[10px] text-slate-400 mt-0.5">
+                                                                        {t.items?.length || 0} item • Kasir: {t.cashierName}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-center gap-2.5 flex-shrink-0">
+                                                                    <div className="text-right">
+                                                                        <p className="text-rose-600 font-bold text-sm">{formatIDR(sisa)}</p>
+                                                                        <p className="text-[10px] text-slate-400">dari {formatIDR(t.totalAmount)}</p>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={e => { e.stopPropagation(); initiateSettleFull(t); }}
+                                                                        title={`Lunaskan sisa ${formatIDR(sisa)} secara tunai`}
+                                                                        className="flex items-center gap-1 bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg text-[11px] font-bold hover:bg-emerald-700 shadow-sm transition-colors"
+                                                                    >
+                                                                        <CheckCircle2 size={13} /> Lunas
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+
+                                                    {grup.items.length > 1 && (
+                                                        <div className="px-4 py-3 bg-white border-t border-slate-100">
+                                                            <button
+                                                                onClick={() => initiateSettleAllForDebtor(grup.name, grup.items)}
+                                                                className="w-full flex items-center justify-center gap-1.5 bg-emerald-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 shadow-sm transition-colors"
+                                                            >
+                                                                <CheckCircle2 size={14} />
+                                                                Lunaskan Semua {grup.items.length} BON ({formatIDR(grup.totalRemaining)})
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
-                                {visibleReceivables.length < receivables.length && (
+                                {visibleDebtorGroups.length < debtorGroups.length && (
                                     <div className="p-4 text-center text-slate-400">
                                         <div ref={loadMoreRef}>Memuat data berikutnya...</div>
                                     </div>
@@ -3232,8 +3423,29 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                         </div>
                                     )}
 
-                                    {/* Form Pembayaran BON */}
-                                    <div className="space-y-3 pt-1">
+                                    {/* Pelunasan satu klik — jalur utama.
+                                        Form angsuran disembunyikan agar kasir tidak perlu
+                                        mengisi nominal, metode, dan catatan hanya untuk
+                                        melunasi BON yang sudah pasti jumlahnya. */}
+                                    <button
+                                        onClick={() => initiateSettleFull(selectedDebt)}
+                                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 rounded-xl font-extrabold hover:bg-emerald-700 shadow-sm transition-colors text-sm"
+                                    >
+                                        <CheckCircle2 size={16} />
+                                        Lunaskan Sisa {formatIDR(selectedDebt.totalAmount - selectedDebt.amountPaid)}
+                                    </button>
+
+                                    {!showInstallmentForm && (
+                                        <button
+                                            onClick={() => setShowInstallmentForm(true)}
+                                            className="w-full text-slate-500 text-xs hover:text-slate-700 py-1 underline decoration-dotted"
+                                        >
+                                            Bayar sebagian / angsuran
+                                        </button>
+                                    )}
+
+                                    {showInstallmentForm && (
+                                        <div className="space-y-3 pt-2 border-t border-slate-200">
                                         <div>
                                             <label htmlFor="repaymentAmount" className="text-xs font-semibold text-slate-700">Jumlah Pembayaran / Angsuran</label>
                                             <input
@@ -3291,14 +3503,21 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                 placeholder="Contoh: Cicilan BON ke-1"
                                             />
                                         </div>
-                                        <button
-                                            onClick={initiateRepaymentCustomer}
-                                            className="w-full bg-primary text-white py-2.5 rounded-xl font-bold hover:bg-primary/90 shadow-sm transition-all text-xs"
-                                        >
-                                            Simpan Pembayaran BON
-                                        </button>
-                                        <button onClick={() => setSelectedDebt(null)} className="w-full text-slate-400 text-xs hover:text-slate-600 py-1">Batal</button>
-                                    </div>
+                                            <button
+                                                onClick={initiateRepaymentCustomer}
+                                                className="w-full bg-primary text-white py-2.5 rounded-xl font-bold hover:bg-primary/90 shadow-sm transition-all text-xs"
+                                            >
+                                                Simpan Pembayaran Sebagian
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    <button
+                                        onClick={() => { setSelectedDebt(null); setShowInstallmentForm(false); }}
+                                        className="w-full text-slate-400 text-xs hover:text-slate-600 py-1"
+                                    >
+                                        Tutup
+                                    </button>
                                 </div>
                             ) : (
                                 <p className="text-slate-400 text-xs text-center py-6">Pilih transaksi BON dari daftar di samping untuk melihat rincian barang dan memproses angsuran / pelunasan piutang.</p>

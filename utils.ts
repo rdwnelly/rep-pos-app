@@ -130,10 +130,67 @@ export const generateSKU = (): string => {
   return `899${timePart}${randomPart}`;
 };
 
-export const toMySQLDate = (date: Date): string => {
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+/**
+ * Zona waktu operasional toko (Sorong, Papua Barat Daya = WIT, UTC+9).
+ * Dipakai eksplisit supaya timestamp tidak bergantung pada setelan jam
+ * perangkat — admin yang membuka aplikasi dari Jakarta (WIB) sebelumnya
+ * menghasilkan tanggal yang bergeser dua jam dari kasir.
+ */
+export const STORE_TIME_ZONE = 'Asia/Jayapura';
+
+/**
+ * Satu-satunya format tanggal yang boleh disimpan: "YYYY-MM-DD HH:mm:ss"
+ * pada zona waktu toko.
+ *
+ * Kenapa bukan ISO 8601 UTC: Firestore membandingkan string mentah, dan
+ * laporan di sini selalu per hari kerja setempat. Dengan UTC, retur
+ * sebelum jam 09:00 WIT tercatat di tanggal kalender sebelumnya, sehingga
+ * tutup buku harian tidak cocok.
+ *
+ * Format ini juga urut secara leksikografis, jadi bisa langsung dipakai
+ * untuk query rentang di Firestore (lihat getTransactionsByDateRange).
+ *
+ * PENTING: jangan pernah menyimpan `new Date().toISOString()` ke field
+ * `date`. Mencampur kedua format membuat query rentang salah, karena
+ * spasi (0x20) lebih kecil daripada 'T' (0x54) dalam urutan string.
+ */
+export const toCanonicalDate = (date: Date = new Date()): string => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: STORE_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '00';
+  // en-CA memberi hour "24" untuk tengah malam pada sebagian runtime.
+  const hour = get('hour') === '24' ? '00' : get('hour');
+
+  return `${get('year')}-${get('month')}-${get('day')} ${hour}:${get('minute')}:${get('second')}`;
 };
+
+/** Bagian tanggal saja dari format kanonik: "YYYY-MM-DD". */
+export const toCanonicalDay = (date: Date = new Date()): string =>
+  toCanonicalDate(date).slice(0, 10);
+
+/**
+ * Batas query untuk satu rentang hari, inklusif di kedua ujung.
+ *
+ * Batas atas WAJIB memakai " 23:59:59", bukan tanggalnya saja:
+ * "2026-10-31 08:00:00" <= "2026-10-31" bernilai false, sehingga batas
+ * tanggal-saja membuang seluruh transaksi di hari terakhir rentang.
+ */
+export const dayRangeBounds = (startDay: string, endDay: string) => ({
+  start: `${startDay.slice(0, 10)} 00:00:00`,
+  end: `${endDay.slice(0, 10)} 23:59:59`,
+});
+
+/** @deprecated Pakai toCanonicalDate(). Dipertahankan agar pemanggil lama tetap jalan. */
+export const toMySQLDate = (date: Date): string => toCanonicalDate(date);
 
 export const exportToCSV = (filename: string, headers: string[], rows: any[][]) => {
   const customHeaders = [

@@ -9,7 +9,33 @@ import { useTheme } from '../hooks/useTheme';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import { firebaseConfig } from '../src/lib/firebase';
+import { auth, firebaseConfig } from '../src/lib/firebase';
+
+// Menetapkan custom claim 'role' lewat Admin SDK di server, supaya
+// Firestore Rules tidak perlu membaca dokumen users di setiap operasi.
+// Kegagalan di sini tidak membatalkan penyimpanan user: rules masih
+// punya fallback ke dokumen users, jadi akun tetap bisa dipakai.
+const syncRoleClaim = async (uid: string, role?: UserRole) => {
+    if (!uid || !role) return;
+    try {
+        const idToken = await auth.currentUser?.getIdToken();
+        if (!idToken) return;
+        const res = await fetch('/api/admin/set-role', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ uid, role }),
+        });
+        if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            console.warn('Gagal menetapkan custom claim:', body.error || res.status);
+        }
+    } catch (error) {
+        console.warn('Gagal menetapkan custom claim:', error);
+    }
+};
 
 // Default store settings - defined outside component to avoid recreation
 const DEFAULT_STORE_SETTINGS: StoreSettings = {
@@ -356,22 +382,41 @@ export const Settings: React.FC = () => {
                 await secondaryAuth.signOut(); // Clean up
             }
 
+            // Password dikelola sepenuhnya oleh Firebase Auth. Menyimpannya
+            // di dokumen Firestore tidak ada gunanya sekaligus membocorkan
+            // kredensial, dan sekarang ditolak oleh firestore.rules.
             const payload = {
                 ...userForm,
                 id: uid
             } as User;
-
-            // If editing and password is empty, remove it from payload to keep existing password
-            if (editingId && !userForm.password) {
-                delete (payload as any).password;
-            }
+            delete (payload as any).password;
 
             await StorageService.saveUser(payload);
+            await syncRoleClaim(uid!, userForm.role);
+
             setIsModalOpen(false);
             setEditingId(null);
             alert('User berhasil disimpan!');
         } catch (error: any) {
             console.error(error);
+
+            // Akun Auth bisa tertinggal tanpa dokumen Firestore (mis. user
+            // yang pernah dihapus dari aplikasi, karena penghapusan hanya
+            // membuang dokumennya). Email-nya jadi terpakai walau user
+            // tidak muncul di daftar, sehingga pesan bawaan Firebase
+            // menyesatkan. Beri tahu cara keluarnya.
+            if (error.code === 'auth/email-already-in-use') {
+                alert(
+                    'Email ini sudah terdaftar di Firebase Auth.\n\n' +
+                    'Jika user-nya tidak ada di daftar, berarti akun lamanya masih ' +
+                    'tertinggal (sisa user yang pernah dihapus). Minta tim IT ' +
+                    'menjalankan:\n\n' +
+                    '  node scripts/audit-users.mjs --email=' + (userForm.email || '') + '\n\n' +
+                    'atau hapus akun tersebut di Firebase Console → Authentication.'
+                );
+                return;
+            }
+
             let errorMessage = error.message || 'Pastikan email belum digunakan.';
             if (errorMessage.includes('Validation failed')) {
                 errorMessage += ' (Password minimal 6 karakter)';

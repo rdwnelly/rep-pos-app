@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { LayoutDashboard, ShoppingCart, Package, Receipt, Wallet, Settings, LogOut, Users, Menu, ChevronLeft, Barcode, ShoppingBag, UserCheck, Truck, ArrowRightLeft, Undo2, ClipboardCheck, X, Info, FileText, Wifi, WifiOff, Building2, BadgePercent, FileClock } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Receipt, Wallet, Settings, LogOut, Users, Menu, ChevronLeft, Barcode, ShoppingBag, UserCheck, Truck, ArrowRightLeft, Undo2, ClipboardCheck, X, Info, FileText, Wifi, WifiOff, CloudUpload, CloudOff, Building2, BadgePercent, FileClock } from 'lucide-react';
 import { UserRole } from '../types';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useSyncState } from '../hooks/useSyncState';
+import { clearSyncFailures } from '../services/syncStatus';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -53,6 +55,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isOnline = useOnlineStatus();
+  const { pending: pendingSync, failures: syncFailures, restoredPending } = useSyncState();
 
   // Otomatis sembunyikan sidebar pada layar HP / Tablet (< 1024px) & saat ukuran layar berubah (resize)
   useEffect(() => {
@@ -154,7 +157,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
         {/* Watermark Background */}
         <div 
           className="absolute bottom-0 left-0 right-0 h-96 bg-repeat-x bg-bottom opacity-[0.05] pointer-events-none"
-          style={{ backgroundImage: 'url("/sidebar-watermark.png")', backgroundSize: '150px' }}
+          style={{ backgroundImage: 'url("/sidebar-watermark.jpg")', backgroundSize: '150px' }}
         ></div>
 
         <div className="p-6 border-b border-white/10 flex items-center justify-between h-[72px] relative z-10">
@@ -162,7 +165,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
             <img src="/logokasir.jpg" alt="Logo" className="w-10 h-10 rounded-xl shadow-md border-2 border-white/20" />
             {(isSidebarOpen || mobileMenuOpen) && (
               <h1 className="text-2xl font-bold text-white tracking-tighter whitespace-nowrap transition-opacity duration-150">
-                Kasir REP
+                KASIR RELY
               </h1>
             )}
           </div>
@@ -201,14 +204,59 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
 
         <div className="p-4 border-t border-white/10">
           {(isSidebarOpen || mobileMenuOpen) && (
-            <div className={`mb-3 px-3 py-2 rounded-lg flex items-center gap-2 text-xs font-medium transition-colors ${isOnline ? 'bg-green-500/20 text-green-200' : 'bg-red-500/20 text-red-200'}`}>
-              {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
-              <span>{isOnline ? 'Online (Sinkron)' : 'Offline (Mode Lokal)'}</span>
+            <div className="mb-3 space-y-2">
+              <div className={`px-3 py-2 rounded-lg flex items-center gap-2 text-xs font-medium transition-colors ${isOnline ? 'bg-green-500/20 text-green-200' : 'bg-red-500/20 text-red-200'}`}>
+                {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
+                <span>{isOnline ? 'Online (Sinkron)' : 'Offline (Mode Lokal)'}</span>
+              </div>
+
+              {(pendingSync > 0 || restoredPending) && (
+                <div className="px-3 py-2 rounded-lg flex items-center gap-2 text-xs font-medium bg-amber-500/20 text-amber-100">
+                  <CloudUpload size={14} className="flex-shrink-0 animate-pulse" />
+                  <span>
+                    {pendingSync > 0
+                      ? `${pendingSync} data menunggu terkirim`
+                      : 'Ada data belum terkirim'}
+                  </span>
+                </div>
+              )}
+
+              {syncFailures.length > 0 && (
+                <button
+                  onClick={() => {
+                    alert(
+                      'Data berikut gagal tersimpan ke server:\n\n' +
+                      syncFailures.map((f) => `• ${f.label}\n  ${f.message}`).join('\n\n') +
+                      '\n\nCatat nomor transaksinya dan laporkan ke tim IT.'
+                    );
+                    clearSyncFailures();
+                  }}
+                  className="w-full px-3 py-2 rounded-lg flex items-center gap-2 text-xs font-semibold bg-rose-600/30 text-rose-100 hover:bg-rose-600/40 transition-colors text-left"
+                >
+                  <CloudOff size={14} className="flex-shrink-0" />
+                  <span>{syncFailures.length} data GAGAL — ketuk untuk lihat</span>
+                </button>
+              )}
             </div>
           )}
           {!isSidebarOpen && !mobileMenuOpen && (
-            <div className={`mb-3 mx-auto w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isOnline ? 'bg-green-500/20 text-green-200' : 'bg-red-500/20 text-red-200'}`} title={isOnline ? 'Online' : 'Offline'}>
-              {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
+            <div className="mb-3 space-y-2">
+              <div className={`mx-auto w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isOnline ? 'bg-green-500/20 text-green-200' : 'bg-red-500/20 text-red-200'}`} title={isOnline ? 'Online' : 'Offline'}>
+                {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
+              </div>
+              {(pendingSync > 0 || restoredPending) && (
+                <div
+                  className="mx-auto w-8 h-8 rounded-lg flex items-center justify-center bg-amber-500/20 text-amber-100 text-[10px] font-bold"
+                  title={pendingSync > 0 ? `${pendingSync} data menunggu terkirim` : 'Ada data belum terkirim'}
+                >
+                  {pendingSync > 0 ? pendingSync : <CloudUpload size={14} />}
+                </div>
+              )}
+              {syncFailures.length > 0 && (
+                <div className="mx-auto w-8 h-8 rounded-lg flex items-center justify-center bg-rose-600/30 text-rose-100" title={`${syncFailures.length} data gagal tersimpan`}>
+                  <CloudOff size={14} />
+                </div>
+              )}
             </div>
           )}
           <button
@@ -234,7 +282,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
             >
               <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
-            <span className="font-bold text-slate-800 text-base sm:text-lg tracking-tight">Kasir REP</span>
+            <span className="font-bold text-slate-800 text-base sm:text-lg tracking-tight">KASIR RELY</span>
           </div>
         </div>
 

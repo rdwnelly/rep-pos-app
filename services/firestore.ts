@@ -14,9 +14,13 @@ import {
   increment,
   where,
   onSnapshot,
+  limit,
   Unsubscribe,
+  type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "../src/lib/firebase";
+import { dayRangeBounds } from "../utils";
+import { queueWrite } from "./syncStatus";
 import {
   BankAccount,
   CashFlow,
@@ -147,6 +151,57 @@ const saveEntityBulk = async <T extends { id?: string }>(
   await batch.commit();
 };
 
+/**
+ * ── Query berbatas, pengganti pembacaan koleksi penuh ────────────────
+ *
+ * getCollection() mengunduh SELURUH koleksi lalu memfilter di memori,
+ * sehingga biaya dan waktu muat naik seiring umur data. Query di bawah
+ * membatasi di sisi server.
+ *
+ * Dua hal yang harus dipatuhi:
+ *
+ * 1. Field `date` wajib berformat kanonik "YYYY-MM-DD HH:mm:ss" (lihat
+ *    toCanonicalDate di utils.ts). Firestore membandingkan string mentah,
+ *    jadi data berformat campur membuat hasil query salah tanpa error.
+ *    Jalankan scripts/normalize-dates.mjs sebelum mengandalkan ini.
+ *
+ * 2. Firestore Rules BUKAN filter: query yang berpotensi mengembalikan
+ *    dokumen tak boleh dibaca ditolak seluruhnya. Rules membatasi kasir
+ *    dan gudang hanya ke transaksi miliknya, jadi query mereka WAJIB
+ *    menyertakan where('cashierId','==',uid).
+ */
+
+const SELF_SCOPED_ROLES = ['CASHIER', 'GUDANG'];
+
+const currentUser = (): { uid?: string; role?: string } => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem('pos_current_user');
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return { uid: parsed.id, role: parsed.role };
+  } catch {
+    return {};
+  }
+};
+
+/**
+ * Menambahkan batasan kepemilikan untuk peran yang hanya boleh melihat
+ * datanya sendiri. Tanpa ini query kasir ditolak rules secara utuh —
+ * itulah sebabnya layar riwayat selama ini kosong bagi akun kasir.
+ */
+const scopedToSelf = (constraints: QueryConstraint[]): QueryConstraint[] => {
+  const { uid, role } = currentUser();
+  return role && SELF_SCOPED_ROLES.includes(role) && uid
+    ? [where('cashierId', '==', uid), ...constraints]
+    : constraints;
+};
+
+const runQuery = async <T>(name: string, constraints: QueryConstraint[]): Promise<T[]> => {
+  const snapshot = await getDocs(query(collectionRef(name), ...constraints));
+  return snapshot.docs.map((docSnapshot) => toEntity<T>(docSnapshot));
+};
+
 const adjustStock = async (productId: string, quantityDelta: number) => {
   const ref = doc(collectionRef("products"), productId);
   await updateDoc(ref, { stock: increment(quantityDelta) });
@@ -176,8 +231,8 @@ const applyTransactionStock = async (
         : quantity * multiplier;
     batch.update(productRef, { stock: increment(-change) });
   });
-  
-  await batch.commit();
+
+  await queueWrite(batch.commit(), `Transaksi ${savedTx.invoiceNumber || savedTx.id}`);
 };
 
 export const FirestoreService = {
@@ -258,6 +313,83 @@ export const FirestoreService = {
   saveSuppliersBulk: async (newSuppliers: Supplier[]) =>
     saveEntityBulk<Supplier>("suppliers", newSuppliers),
 
+  /**
+   * Riwayat transaksi pada rentang hari (inklusif kedua ujung).
+   * Dipakai Dashboard, Laporan Bulanan, Barang Terjual, dan tab riwayat.
+   */
+  getTransactionsByDateRange: async (
+    startDay: string,
+    endDay: string,
+  ): Promise<Transaction[]> => {
+    const { start, end } = dayRangeBounds(startDay, endDay);
+    return runQuery<Transaction>(
+      "transactions",
+      scopedToSelf([
+        where("date", ">=", start),
+        where("date", "<=", end),
+        orderBy("date", "desc"),
+      ]),
+    );
+  },
+
+  /**
+   * Piutang: transaksi yang belum lunas, TANPA batas tanggal.
+   *
+   * Sengaja tidak dibatasi rentang: utang pelanggan dari tahun lalu tetap
+   * harus tampil. Membatasi tanggal di sini akan menghilangkan piutang
+   * lama dari daftar tanpa error apa pun — justru kebalikan dari tujuan.
+   * Yang membatasi di sini adalah statusnya, bukan waktunya.
+   */
+  getOutstandingTransactions: async (): Promise<Transaction[]> =>
+    runQuery<Transaction>(
+      "transactions",
+      scopedToSelf([
+        where("paymentStatus", "in", ["SEBAGIAN", "BELUM_LUNAS"]),
+        orderBy("date", "desc"),
+      ]),
+    ),
+
+  /** Riwayat satu pelanggan, tanpa mengunduh transaksi pelanggan lain. */
+  getTransactionsByCustomer: async (customerId: string): Promise<Transaction[]> =>
+    runQuery<Transaction>(
+      "transactions",
+      scopedToSelf([
+        where("customerId", "==", customerId),
+        orderBy("date", "desc"),
+      ]),
+    ),
+
+  getCashFlowByDateRange: async (
+    startDay: string,
+    endDay: string,
+  ): Promise<CashFlow[]> => {
+    const { start, end } = dayRangeBounds(startDay, endDay);
+    return runQuery<CashFlow>("cashflow", [
+      where("date", ">=", start),
+      where("date", "<=", end),
+      orderBy("date", "desc"),
+    ]);
+  },
+
+  getPurchasesByDateRange: async (
+    startDay: string,
+    endDay: string,
+  ): Promise<Purchase[]> => {
+    const { start, end } = dayRangeBounds(startDay, endDay);
+    return runQuery<Purchase>("purchases", [
+      where("date", ">=", start),
+      where("date", "<=", end),
+      orderBy("date", "desc"),
+    ]);
+  },
+
+  /** Utang ke supplier, tanpa batas tanggal — alasan sama seperti piutang. */
+  getOutstandingPurchases: async (): Promise<Purchase[]> =>
+    runQuery<Purchase>("purchases", [
+      where("paymentStatus", "in", ["SEBAGIAN", "BELUM_LUNAS"]),
+      orderBy("date", "desc"),
+    ]),
+
   getTransactions: async (): Promise<Transaction[]> =>
     getCollectionOrdered<Transaction>("transactions", "date", "desc"),
   addTransaction: async (transaction: Transaction) => {
@@ -302,7 +434,13 @@ export const FirestoreService = {
       });
     }
 
-    await batch.commit();
+    // Jangan menunggu ack server: offline, commit() tidak pernah resolve
+    // dan kasir menggantung tanpa struk. Tulisannya sudah aman di
+    // IndexedDB dan akan terkirim sendiri saat jaringan kembali.
+    await queueWrite(
+      batch.commit(),
+      `Transaksi ${txData.invoiceNumber || txData.id}`
+    );
     return txData;
   },
   updateTransaction: async (transaction: Transaction) =>
@@ -616,7 +754,12 @@ export const FirestoreService = {
   getTravelCommissions: async (): Promise<TravelBookingCommission[]> =>
     getCollectionOrdered<TravelBookingCommission>("travel_commissions", "departureDate", "desc"),
   saveTravelCommission: async (commission: TravelBookingCommission) =>
-    saveEntity<TravelBookingCommission>("travel_commissions", commission),
+    // Dipicu dari layar kasir setelah struk tercetak, jadi tidak boleh
+    // memblokir reset keranjang saat offline.
+    queueWrite(
+      saveEntity<TravelBookingCommission>("travel_commissions", commission),
+      `Komisi agen ${commission.bookingCode || commission.id}`
+    ),
   updateTravelCommission: async (commission: TravelBookingCommission) =>
     saveEntity<TravelBookingCommission>("travel_commissions", commission),
   deleteTravelCommission: async (id: string) =>

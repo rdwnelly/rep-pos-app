@@ -62,15 +62,19 @@ export default function Login() {
   return (
     <div 
       className="min-h-screen flex items-center justify-center bg-gray-900 bg-cover bg-center relative"
-      style={{ backgroundImage: 'url("/bg-login.png")' }}
+      style={{ backgroundImage: 'url("/bg-login.jpg")' }}
     >
       {/* Dark filter overlay */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"></div>
 
       <div className="bg-white/95 backdrop-blur-md p-8 rounded-xl shadow-2xl w-full max-w-md border-t-4 border-accent relative z-10">
         <div className="text-center mb-8">
-          <img src="/logokasir.jpg" alt="Logo Kasir REP" className="mx-auto h-24 w-24 mb-4 rounded-xl shadow-lg border-2 border-accent" />
-          <h1 className="text-2xl font-bold text-gray-800">Selamat Datang di Kasir REP</h1>
+          <img
+            src="/rely-studio.jpg"
+            alt="RELY STUDIO — Application & Web Development"
+            className="mx-auto w-full max-w-[260px] h-auto mb-5 rounded-xl"
+          />
+          <h1 className="text-2xl font-bold text-gray-800">Selamat Datang di KASIR RELY</h1>
           <p className="text-sm text-gray-600 mt-2">
             Yaswar Cafe & Toko Souvenir
             <br />

@@ -8,12 +8,24 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Peran dibaca dari custom claim pada ID token: 0 document read,
+    // jadi jauh lebih murah dan cepat dibanding get() per operasi.
+    // Fallback ke dokumen users/{uid} dipertahankan supaya akun yang
+    // claim-nya belum di-backfill (mis. user baru dari menu Pengaturan)
+    // tetap bisa bekerja. Hapus fallback ini setelah semua akun
+    // punya claim dan pembuatan user sudah lewat /api/admin/set-role.
     function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return 'role' in request.auth.token
+        ? request.auth.token.role
+        : get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
     function isAdmin() {
       return getUserRole() in ['SUPERADMIN', 'OWNER', 'ADMIN'];
+    }
+
+    function isOwnerUp() {
+      return getUserRole() in ['SUPERADMIN', 'OWNER'];
     }
 
     function isCashier() {
@@ -29,7 +41,13 @@ service cloud.firestore {
     // Hanya SUPERADMIN yang bisa baca semua user.
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || getUserRole() == 'SUPERADMIN');
-      allow write: if isAuthenticated() && getUserRole() == 'SUPERADMIN';
+
+      // Password dikelola sepenuhnya oleh Firebase Auth. Menyimpan
+      // password (plaintext maupun hash) di dokumen Firestore tidak
+      // ada gunanya dan menjadi kebocoran kredensial, jadi ditolak.
+      allow write: if isAuthenticated()
+                   && getUserRole() == 'SUPERADMIN'
+                   && !('password' in request.resource.data);
     }
 
     // ─── Store Settings ──────────────────────────────────────────
@@ -40,12 +58,20 @@ service cloud.firestore {
 
     // ─── Products ────────────────────────────────────────────────
     // Semua user bisa baca produk.
-    // Hanya Admin yang bisa create/delete produk.
-    // Semua yang login bisa update (untuk update stok dari transaksi).
+    // Hanya Admin/Gudang yang bisa create/delete produk.
     match /products/{productId} {
       allow read: if isAuthenticated();
       allow create, delete: if isAuthenticated() && (isAdmin() || isWarehouse());
-      allow update: if isAuthenticated(); // Stock updates from transactions
+
+      // Admin/Gudang boleh mengubah data master apa pun.
+      // Peran lain (kasir) HANYA boleh menyentuh field 'stock', karena
+      // itulah satu-satunya yang perlu berubah saat transaksi berjalan.
+      // Tanpa batasan ini kasir bisa mengubah price dan hpp lewat SDK.
+      allow update: if isAuthenticated() && (
+                      isAdmin()
+                      || isWarehouse()
+                      || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock'])
+                    );
     }
 
     // ─── Categories ──────────────────────────────────────────────
@@ -79,22 +105,116 @@ service cloud.firestore {
     }
 
     // ─── Transactions ────────────────────────────────────────────
-    // Semua user login bisa create transaksi (Kasir perlu ini).
-    // Kasir hanya bisa baca transaksi miliknya sendiri.
-    // Admin ke atas bisa baca semua.
-    // Hapus hanya untuk Owner/Superadmin.
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated() && (isAdmin() || resource.data.cashierId == request.auth.uid);
-      allow create: if isAuthenticated(); // Kasir, Admin, dll semua bisa buat transaksi
-      allow update: if isAuthenticated() && (isAdmin() || resource.data.cashierId == request.auth.uid);
-      allow delete: if isAuthenticated() && getUserRole() in ['SUPERADMIN', 'OWNER'];
+
+      function incoming() {
+        return request.resource.data;
+      }
+
+      function isReturn() {
+        return incoming().get('type', 'SALE') == 'RETURN';
+      }
+
+      // Field wajib ada — hanya ditegakkan saat create, supaya dokumen
+      // lama yang dibuat sebelum validasi ini ada tetap bisa di-update
+      // (mis. pelunasan piutang atas transaksi tahun lalu).
+      function hasRequiredKeys() {
+        return incoming().keys().hasAll([
+                 'date', 'items', 'totalAmount', 'amountPaid',
+                 'paymentStatus', 'paymentMethod', 'customerName',
+                 'cashierId', 'cashierName'
+               ]);
+      }
+
+      // Tipe data harus benar. Ini menutup angka yang dikirim sebagai
+      // string, yang membuat laporan keuangan salah jumlah tanpa error.
+      // Semua akses lewat get() dengan default agar dokumen lama yang
+      // field-nya tidak lengkap tidak langsung menggagalkan evaluasi.
+      function hasValidTypes() {
+        return incoming().get('items', []) is list
+               && incoming().get('items', []).size() > 0
+               && incoming().get('totalAmount', 0) is number
+               && incoming().get('amountPaid', 0) is number
+               && incoming().get('change', 0) is number
+               && incoming().get('date', '') is string
+               && incoming().get('cashierId', '') is string
+               && incoming().get('customerName', '') is string
+               && incoming().get('paymentStatus', 'LUNAS') in ['LUNAS', 'SEBAGIAN', 'BELUM_LUNAS']
+               && incoming().get('paymentMethod', 'CASH') in ['CASH', 'TRANSFER', 'TEMPO', 'BON', 'QRIS'];
+      }
+
+      // Penjualan tidak boleh bertotal negatif; retur justru harus
+      // negatif karena dipakai untuk membalik nilai penjualan.
+      function hasValidSign() {
+        return isReturn()
+               ? incoming().totalAmount <= 0
+               : incoming().totalAmount >= 0;
+      }
+
+      // Konsistensi diskon, hanya diperiksa bila subtotal dikirim
+      // (POS penjualan normal tidak mengirim subtotal; Backdate dan
+      // Reopen mengirimnya).
+      function hasConsistentDiscount() {
+        return !('subtotal' in incoming())
+               || (
+                 incoming().subtotal is number
+                 && incoming().get('discountAmount', 0) is number
+                 && incoming().get('discountAmount', 0) >= 0
+                 && incoming().get('discountAmount', 0) <= incoming().subtotal
+                 && incoming().totalAmount == incoming().subtotal - incoming().get('discountAmount', 0)
+               );
+      }
+
+      // Kembalian harus benar-benar selisih bayar dengan total.
+      // HANYA untuk create: pada update angsuran, 'change' sengaja
+      // dihitung terhadap sisa utang, bukan terhadap total.
+      function hasConsistentChange() {
+        return incoming().get('change', 0) == incoming().amountPaid - incoming().totalAmount;
+      }
+
+      // Kasir tidak boleh mengatribusikan transaksi ke orang lain.
+      // Admin ke atas boleh, karena perlu untuk input susulan/backdate.
+      function isAttributedToSelf() {
+        return incoming().cashierId == request.auth.uid;
+      }
+
+      allow read: if isAuthenticated()
+                  && (isAdmin() || resource.data.cashierId == request.auth.uid);
+
+      allow create: if isAuthenticated()
+                    && hasRequiredKeys()
+                    && hasValidTypes()
+                    && hasValidSign()
+                    && hasConsistentDiscount()
+                    && hasConsistentChange()
+                    && (isAdmin() || isAttributedToSelf());
+
+      // Update dipakai untuk angsuran, retur, dan reopen. Bentuk dan
+      // tanda tetap divalidasi, tapi identitas kasir, tanggal, dan
+      // jenis transaksi tidak boleh digeser oleh non-admin — itu
+      // yang menjaga jejak audit tetap utuh.
+      allow update: if isAuthenticated()
+                    && (isAdmin() || resource.data.cashierId == request.auth.uid)
+                    && hasValidTypes()
+                    && hasValidSign()
+                    && hasConsistentDiscount()
+                    && (
+                      isAdmin()
+                      || (
+                        incoming().cashierId == resource.data.cashierId
+                        && incoming().date == resource.data.date
+                        && incoming().get('type', 'SALE') == resource.data.get('type', 'SALE')
+                      )
+                    );
+
+      allow delete: if isAuthenticated() && isOwnerUp();
     }
 
     // ─── Purchases ───────────────────────────────────────────────
     match /purchases/{purchaseId} {
       allow read: if isAuthenticated();
       allow create, update: if isAuthenticated() && !isCashier();
-      allow delete: if isAuthenticated() && getUserRole() in ['SUPERADMIN', 'OWNER'];
+      allow delete: if isAuthenticated() && isOwnerUp();
     }
 
     // ─── Cash Flow ───────────────────────────────────────────────
@@ -102,7 +222,7 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && isAdmin();
-      allow delete: if isAuthenticated() && getUserRole() in ['SUPERADMIN', 'OWNER'];
+      allow delete: if isAuthenticated() && isOwnerUp();
     }
 
     // ─── Stock Adjustments ───────────────────────────────────────

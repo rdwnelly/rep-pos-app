@@ -24,6 +24,12 @@ dist-ssr
 *.sln
 *.sw?
 
+# Firebase service account / Admin SDK credentials
+# JANGAN pernah commit file ini; simpan di luar folder project.
+*serviceAccount*.json
+*-adminsdk-*.json
+firebase-adminsdk*.json
+
 # Environment Variables
 .env
 .env.*

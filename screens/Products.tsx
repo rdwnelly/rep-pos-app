@@ -182,16 +182,10 @@ export const Products: React.FC = () => {
     setFormData({ ...formData, image: '' });
   };
 
-  const handleApplyHPP = (hpp: number, selectedPrice: number, allSuggestions: any[]) => {
-    const eko = allSuggestions.find(s => s.tier === 'Ekonomis')?.price || selectedPrice;
-    const std = allSuggestions.find(s => s.tier === 'Standar')?.price || selectedPrice;
-    const prem = allSuggestions.find(s => s.tier === 'Premium')?.price || 0;
-
-    setFormData(prev => ({
-      ...prev,
-      hpp: hpp,
-      price: std
-    }));
+  // Hanya HPP yang diisi dari kalkulator; harga jual ditentukan sendiri
+  // di form produk (dulu diisi otomatis dari saran harga AI).
+  const handleApplyHPP = (hpp: number) => {
+    setFormData(prev => ({ ...prev, hpp }));
     setIsHPPModalOpen(false);
   };
 
@@ -1215,11 +1209,10 @@ export const Products: React.FC = () => {
       )}
 
       {/* HPP Calculator Modal */}
-      <HPPCalculatorModal 
+      <HPPCalculatorModal
         isOpen={isHPPModalOpen}
         onClose={() => setIsHPPModalOpen(false)}
         productName={formData.name || ''}
-        categoryName={categories.find(c => c.id === formData.categoryId)?.name || ''}
         onApply={handleApplyHPP}
       />
     </div>

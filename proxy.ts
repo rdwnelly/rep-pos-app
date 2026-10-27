@@ -1,46 +1,66 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { jwtVerify } from 'jose';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 
-// Use jose for edge-compatible JWT verification in middleware
+// Aplikasi ini memakai Firebase Auth, bukan JWT buatan sendiri.
+// Sebelumnya proxy menuntut cookie 'token' yang tidak pernah
+// diset oleh alur login mana pun, sehingga SEMUA /api selalu 401.
+// Sekarang yang diverifikasi adalah ID token Firebase dari header
+// Authorization: Bearer <idToken>.
+const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+
+// Kunci publik Google untuk ID token Firebase; createRemoteJWKSet
+// menyimpan hasilnya di cache sehingga aman dipakai di Edge.
+const JWKS = createRemoteJWKSet(
+  new URL('https://www.googleapis.com/service_accounts/v1/jwks/securetoken@system.gserviceaccount.com')
+);
+
+// Semua route /api sekarang butuh ID token. Daftar ini dipertahankan
+// agar route publik berikutnya mudah ditambahkan.
+const PUBLIC_PATHS: string[] = [];
+
 export async function proxy(request: NextRequest) {
-  // Only apply to /api routes
-  if (!request.nextUrl.pathname.startsWith('/api')) {
+  const { pathname } = request.nextUrl;
+
+  if (!pathname.startsWith('/api')) {
     return NextResponse.next();
   }
 
-  // Skip auth for login route
-  if (request.nextUrl.pathname === '/api/login') {
+  if (PUBLIC_PATHS.includes(pathname)) {
     return NextResponse.next();
   }
 
-  const token = request.cookies.get('token')?.value;
+  const authHeader = request.headers.get('authorization') || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
 
   if (!token) {
     return NextResponse.json(
-      { error: 'Unauthorized: No token provided' },
+      { error: 'Unauthorized: ID token Firebase tidak dikirim' },
       { status: 401 }
     );
   }
 
   try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'fallback_secret');
-    const { payload } = await jwtVerify(token, secret);
-    
-    // Add user info to headers for downstream route handlers
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: `https://securetoken.google.com/${PROJECT_ID}`,
+      audience: PROJECT_ID,
+    });
+
     const requestHeaders = new Headers(request.headers);
-    requestHeaders.set('x-user-id', payload.id as string);
-    requestHeaders.set('x-user-role', payload.role as string);
-    requestHeaders.set('x-user-username', payload.username as string);
+    requestHeaders.set('x-user-id', String(payload.user_id || payload.sub || ''));
+    requestHeaders.set('x-user-email', String(payload.email || ''));
+    // Kosong bila custom claim belum di-backfill; route yang butuh
+    // peran wajib menyediakan fallback-nya sendiri.
+    requestHeaders.set('x-user-role', typeof payload.role === 'string' ? payload.role : '');
 
     return NextResponse.next({
       request: {
         headers: requestHeaders,
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
-      { error: 'Forbidden: Invalid token' },
+      { error: 'Forbidden: ID token tidak valid atau kedaluwarsa' },
       { status: 403 }
     );
   }

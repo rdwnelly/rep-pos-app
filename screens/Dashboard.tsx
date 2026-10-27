@@ -5,13 +5,12 @@ import {
 } from 'recharts';
 import {
   LayoutDashboard, TrendingUp, TrendingDown, Wallet, AlertCircle, Package,
-  RefreshCw, Calendar, CalendarDays, Printer, Brain, CreditCard, ShoppingBag,
+  RefreshCw, Calendar, CalendarDays, Printer, CreditCard, ShoppingBag,
   DollarSign, Percent, Clock, ArrowUpRight, FileSpreadsheet, Download,
-  Layers, ChevronLeft, ChevronRight, Sparkles, AlertTriangle, CheckCircle2,
+  Layers, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2,
   User as UserIcon, Store, Activity, ArrowRight, Filter
 } from 'lucide-react';
 import { StorageService } from '../services/storage';
-import { getBusinessInsights } from '../services/geminiService';
 import { formatIDR, formatNumber, exportToExcel, exportToCSV, formatDate } from '../utils';
 import { generatePrintDashboard } from '../utils/printHelpers';
 import { Transaction, Product, CartItem, User, TransactionType, PaymentMethod, PaymentStatus, StoreSettings } from '../types';
@@ -19,7 +18,6 @@ import { useData } from '../hooks/useData';
 
 export const Dashboard: React.FC = () => {
   // Data Fetching
-  const transactions = useData(() => StorageService.getTransactions(), [], 'transactions') || [];
   const products = useData(() => StorageService.getProducts(), [], 'products') || [];
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
 
@@ -44,9 +42,57 @@ export const Dashboard: React.FC = () => {
     return start;
   });
 
+  /**
+   * Rentang hari yang sedang ditampilkan, diturunkan dari filter waktu
+   * yang sama seperti filteredTxs di bawah. Dipakai sebagai batas query
+   * agar Dashboard tidak lagi mengunduh seluruh riwayat transaksi.
+   */
+  const queryRange = useMemo(() => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const asDay = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    if (timeFilter === 'daily') {
+      return { start: asDay(selectedDate), end: asDay(selectedDate) };
+    }
+    if (timeFilter === 'weekly') {
+      const end = new Date(selectedWeekStart);
+      end.setDate(end.getDate() + 6);
+      return { start: asDay(selectedWeekStart), end: asDay(end) };
+    }
+    if (timeFilter === 'monthly') {
+      return {
+        start: asDay(new Date(selectedYear, selectedMonth, 1)),
+        end: asDay(new Date(selectedYear, selectedMonth + 1, 0)),
+      };
+    }
+    if (timeFilter === 'custom') {
+      return { start: customStartDate.slice(0, 10), end: customEndDate.slice(0, 10) };
+    }
+    // yearly
+    return {
+      start: asDay(new Date(selectedYear, 0, 1)),
+      end: asDay(new Date(selectedYear, 11, 31)),
+    };
+  }, [timeFilter, selectedDate, selectedWeekStart, selectedMonth, selectedYear, customStartDate, customEndDate]);
+
+  const transactions = useData(
+    () => StorageService.getTransactionsByDateRange(queryRange.start, queryRange.end),
+    [queryRange.start, queryRange.end],
+    'transactions',
+  ) || [];
+
+  /**
+   * Piutang dibaca terpisah dan TANPA batas tanggal: utang pelanggan dari
+   * tahun-tahun sebelumnya tetap harus ikut dihitung. Yang membatasi di
+   * sini statusnya, bukan waktunya.
+   */
+  const outstandingTxs = useData(
+    () => StorageService.getOutstandingTransactions(),
+    [],
+    'transactions',
+  ) || [];
+
   // AI & Interactive States
-  const [loadingAI, setLoadingAI] = useState(false);
-  const [aiInsight, setAiInsight] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<string>(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -208,13 +254,13 @@ export const Dashboard: React.FC = () => {
   // Unpaid Receivables (Piutang)
   const totalReceivables = useMemo(() => {
     const endOfSelectedYear = new Date(selectedYear, 11, 31, 23, 59, 59).getTime();
-    return transactions
+    return outstandingTxs
       .filter(t => {
         const txTime = new Date(t.date).getTime();
         return t.paymentStatus !== PaymentStatus.PAID && txTime <= endOfSelectedYear;
       })
       .reduce((sum, t) => sum + (t.totalAmount - (t.amountPaid || 0)), 0);
-  }, [transactions, selectedYear]);
+  }, [outstandingTxs, selectedYear]);
 
   // Low Stock Items (< 10)
   const lowStockProducts = useMemo(() => {
@@ -374,21 +420,8 @@ export const Dashboard: React.FC = () => {
   const CHART_COLORS = ['#059669', '#2563eb', '#7c3aed', '#d97706', '#dc2626', '#0891b2', '#475569'];
 
   // ========================================================
-  // 4. ACTION HANDLERS (AI, EXPORT, PRINT)
+  // 4. ACTION HANDLERS (EXPORT, PRINT)
   // ========================================================
-  const handleGenerateInsight = async () => {
-    setLoadingAI(true);
-    try {
-      const result = await getBusinessInsights(filteredTxs, products);
-      setAiInsight(result);
-    } catch (err) {
-      console.error(err);
-      setAiInsight("Gagal memuat analisis AI saat ini.");
-    } finally {
-      setLoadingAI(false);
-    }
-  };
-
   const timeLabel = timeFilter === 'daily'
     ? 'Hari Ini'
     : (timeFilter === 'weekly'
@@ -541,16 +574,6 @@ export const Dashboard: React.FC = () => {
             </button>
           </div>
 
-          {/* AI Insights Button */}
-          <button
-            onClick={handleGenerateInsight}
-            disabled={loadingAI}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-3.5 py-2 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all text-xs font-black shadow-md shadow-indigo-600/20 active:scale-95"
-          >
-            <Sparkles size={14} className={loadingAI ? 'animate-spin' : ''} />
-            {loadingAI ? 'Menganalisis...' : 'Analisis AI'}
-          </button>
-
           {/* Print Button */}
           <button
             onClick={handlePrint}
@@ -687,40 +710,6 @@ export const Dashboard: React.FC = () => {
           Terakhir sinkron: <strong className="text-slate-700">{lastRefreshed} WIB</strong>
         </div>
       </div>
-
-      {/* AI Business Insights Banner */}
-      {aiInsight && (
-        <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 text-white p-5 rounded-2xl shadow-xl border border-indigo-700/60 animate-fade-in relative overflow-hidden">
-          <div className="absolute -right-8 -bottom-8 opacity-10 pointer-events-none">
-            <Brain size={180} />
-          </div>
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-indigo-500/20 text-indigo-300 rounded-xl border border-indigo-400/30">
-                <Sparkles size={18} />
-              </div>
-              <div>
-                <h3 className="font-black text-sm text-indigo-100 flex items-center gap-2">
-                  Wawasan Bisnis Cerdas Gemini AI
-                  <span className="bg-indigo-500/30 text-indigo-200 text-[10px] px-2 py-0.5 rounded-full font-mono">
-                    AI Advisor
-                  </span>
-                </h3>
-                <p className="text-[11px] text-indigo-300">Analisis taktis performa penjualan & rekomendasi otomatis</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setAiInsight(null)}
-              className="text-xs text-indigo-300 hover:text-white bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-lg transition-colors"
-            >
-              Tutup
-            </button>
-          </div>
-          <div className="text-xs text-indigo-100 bg-black/30 p-4 rounded-xl border border-indigo-800/60 leading-relaxed whitespace-pre-line font-sans">
-            {aiInsight}
-          </div>
-        </div>
-      )}
 
       {/* 6 Executive KPI Metric Summary Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">

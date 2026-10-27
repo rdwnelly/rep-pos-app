@@ -4,7 +4,7 @@ import { Search, Trash2, User, Plus, Minus, ShoppingBag, Printer, CreditCard, Ba
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Product, CartItem, PaymentStatus, Transaction, PaymentMethod, User as UserType, Customer, StoreSettings, TransactionType, Category, TravelBookingCommission, CommissionMethod, CommissionStatus, OpenBill } from '../types';
-import { formatIDR, formatNumber, generateId, formatDate, toMySQLDate } from '../utils';
+import { formatIDR, formatNumber, generateId, formatDate, toCanonicalDate } from '../utils';
 import { generatePrintInvoice, PrintInvoiceOptions } from '../utils/printHelpers';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
@@ -359,7 +359,10 @@ export const POS: React.FC = () => {
         }
 
         if (connected) {
-          const options = { ...storeSettings, cashierName: bill.cashierName || currentUser.name || 'Kasir', isTemporarySlip: true };
+          // storeSettings masih undefined sebelum termuat; pakai pola
+          // fallback yang sama seperti printReceipt di atas.
+          const baseSettings = storeSettings || ({ name: 'Kasir REP' } as StoreSettings);
+          const options = { ...baseSettings, cashierName: bill.cashierName || currentUser.name || 'Kasir', isTemporarySlip: true };
           await bluetooth.print(generateESCPOSReceipt(billTx, options));
           alert(`Struk pesanan sementara Open Bill #${bill.billNumber} berhasil dicetak!`);
           return;
@@ -622,7 +625,7 @@ export const POS: React.FC = () => {
 
       const newPaymentHistoryItem = paid > 0 ? {
         id: generateId(),
-        date: new Date().toISOString(),
+        date: toCanonicalDate(),
         amount: paid,
         method: paymentMethod,
         bankId: selectedBankId,
@@ -706,7 +709,7 @@ export const POS: React.FC = () => {
       // id: generateId(), // Handled by backend (F3)
       id: '', // Send empty or handle in backend logic
       type: TransactionType.SALE,
-      date: toMySQLDate(new Date()),
+      date: toCanonicalDate(),
       items: cart,
       totalAmount,
       amountPaid: paid,

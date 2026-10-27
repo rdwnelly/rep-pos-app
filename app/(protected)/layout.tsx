@@ -1,32 +1,58 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { useAuth } from "../../context/AuthContext";
 import { auth } from "../../src/lib/firebase";
 import { Layout } from "../../components/Layout";
 import { UserRole } from "../../types";
-import {
-  About,
-  BackdateEntry,
-  BarcodeGenerator,
-  CustomerHistory,
-  Dashboard,
-  Finance,
-  POS,
-  People,
-  Products,
-  RealStockCheck,
-  ReturnHistory,
-  Settings,
-  SoldItems,
-  SupplierHistory,
-  TransferHistory,
-  MonthlyReport,
-  TravelAgentCommission,
-} from "../../screens";
-import BeritaAcaraPage from "./berita-acara/page";
+import { Loading } from "../../components/Loading";
+
+// POS tetap di-impor statis: itu start_url aplikasi dan layar yang
+// dibuka kasir sepanjang hari, jadi tidak boleh menunggu chunk terpisah.
+import { POS } from "../../screens/POS";
+
+/**
+ * Sisanya dipecah jadi chunk sendiri. Sebelumnya ke-17 layar di-impor
+ * statis di sini, sehingga membuka /pos ikut mengunduh Finance (4.601
+ * baris), MonthlyReport (3.203 baris), Berita Acara, plus recharts,
+ * jspdf, html2canvas, dan xlsx — padahal belum tentu dipakai.
+ *
+ * ssr: false karena semua layar ini client component yang bergantung
+ * pada localStorage dan Firebase Auth di browser.
+ */
+const lazyScreen = (
+  load: () => Promise<any>,
+  exportName: string,
+): React.ComponentType<any> =>
+  dynamic(() => load().then((mod) => mod[exportName]), {
+    ssr: false,
+    loading: () => <Loading />,
+  });
+
+const About = lazyScreen(() => import("../../screens/About"), "About");
+const BackdateEntry = lazyScreen(() => import("../../screens/BackdateEntry"), "BackdateEntry");
+const BarcodeGenerator = lazyScreen(() => import("../../screens/BarcodeGenerator"), "BarcodeGenerator");
+const CustomerHistory = lazyScreen(() => import("../../screens/CustomerHistory"), "CustomerHistory");
+const Dashboard = lazyScreen(() => import("../../screens/Dashboard"), "Dashboard");
+const Finance = lazyScreen(() => import("../../screens/Finance"), "Finance");
+const MonthlyReport = lazyScreen(() => import("../../screens/MonthlyReport"), "MonthlyReport");
+const People = lazyScreen(() => import("../../screens/People"), "People");
+const Products = lazyScreen(() => import("../../screens/Products"), "Products");
+const RealStockCheck = lazyScreen(() => import("../../screens/RealStockCheck"), "RealStockCheck");
+const ReturnHistory = lazyScreen(() => import("../../screens/ReturnHistory"), "ReturnHistory");
+const Settings = lazyScreen(() => import("../../screens/Settings"), "Settings");
+const SoldItems = lazyScreen(() => import("../../screens/SoldItems"), "SoldItems");
+const SupplierHistory = lazyScreen(() => import("../../screens/SupplierHistory"), "SupplierHistory");
+const TransferHistory = lazyScreen(() => import("../../screens/TransferHistory"), "TransferHistory");
+const TravelAgentCommission = lazyScreen(() => import("../../screens/TravelAgentCommission"), "TravelAgentCommission");
+
+const BeritaAcaraPage = dynamic(() => import("./berita-acara/page"), {
+  ssr: false,
+  loading: () => <Loading />,
+});
 
 const pageMap: Record<
   string,

@@ -1,4 +1,4 @@
-# 📋 Detail Fitur Aplikasi Cemilan KasirPOS Nusantara
+# 📋 Detail Fitur Aplikasi KASIR RELY
 
 ## 🗂️ Daftar Isi
 
@@ -16,17 +16,18 @@
 
 ## Ikhtisar Aplikasi
 
-**Cemilan KasirPOS Nusantara** adalah aplikasi Point of Sale (POS) yang dirancang khusus untuk usaha kecil dan menengah (UMKM) di Indonesia. Aplikasi ini menawarkan solusi lengkap untuk mengelola penjualan, inventaris, keuangan, dan pelanggan dengan antarmuka yang modern dan mudah digunakan.
+**KASIR RELY** adalah aplikasi Point of Sale (POS) buatan **RELY STUDIO**, diterapkan untuk Yaswar Cafe & Toko Souvenir, Yayasan Rumah Etnik Papua di Sorong. Satu aplikasi untuk mengelola penjualan, inventaris, keuangan, dan pelanggan.
+
+> Dokumen ini adalah katalog fitur per layar. Untuk hal teknis (arsitektur, cara menjalankan, deploy, batasan yang diketahui) lihat [README.md](./README.md), yang selalu jadi acuan utama.
 
 ### Teknologi yang Digunakan
 
-- **Frontend**: React 19 dengan TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS (dengan animasi custom fade-in)
-- **Backend**: Node.js (Express) - Primary, PHP (Legacy/Backup)
-- **Database**: MySQL (Timezone: Asia/Jakarta / WIB)
-- **Authentication**: JWT (JSON Web Tokens)
-- **Security**: Bcrypt untuk enkripsi password, Helmet untuk security headers
+- **Framework**: Next.js 16 (App Router, Turbopack)
+- **Frontend**: React 19 dengan TypeScript (`strict`)
+- **Styling**: Tailwind CSS
+- **Database**: Firebase Firestore (zona waktu toko: Asia/Jayapura / WIT)
+- **Authentication**: Firebase Authentication
+- **Hak akses**: Firestore Security Rules + custom claim `role`
 
 ---
 
@@ -34,13 +35,10 @@
 
 ### 1. Sistem Login
 
-- **Username & Password**: Login menggunakan kredensial terenkripsi
-- **JWT Authentication**: Token berbasis JWT untuk session management
-- **Password Hashing**: Semua password **wajib** dienkripsi menggunakan Bcrypt (Format `$2...`)
-- **Strict Security**: Tidak ada fallback untuk password plain-text (sama seperti backend PHP)
-- **Default Credentials**:
-  - Username: `superadmin`
-  - Password: `password` (otomatis terenkripsi saat pertama login)
+- **Email & Password**: login lewat Firebase Authentication
+- **Sesi**: ID token Firebase, diperbarui otomatis oleh SDK
+- **Password**: disimpan dan diverifikasi sepenuhnya oleh Firebase, tidak pernah masuk ke Firestore
+- **Tidak ada kredensial default**: akun dibuat SUPERADMIN lewat menu Pengaturan → User
 
 ### 2. Role-Based Access Control (RBAC)
 
@@ -98,76 +96,17 @@ Aplikasi mendukung 5 level pengguna dengan akses berbeda:
 - **Tidak dapat** melihat modul Keuangan, Kontak, atau Pengaturan.
 - **Tidak dapat** melihat HPP.
 
-### 3. Fitur Keamanan Tambahan (Updated Security Audit 2026)
+### 3. Fitur Keamanan Tambahan
 
-- **Advanced Rate Limiting**: Proteksi brute-force menggunakan `express-rate-limit` untuk mencegah abuse pada endpoint API.
-- **CORS Strict Mode**: Konfigurasi Cross-Origin Resource Sharing yang lebih ketat dengan validasi Origin.
-- **HttpOnly Cookies**: Opsi penyimpanan token di cookie HttpOnly untuk mitigasi XSS penuh (didukung oleh backend).
-- **HSTS (HTTP Strict Transport Security)**: Otomatis memaksa koneksi HTTPS saat terdeteksi (via `Helmet`).
-- **Content Security Policy (CSP)**: Header CSP ketat untuk mengontrol sumber resource yang diizinkan (via `Helmet`).
-- **Input Sanitization**: Validasi input berlapis dan Parameter Binding otomatis via Sequelize untuk mencegah SQL Injection.
-- **Secure Headers**: Implementasi standard security headers (X-Frame-Options, X-Content-Type-Options) via `Helmet`.
+- **Firestore Security Rules**: satu-satunya penjaga akses, karena tidak ada backend yang memvalidasi. Membatasi field yang boleh diubah (kasir hanya boleh menyentuh `stock` pada produk), memeriksa tipe data dan tanda nilai transaksi, serta melarang kasir mengatribusikan transaksi ke orang lain.
+- **Peran lewat custom claim**: `role` dibaca dari ID token, bukan dari dokumen `users`, sehingga tidak ada document read tambahan per operasi.
+- **Password tidak pernah disimpan di database**: dikelola sepenuhnya Firebase Authentication, dan rules menolak dokumen `users` yang memuat field `password`.
+- **Security headers**: diatur di `next.config.mjs` (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy).
+- **Verifikasi ID token**: `proxy.ts` memverifikasi ID token Firebase untuk setiap permintaan ke `/api/*`.
 
-### 4. Default User
+### 4. Akun Pengguna
 
-Default user untuk `cemilankasirpos_php_v02.sql`
-
-```
-Super Admin
-- Username: superadmin
-- Password: password
-- Role: SUPERADMIN
-
-Administrator
-- Username: admin
-- Password: admin
-- Role: OWNER
-
-Owner Cemilan
-- Username: owner
-- Password: owner
-- Role: OWNER
-
-Kasir 1
-- Username: kasir1
-- Password: kasir1
-- Role: CASHIER
-
-Kasir 2
-- Username: kasir2
-- Password: kasir2
-- Role: CASHIER
-
-Kasir 3
-- Username: kasir3
-- Password: kasir3
-- Role: CASHIER
-
-Manager Toko
-- Username: manager
-- Password: manager
-- Role: OWNER
-
-Kasir Pagi
-- Username: kasir_pagi
-- Password: kasir_pagi
-- Role: CASHIER
-
-Kasir Siang
-- Username: kasir_siang
-- Password: kasir_siang
-- Role: CASHIER
-
-Kasir Malam
-- Username: kasir_malam
-- Password: kasir_malam
-- Role: CASHIER
-
-Admin Gudang
-- Username: admin_gudang
-- Password: admin_gudang
-- Role: GUDANG
-```
+**Tidak ada kredensial default.** Akun dibuat SUPERADMIN melalui menu Pengaturan → User, yang mendaftarkannya ke Firebase Authentication lalu menyimpan profilnya di koleksi `users`.
 
 ---
 
@@ -1083,18 +1022,16 @@ Toggle show/hide untuk:
 
 ## 🔒 Keamanan Data
 
-### Enkripsi & Hashing
+### Kredensial
 
-- **Password**: Bcrypt hashing
-- **JWT Tokens**: Signed dengan secret key
-- **Sensitive Data**: Auto-sanitized dari API response
+- **Password**: dikelola Firebase Authentication, tidak pernah tersimpan di Firestore
+- **Sesi**: ID token Firebase, diperbarui otomatis oleh SDK
 
-### Access Control
+### Kontrol Akses
 
-- **Role-based permissions**: Strict RBAC enforcement
-- **Data isolation**: Cashier hanya lihat data sendiri
-- **API Authentication**: Semua endpoint protected
-- **CORS**: Whitelist domains only
+- **Peran**: ditegakkan Firestore Security Rules, dibaca dari custom claim
+- **Isolasi data**: kasir hanya bisa membaca transaksi miliknya sendiri
+- **Field terbatas**: kasir hanya boleh mengubah `stock` pada produk, bukan harga atau HPP
 
 ### Audit Trail
 
@@ -1105,9 +1042,9 @@ Toggle show/hide untuk:
 
 ### Data Backup
 
-- **Manual export**: Export semua data ke CSV/Excel
-- **SQL dump**: Backup database lengkap
-- **Regular backups**: Disarankan backup berkala
+- **Ekspor manual**: semua data bisa diekspor ke CSV/Excel dari layar masing-masing
+- **Backup Firestore**: lewat Firebase Console atau `gcloud firestore export`
+- **Backup berkala**: disarankan, terutama sebelum menjalankan skrip pemeliharaan
 
 ---
 
@@ -1145,25 +1082,13 @@ Toggle show/hide untuk:
 
 ## 🚀 Deployment Options
 
-### Local Development
+Langkah lengkapnya ada di [README.md](./README.md). Ringkasnya:
 
-- Node.js (npm start)
-- Docker Compose
-- XAMPP/Laragon (Database only)
-
-### Production Hosting
-
-- **Shared Hosting**: cPanel support
-- **VPS**: Ubuntu/CentOS server
-- **Cloud**: AWS, DigitalOcean, dll
-- **Docker**: Docker Compose setup
-
-### Scalability
-
-- MySQL database untuk multi-user
-- API-based architecture
-- Horizontal scaling ready
-- Load balancing support (planned)
+- **Lokal**: `npm run dev` (port 3001)
+- **Produksi**: `npm run build && npm run start` di host mana pun yang bisa menjalankan Node.js 20.9+
+- **Wajib HTTPS**: service worker hanya aktif di secure context; tanpa HTTPS seluruh kemampuan offline mati tanpa pesan error
+- **Rules & indeks Firestore** di-deploy terpisah dengan `firebase-tools`
+- **Multi-pengguna** ditangani Firestore (sinkronisasi real-time, antrean tulisan saat offline), bukan oleh server aplikasi
 
 ---
 
@@ -1171,14 +1096,10 @@ Toggle show/hide untuk:
 
 Untuk informasi lebih detail, lihat dokumentasi berikut:
 
-- **[README.md](./README.md)**: Overview aplikasi
-- **[README_DEVELOPMENT.md](./README_DEVELOPMENT.md)**: Setup development
-- **[README_PRODUCTION.md](./README_PRODUCTION.md)**: Production deployment
-- **[README_CPANEL_HOSTING.md](./README_CPANEL_HOSTING.md)**: Deploy ke cPanel
-- **[README_RUN_LOCALLY.md](./README_RUN_LOCALLY.md)**: Run locally
-- **[README_PHP_BACKEND.md](./README_PHP_BACKEND.md)**: Backend architecture
-- **[SECURITY_AUDIT.md](./SECURITY_AUDIT.md)**: Security audit
-- **[SECURITY_IMPLEMENTATION.md](./SECURITY_IMPLEMENTATION.md)**: Security features
+- **[README.md](./README.md)**: arsitektur, cara menjalankan, deploy, skrip pemeliharaan, dan batasan yang diketahui
+- **[firestore.rules](./firestore.rules)**: aturan hak akses yang sebenarnya berlaku
+
+> Dokumen deployment dan audit keamanan yang lama sudah dihapus karena mendokumentasikan arsitektur MySQL/Express/Docker yang tidak lagi dipakai.
 
 ---
 
@@ -1234,13 +1155,11 @@ A: Cek username/password, pastikan server running
 
 ### Contact Support
 
-- **GitHub**: [dotslashgabut/cemilan-kasirpos](https://github.com/dotslashgabut/cemilan-kasirpos)
-- **YouTube**: [DotSlashGabut](https://www.youtube.com/@dotslashgabut)
-- **Saweria**: [Support via Saweria](https://saweria.co/dotslashgabut)
-- **Ko-fi**: [Support via Ko-fi](https://ko-fi.com/dotslashgabut)
+- **Pengembang**: RELY STUDIO — Application & Web Development
+- **GitHub**: [github.com/rdwnelly](https://github.com/rdwnelly)
 
 ---
 
-**Terima kasih telah menggunakan Cemilan KasirPOS Nusantara! 🍬**
+**KASIR RELY — dikembangkan oleh RELY STUDIO.**
 
 _Semoga bermanfaat untuk mengembangkan usaha Anda._

@@ -1,4 +1,4 @@
-import { Product, Transaction, User, CashFlow, Category, Division, Customer, Supplier, Purchase, StoreSettings, BankAccount, SyncQueueItem, TravelAgent, TravelBookingCommission, OpenBill } from "../types";
+import { Product, Transaction, User, CashFlow, Category, Division, Customer, Supplier, Purchase, StoreSettings, BankAccount, TravelAgent, TravelBookingCommission, OpenBill } from "../types";
 import { ApiService } from "./api";
 
 // Simple Event Bus for Data Changes
@@ -29,15 +29,15 @@ export const StorageService = {
   refreshAll: () => {
     notifyListeners();
   },
-  init: async () => {
-    // No initialization needed for direct API usage
-    console.log("StorageService initialized in Fully MySQL mode");
-  },
-
-  addToSyncQueue: async (table: SyncQueueItem['table'], action: SyncQueueItem['action'], dataId: string, data: any) => {
-    // No local sync queue in fully MySQL mode
-    console.warn("Sync queue not supported in Fully MySQL mode");
-  },
+  /**
+   * Antrean offline tidak lagi dikelola di sini. Firestore sudah
+   * menyimpan tulisan ke IndexedDB lalu mengirimnya saat jaringan
+   * kembali; statusnya dipantau lewat services/syncStatus.ts.
+   *
+   * Dua stub lama ("Fully MySQL mode") dihapus karena menyesatkan:
+   * aplikasi ini berjalan di atas Firestore, bukan MySQL, dan tidak
+   * ada pemanggil keduanya.
+   */
 
   // Store Settings
   getStoreSettings: async (): Promise<StoreSettings> => {
@@ -307,6 +307,37 @@ export const StorageService = {
   // Transactions (Sales)
   getTransactions: async (): Promise<Transaction[]> => {
     return await ApiService.getTransactions();
+  },
+
+  /**
+   * ── Pengganti getTransactions() yang mengunduh seluruh koleksi ──────
+   *
+   * getTransactions() mengambil SEMUA transaksi sejak awal lalu difilter
+   * di memori, jadi biaya dan waktu muatnya tumbuh terus seiring umur
+   * data. Keempat metode di bawah membatasi di sisi server.
+   *
+   * Prasyarat: field `date` harus sudah berformat kanonik. Jalankan
+   * scripts/normalize-dates.mjs lebih dulu.
+   */
+  getTransactionsByDateRange: async (startDay: string, endDay: string): Promise<Transaction[]> => {
+    return await ApiService.getTransactionsByDateRange(startDay, endDay);
+  },
+  /** Piutang — sengaja TANPA batas tanggal, lihat catatan di firestore.ts. */
+  getOutstandingTransactions: async (): Promise<Transaction[]> => {
+    return await ApiService.getOutstandingTransactions();
+  },
+  getTransactionsByCustomer: async (customerId: string): Promise<Transaction[]> => {
+    return await ApiService.getTransactionsByCustomer(customerId);
+  },
+  getCashFlowByDateRange: async (startDay: string, endDay: string): Promise<CashFlow[]> => {
+    return await ApiService.getCashFlowByDateRange(startDay, endDay);
+  },
+  getPurchasesByDateRange: async (startDay: string, endDay: string): Promise<Purchase[]> => {
+    return await ApiService.getPurchasesByDateRange(startDay, endDay);
+  },
+  /** Utang supplier — juga tanpa batas tanggal. */
+  getOutstandingPurchases: async (): Promise<Purchase[]> => {
+    return await ApiService.getOutstandingPurchases();
   },
   addTransaction: async (transaction: Transaction) => {
     const result = await ApiService.addTransaction(transaction);

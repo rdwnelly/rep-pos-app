@@ -122,8 +122,19 @@ export const About: React.FC = () => {
                         </p>
                         
                         <div className="space-y-4 relative z-10">
+                            {/* Panel ini berlatar gelap, sementara logo berlatar
+                                terang — jadi diberi kartu putih agar terbaca
+                                dan terlihat disengaja, bukan tempelan. */}
+                            <div className="bg-white rounded-xl p-4 shadow-lg inline-block w-full max-w-[280px]">
+                                <img
+                                    src="/rely-studio.jpg"
+                                    alt="RELY STUDIO — Application &amp; Web Development"
+                                    className="w-full h-auto"
+                                />
+                            </div>
+
                             <div>
-                                <p className="text-accent font-bold text-lg">Ridwan Elly</p>
+                                <p className="text-slate-100 font-bold text-base">Ridwan Elly</p>
                                 <p className="text-xs text-slate-400">Lead Full-Stack Software Engineer</p>
                             </div>
                             
