@@ -25,9 +25,9 @@ dist-ssr
 *.sw?
 
 # Environment Variables
-# .env
-# .env.*
-# !.env.example
+.env
+.env.*
+!.env.local.example
 
 # PHP
 # php_server/config.php
