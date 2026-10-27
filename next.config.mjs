@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  serverExternalPackages: ['sequelize'],
+  // firebase-admin hanya boleh berjalan di Node, bukan di bundle Edge.
+  // (dulu berisi 'sequelize', yang sudah dicabut bersama lapisan MySQL)
+  serverExternalPackages: ['firebase-admin'],
   async headers() {
     return [
       {
