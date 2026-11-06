@@ -17,7 +17,13 @@ const JWKS = createRemoteJWKSet(
 
 // Semua route /api sekarang butuh ID token. Daftar ini dipertahankan
 // agar route publik berikutnya mudah ditambahkan.
-const PUBLIC_PATHS: string[] = [];
+// Endpoint integrasi PORTAL REP memverifikasi sendiri pemanggilnya (secret bersama untuk
+// panggilan server-ke-server, atau tiket SSO sekali pakai), sehingga tidak memakai ID token.
+const PUBLIC_PATHS: string[] = [
+  '/api/portal/summary',
+  '/api/portal/sso/ticket',
+  '/api/portal/sso/redeem',
+];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

@@ -251,6 +251,12 @@ service cloud.firestore {
       allow write: if isAuthenticated() && isAdmin();
     }
 
+    // ─── Tiket SSO PORTAL REP ────────────────────────────────────
+    // Hanya dikelola server (Admin SDK). Klien tidak boleh membaca tiket.
+    match /portal_sso_tickets/{ticketId} {
+      allow read, write: if false;
+    }
+
     // ─── Travel Commissions ──────────────────────────────────────
     match /travel_commissions/{commissionId} {
       allow read: if isAuthenticated();

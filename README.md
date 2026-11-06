@@ -185,3 +185,15 @@ Sepuluh dokumen lama yang mendokumentasikan arsitektur MySQL/Express/Docker suda
 ---
 
 **KASIR RELY** — dikembangkan oleh **RELY STUDIO** (Application & Web Development) · [github.com/rdwnelly](https://github.com/rdwnelly)
+
+## Integrasi PORTAL REP
+
+Endpoint untuk portal yayasan (kontrak lengkap: `docs/KONTRAK_INTEGRASI.md` di repo `portal-rep`):
+
+| Endpoint | Pemanggil | Fungsi |
+| :--- | :--- | :--- |
+| `GET /api/portal/summary?period=TODAY\|THIS_WEEK\|THIS_MONTH` | server portal (secret) | penjualan bersih, jumlah transaksi, produk terlaris, stok menipis (< 10), tren |
+| `POST /api/portal/sso/ticket` | server portal (secret) | tiket masuk otomatis sekali pakai (60 detik) untuk email yang punya akun POS |
+| `POST /api/portal/sso/redeem` + halaman `/sso` | browser | tukar tiket → custom token → login |
+
+Environment: `PORTAL_INTEGRATION_SECRET` (≥ 32 karakter, sama dengan `INTEGRATION_POS_SECRET` di portal) dan `FIREBASE_SERVICE_ACCOUNT_JSON`. Jika secret kosong, seluruh endpoint integrasi menolak permintaan.
