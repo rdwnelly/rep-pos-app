@@ -42,6 +42,7 @@ import {
   Division,
   TravelAgent,
   TravelBookingCommission,
+  VisitorLog,
 } from "../types";
 
 const collectionRef = (name: string) => collection(db, name);
@@ -751,6 +752,34 @@ export const FirestoreService = {
     deleteDoc(doc(collectionRef("travel_agents"), id)),
 
   // Travel Commissions
+  // ── Data Pengunjung Wisatawan ───────────────────────────────
+  getVisitorLogs: async (): Promise<VisitorLog[]> =>
+    getCollectionOrdered<VisitorLog>("visitor_logs", "date", "desc"),
+
+  /**
+   * Kunjungan pada rentang hari tertentu. Dipakai layar Data
+   * Pengunjung dan rekap bulanan, agar tidak mengunduh seluruh
+   * riwayat kunjungan setiap kali laporan dibuka.
+   */
+  getVisitorLogsByDateRange: async (
+    startDay: string,
+    endDay: string,
+  ): Promise<VisitorLog[]> => {
+    const { start, end } = dayRangeBounds(startDay, endDay);
+    return runQuery<VisitorLog>("visitor_logs", [
+      where("date", ">=", start),
+      where("date", "<=", end),
+      orderBy("date", "desc"),
+    ]);
+  },
+
+  saveVisitorLog: async (log: VisitorLog) =>
+    saveEntity<VisitorLog>("visitor_logs", log),
+  updateVisitorLog: async (log: VisitorLog) =>
+    saveEntity<VisitorLog>("visitor_logs", log),
+  deleteVisitorLog: async (id: string) =>
+    deleteDoc(doc(collectionRef("visitor_logs"), id)),
+
   getTravelCommissions: async (): Promise<TravelBookingCommission[]> =>
     getCollectionOrdered<TravelBookingCommission>("travel_commissions", "departureDate", "desc"),
   saveTravelCommission: async (commission: TravelBookingCommission) =>

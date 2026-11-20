@@ -10,6 +10,9 @@ import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { playBeep } from '../utils/soundEffect';
 import { PaymentQRCode } from '../components/ui/PaymentQRCode';
+import { VisitorLogModal, VisitorPrefill } from '../components/VisitorLogModal';
+import { VisitorServiceType } from '../types';
+import { resolveVisitorService } from '../utils/categoryMapping';
 
 const FlyingItem = ({ item, cartRect }: { item: any, cartRect?: DOMRect }) => {
   const [animate, setAnimate] = useState(false);
@@ -43,6 +46,50 @@ const FlyingItem = ({ item, cartRect }: { item: any, cartRect?: DOMRect }) => {
     </div>
   );
 };
+/**
+ * Mengenali layanan kunjungan dari isi keranjang.
+ *
+ * Keempat layanan berikut sama-sama menandakan ada tamu yang datang:
+ * tiket masuk, paket tour/edukasi, sewa kostum, dan homestay. Semuanya
+ * dijual sebagai produk biasa, jadi penandanya hanya nama kategori.
+ * Pola pencocokan disamakan dengan pemetaan kategori pada Berita Acara.
+ */
+/**
+ * Jumlah pengunjung hanya boleh ditebak dari layanan yang kuantitasnya
+ * memang berarti orang. Satu paket tour bisa untuk 30 peserta, dan satu
+ * baris homestay berarti malam atau kamar — bukan jumlah tamu. Untuk
+ * keduanya kasir yang mengisi jumlah sebenarnya.
+ */
+const PAX_FROM_QTY: VisitorServiceType[] = [
+  VisitorServiceType.TIKET_MASUK,
+  VisitorServiceType.SEWA_KOSTUM,
+];
+
+const analyzeVisitorServices = (items: CartItem[], categories: Category[]) => {
+  const services = new Set<VisitorServiceType>();
+  const terjual: string[] = [];
+  let suggestedPax = 0;
+  let revenue = 0;
+
+  items.forEach(item => {
+    const jenis = resolveVisitorService(item.categoryName || '', categories);
+    if (!jenis) return;
+
+    const qty = Number(item.qty) || 0;
+    services.add(jenis);
+    revenue += (Number(item.finalPrice) || 0) * qty;
+    terjual.push(`${item.name} ×${qty}`);
+    if (PAX_FROM_QTY.includes(jenis)) suggestedPax += qty;
+  });
+
+  return {
+    serviceTypes: [...services],
+    suggestedPax,
+    revenue,
+    soldSummary: terjual.join(', '),
+  };
+};
+
 export const POS: React.FC = () => {
   const bluetooth = useBluetoothPrinter();
   const products = useData(() => StorageService.getProducts(), [], 'products') || [];
@@ -84,6 +131,10 @@ export const POS: React.FC = () => {
 
   // Reopen / Add-on Order State
   const [reopenTx, setReopenTx] = useState<Transaction | null>(null);
+
+  // Pendataan pengunjung muncul setelah keranjang direset, agar kasir
+  // tidak tertahan dan dapat langsung melayani antrean berikutnya.
+  const [visitorPrefill, setVisitorPrefill] = useState<VisitorPrefill | null>(null);
 
   // Check sessionStorage for Reopen Transaction payload on mount
   useEffect(() => {
@@ -804,11 +855,28 @@ export const POS: React.FC = () => {
         await StorageService.deleteOpenBill(activeOpenBillId);
       }
 
+      // Data pengunjung dikumpulkan dari keranjang SEBELUM direset.
+      const visitorInfo = analyzeVisitorServices(cart, categories);
+
       // Reset
       resetCartAndState();
       setShowPaymentModal(false);
       searchInputRef.current?.focus();
       setShowSuccessModal(true);
+
+      // Ada layanan kunjungan terjual -> minta pendataan tamu.
+      if (visitorInfo.serviceTypes.length > 0) {
+        setVisitorPrefill({
+          transactionId: savedTransaction?.id || txToPrint.id,
+          invoiceNumber: savedTransaction?.invoiceNumber || txToPrint.invoiceNumber,
+          ticketRevenue: visitorInfo.revenue,
+          suggestedPax: visitorInfo.suggestedPax,
+          serviceTypes: visitorInfo.serviceTypes,
+          soldSummary: visitorInfo.soldSummary,
+          agentId: selectedTravelAgentId || undefined,
+          agentName: travelAgents.find(a => a.id === selectedTravelAgentId)?.name,
+        });
+      }
 
       // Auto close after 3 seconds
       setTimeout(() => {
@@ -1964,6 +2032,16 @@ export const POS: React.FC = () => {
         </div>,
         document.body
       )}
+
+      {/* Pendataan kunjungan wisatawan setelah penjualan tiket masuk */}
+      <VisitorLogModal
+        key={visitorPrefill?.transactionId || 'visitor-idle'}
+        isOpen={!!visitorPrefill}
+        onClose={() => setVisitorPrefill(null)}
+        prefill={visitorPrefill || undefined}
+        recordedById={currentUser.id || ''}
+        recordedByName={currentUser.name || 'Kasir'}
+      />
 
     </div>
   );

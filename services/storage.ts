@@ -1,4 +1,4 @@
-import { Product, Transaction, User, CashFlow, Category, Division, Customer, Supplier, Purchase, StoreSettings, BankAccount, TravelAgent, TravelBookingCommission, OpenBill } from "../types";
+import { Product, Transaction, User, CashFlow, Category, Division, Customer, Supplier, Purchase, StoreSettings, BankAccount, TravelAgent, TravelBookingCommission, OpenBill, VisitorLog } from "../types";
 import { ApiService } from "./api";
 
 // Simple Event Bus for Data Changes
@@ -102,18 +102,30 @@ export const StorageService = {
   },
 
   // Categories
+  /**
+   * Kategori "umum" peninggalan versi lama disembunyikan dari tampilan,
+   * TAPI tidak lagi dihapus di sini.
+   *
+   * Sebelumnya setiap pemanggilan getCategories() menghapus dokumennya
+   * di basis data — pembacaan yang diam-diam mengubah data. Pembersihan
+   * sesungguhnya kini dilakukan sekali lewat scripts/cleanup-umum-category.mjs.
+   */
   getCategories: async (): Promise<Category[]> => {
     const cats = await ApiService.getCategories();
-    const umumCats = cats.filter(c => c.name?.trim().toLowerCase() === 'umum');
-    if (umumCats.length > 0) {
-      for (const c of umumCats) {
-        if (c.id) {
-          ApiService.deleteCategory(c.id).catch(console.error);
-        }
-      }
-      return cats.filter(c => c.name?.trim().toLowerCase() !== 'umum');
-    }
-    return cats;
+    return cats
+      .filter(c => c.name?.trim().toLowerCase() !== 'umum')
+      .filter(c => c.isActive !== false)
+      .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)
+        || (a.name || '').localeCompare(b.name || ''));
+  },
+
+  /** Termasuk kategori non-aktif — untuk layar pengelolaan kategori. */
+  getAllCategories: async (): Promise<Category[]> => {
+    const cats = await ApiService.getCategories();
+    return cats
+      .filter(c => c.name?.trim().toLowerCase() !== 'umum')
+      .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)
+        || (a.name || '').localeCompare(b.name || ''));
   },
   saveCategory: async (category: Category) => {
     if (!category.id) {
@@ -226,7 +238,25 @@ export const StorageService = {
     }
     notifyListeners('categories');
   },
+  /**
+   * Menolak penghapusan kategori yang masih dipakai produk.
+   *
+   * Sebelumnya dokumen kategori langsung dihapus sementara produk tetap
+   * menyimpan categoryId yang sudah tidak ada — padahal pesan
+   * konfirmasi di layar menjanjikan produknya dipindahkan. Kategori
+   * yang tidak dipakai lagi sebaiknya dinonaktifkan, bukan dihapus,
+   * agar laporan periode lama tetap terbaca.
+   */
   deleteCategory: async (id: string) => {
+    const products = await ApiService.getProducts();
+    const dipakai = products.filter(p => p.categoryId === id);
+    if (dipakai.length > 0) {
+      throw new Error(
+        `Kategori ini masih dipakai ${dipakai.length} produk. ` +
+        `Pindahkan produknya ke kategori lain terlebih dahulu, ` +
+        `atau nonaktifkan kategori ini agar tetap tersimpan di laporan lama.`
+      );
+    }
     await ApiService.deleteCategory(id);
     notifyListeners('categories');
     if (typeof window !== 'undefined') {
@@ -235,21 +265,17 @@ export const StorageService = {
   },
 
   // Products
+  /**
+   * Kategori "umum" dikosongkan pada hasil baca saja. Penulisan balik
+   * ke basis data sengaja dihapus: membaca daftar produk tidak boleh
+   * mengubah data produk.
+   */
   getProducts: async (): Promise<Product[]> => {
     const products = await ApiService.getProducts();
-    let hasUmum = false;
-    const cleaned = products.map(p => {
-      if (p.categoryName?.trim().toLowerCase() === 'umum') {
-        hasUmum = true;
-        return { ...p, categoryName: '', categoryId: '' };
-      }
-      return p;
-    });
-    if (hasUmum) {
-      const toUpdate = products.filter(p => p.categoryName?.trim().toLowerCase() === 'umum').map(p => ({ ...p, categoryName: '', categoryId: '' }));
-      ApiService.saveProductsBulk(toUpdate).catch(console.error);
-    }
-    return cleaned;
+    return products.map(p =>
+      p.categoryName?.trim().toLowerCase() === 'umum'
+        ? { ...p, categoryName: '', categoryId: '' }
+        : p);
   },
   saveProduct: async (product: Product) => {
     if (product.categoryName?.trim().toLowerCase() === 'umum') {
@@ -538,6 +564,23 @@ export const StorageService = {
   },
 
   // Travel Commissions
+  // ── Data Pengunjung Wisatawan ───────────────────────────────
+  getVisitorLogs: async (): Promise<VisitorLog[]> => {
+    return await ApiService.getVisitorLogs();
+  },
+  getVisitorLogsByDateRange: async (startDay: string, endDay: string): Promise<VisitorLog[]> => {
+    return await ApiService.getVisitorLogsByDateRange(startDay, endDay);
+  },
+  saveVisitorLog: async (log: VisitorLog) => {
+    if (!log.id) await ApiService.saveVisitorLog(log);
+    else await ApiService.updateVisitorLog(log);
+    notifyListeners('visitor_logs');
+  },
+  deleteVisitorLog: async (id: string) => {
+    await ApiService.deleteVisitorLog(id);
+    notifyListeners('visitor_logs');
+  },
+
   getTravelCommissions: async (): Promise<TravelBookingCommission[]> => {
     return await ApiService.getTravelCommissions();
   },

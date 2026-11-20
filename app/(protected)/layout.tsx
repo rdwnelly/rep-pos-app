@@ -48,6 +48,7 @@ const SoldItems = lazyScreen(() => import("../../screens/SoldItems"), "SoldItems
 const SupplierHistory = lazyScreen(() => import("../../screens/SupplierHistory"), "SupplierHistory");
 const TransferHistory = lazyScreen(() => import("../../screens/TransferHistory"), "TransferHistory");
 const TravelAgentCommission = lazyScreen(() => import("../../screens/TravelAgentCommission"), "TravelAgentCommission");
+const VisitorData = lazyScreen(() => import("../../screens/VisitorData"), "VisitorData");
 
 const BeritaAcaraPage = dynamic(() => import("./berita-acara/page"), {
   ssr: false,
@@ -80,6 +81,7 @@ const pageMap: Record<
   customer_history: { component: CustomerHistory, requiresCurrentUser: true },
   supplier_history: { component: SupplierHistory, requiresCurrentUser: true },
   travel_commission: { component: TravelAgentCommission, requiresCurrentUser: true },
+  visitor_data: { component: VisitorData, requiresCurrentUser: true },
   real_stock_check: { component: RealStockCheck, requiresCurrentUser: true },
   sold_items: { component: SoldItems, requiresCurrentUser: true },
   transfer_history: { component: TransferHistory, requiresCurrentUser: true },

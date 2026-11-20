@@ -5,6 +5,7 @@ import { useData } from "../../../hooks/useData";
 import { StorageService, notifyListeners } from "../../../services/storage";
 import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
 import { formatIDR, formatNumber } from "../../../utils";
+import { resolveReportRowName } from "../../../utils/categoryMapping";
 import {
     Plus, PlusCircle, Trash2, Info, Save, Archive, FileText, X, Printer, Eye,
     FolderPlus, Download, Loader2, CheckCircle2, RefreshCw, AlertCircle, Sparkles, Check,
@@ -31,21 +32,6 @@ const BASE_SALES_CATEGORIES = [
     "Sewa kostum keluar",
 ];
 
-// Mapping dari categoryName (lowercase) ke nama tampilan pada Berita Acara
-// Tiket Masuk dan Sewa Kostum digabung ke kategori "Taman Etnik"
-const mapCategoryNameToSalesRow = (catName) => {
-    const lower = (catName || "").toLowerCase().trim();
-    if (!lower || lower === "umum" || lower === "tanpa kategori") return "TOKO SOUVENIR";
-    if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar") || lower === "sewa kostum keluar") return "Sewa kostum keluar";
-    if (lower.includes("taman etnik") || lower.includes("taman") || lower.includes("tiket") || lower.includes("sewa kostum") || lower.includes("kostum")) return "Taman Etnik";
-    if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "TOKO SOUVENIR";
-    if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) return "Kafe & Resto";
-    if (lower.includes("kios")) return "Kios";
-    if (lower.includes("sopendo") || lower.includes("saswar") || lower.includes("edukasi")) return "Paket Sopendo / Saswar / Edukasi";
-    if (lower.includes("fotografer") || lower.includes("foto")) return "Jasa Fotografer";
-    // Kembalikan nama asli kategori agar muncul sebagai baris baru otomatis
-    return catName;
-};
 
 const FIXED_EXPENSE_CATEGORIES = BASE_SALES_CATEGORIES;
 
@@ -217,7 +203,7 @@ const calculateSalesRowsForDate = (allTransactions, targetDate, salesCategories 
                     (item.id ? prodIdToCatName[item.id] : null) ||
                     '').trim();
                 
-                const mappedRowName = mapCategoryNameToSalesRow(originalCatName);
+                const mappedRowName = resolveReportRowName(originalCatName, allCategories);
                 
                 // Match to registered salesCategories
                 const matchedName = salesCategories.find(c => c.toLowerCase().trim() === mappedRowName.toLowerCase())

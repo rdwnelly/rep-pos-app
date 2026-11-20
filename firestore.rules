@@ -257,6 +257,57 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ─── Data Pengunjung Wisatawan ───────────────────────────────
+    // Dipakai untuk pelaporan kunjungan, sehingga nilainya harus
+    // konsisten sejak ditulis. Validasi di sini menolak data yang
+    // jumlah dewasa dan anaknya tidak cocok dengan total pengunjung.
+    match /visitor_logs/{logId} {
+
+      function visitor() {
+        return request.resource.data;
+      }
+
+      function hasValidVisitorData() {
+        return visitor().keys().hasAll([
+                 'date', 'originType', 'originRegion', 'segment',
+                 'paxTotal', 'paxAdult', 'paxChild',
+                 'recordedById', 'recordedByName'
+               ])
+               && visitor().date is string
+               && visitor().originType in ['NUSANTARA', 'MANCANEGARA']
+               && visitor().originRegion is string
+               && visitor().originRegion.size() > 0
+               && visitor().segment in ['UMUM', 'KELUARGA', 'PELAJAR', 'INSTANSI', 'KOMUNITAS']
+               && visitor().paxTotal is int
+               && visitor().paxTotal > 0
+               && visitor().paxAdult is int
+               && visitor().paxAdult >= 0
+               && visitor().paxChild is int
+               && visitor().paxChild >= 0
+               // Rincian wajib menjumlah tepat ke total pengunjung.
+               && visitor().paxAdult + visitor().paxChild == visitor().paxTotal
+               // Kanal pemesanan opsional, tapi nilainya harus dikenal.
+               && visitor().get('bookingChannel', 'LANGSUNG') in ['LANGSUNG', 'TRAVEL_AGENT', 'OTA']
+               // Pemesanan lewat OTA wajib menyebutkan platformnya,
+               // karena tanpa itu rekap kanal tidak bisa ditelusuri.
+               && (visitor().get('bookingChannel', 'LANGSUNG') != 'OTA'
+                   || (visitor().get('otaName', '') is string && visitor().get('otaName', '').size() > 0));
+      }
+
+      allow read: if isAuthenticated();
+
+      allow create: if isAuthenticated()
+                    && hasValidVisitorData()
+                    && visitor().recordedById == request.auth.uid;
+
+      // Koreksi hanya oleh admin atau oleh petugas yang mencatatnya.
+      allow update: if isAuthenticated()
+                    && hasValidVisitorData()
+                    && (isAdmin() || resource.data.recordedById == request.auth.uid);
+
+      allow delete: if isAuthenticated() && isAdmin();
+    }
+
     // ─── Travel Commissions ──────────────────────────────────────
     match /travel_commissions/{commissionId} {
       allow read: if isAuthenticated();

@@ -16,9 +16,60 @@ export interface User {
   image?: string; // Base64 string
 }
 
+/**
+ * Kelompok baris laporan tempat sebuah kategori dijumlahkan.
+ *
+ * Nilai inilah yang dipakai Berita Acara dan Laporan Bulanan, BUKAN
+ * nama kategorinya. Sebelumnya pengelompokan ditebak dengan mencocokkan
+ * potongan nama ("tiket", "taman", "kostum"), sehingga mengganti nama
+ * kategori diam-diam memindahkan pendapatannya ke baris lain.
+ */
+export enum CategoryReportGroup {
+  TAMAN_ETNIK = 'TAMAN_ETNIK',
+  TOKO_SOUVENIR = 'TOKO_SOUVENIR',
+  KAFE_RESTO = 'KAFE_RESTO',
+  KIOS = 'KIOS',
+  PAKET_EDUKASI = 'PAKET_EDUKASI',
+  JASA_FOTOGRAFER = 'JASA_FOTOGRAFER',
+  SEWA_KOSTUM_KELUAR = 'SEWA_KOSTUM_KELUAR',
+  LAINNYA = 'LAINNYA',
+}
+
+/** Nama baris sebagaimana tercetak pada dokumen laporan. */
+export const REPORT_GROUP_LABEL: Record<CategoryReportGroup, string> = {
+  [CategoryReportGroup.TAMAN_ETNIK]: 'Taman Etnik',
+  [CategoryReportGroup.TOKO_SOUVENIR]: 'TOKO SOUVENIR',
+  [CategoryReportGroup.KAFE_RESTO]: 'Kafe & Resto',
+  [CategoryReportGroup.KIOS]: 'Kios',
+  [CategoryReportGroup.PAKET_EDUKASI]: 'Paket Sopendo / Saswar / Edukasi',
+  [CategoryReportGroup.JASA_FOTOGRAFER]: 'Jasa Fotografer',
+  [CategoryReportGroup.SEWA_KOSTUM_KELUAR]: 'Sewa kostum keluar',
+  [CategoryReportGroup.LAINNYA]: 'Lainnya',
+};
+
 export interface Category {
   id: string;
   name: string;
+
+  /**
+   * Baris laporan tujuan. Bila kosong, sistem jatuh kembali ke
+   * pencocokan nama seperti perilaku lama, sehingga kategori yang
+   * belum disetel tetap berjalan sebagaimana adanya.
+   */
+  reportGroup?: CategoryReportGroup;
+
+  /**
+   * Menandai bahwa penjualan kategori ini berarti ada tamu berkunjung.
+   * Dipakai POS untuk memunculkan pendataan pengunjung.
+   */
+  visitorService?: VisitorServiceType;
+
+  /** Kategori non-aktif disembunyikan dari POS tetapi riwayatnya utuh. */
+  isActive?: boolean;
+  /** Urutan tampil; makin kecil makin atas. */
+  sortOrder?: number;
+  description?: string;
+  updatedAt?: string;
 }
 
 export interface Division {
@@ -347,3 +398,138 @@ export interface TravelBookingCommission extends BaseEntity {
   notes?: string;
   createdAt?: string;
 }
+
+// ─── Data Pengunjung Wisatawan ────────────────────────────────
+// Dibuat untuk memenuhi kebutuhan pelaporan kunjungan wisata.
+// Pemisahan wisatawan nusantara dan mancanegara beserta daerah
+// asalnya bersifat WAJIB karena itulah inti laporan ke dinas.
+
+export enum VisitorOrigin {
+  NUSANTARA = 'NUSANTARA',
+  MANCANEGARA = 'MANCANEGARA',
+}
+
+/**
+ * Layanan yang membuat seseorang terhitung sebagai pengunjung.
+ *
+ * Satu kunjungan bisa memakai lebih dari satu layanan, misalnya tiket
+ * masuk sekaligus sewa kostum, sehingga disimpan sebagai daftar.
+ */
+export enum VisitorServiceType {
+  TIKET_MASUK = 'TIKET_MASUK',
+  PAKET_TOUR = 'PAKET_TOUR',
+  SEWA_KOSTUM = 'SEWA_KOSTUM',
+  HOMESTAY = 'HOMESTAY',
+  LAINNYA = 'LAINNYA',
+}
+
+export const VISITOR_SERVICE_LABEL: Record<VisitorServiceType, string> = {
+  [VisitorServiceType.TIKET_MASUK]: 'Tiket Masuk',
+  [VisitorServiceType.PAKET_TOUR]: 'Paket Tour / Edukasi',
+  [VisitorServiceType.SEWA_KOSTUM]: 'Sewa Kostum',
+  [VisitorServiceType.HOMESTAY]: 'Homestay',
+  [VisitorServiceType.LAINNYA]: 'Lainnya',
+};
+
+/**
+ * Kanal pemesanan — dari mana tamu datang.
+ *
+ * Dibuat terpisah dari modul Komisi Agen, karena yang dicatat di sana
+ * adalah driver dan guide yang membawa wisatawan, bukan platform
+ * pemesanan daring. Homestay misalnya bisa dipesan langsung di tempat
+ * (lewat kasir) maupun lewat OTA yang tidak melewati kasir sama sekali.
+ */
+export enum VisitorBookingChannel {
+  LANGSUNG = 'LANGSUNG',
+  TRAVEL_AGENT = 'TRAVEL_AGENT',
+  OTA = 'OTA',
+}
+
+export const VISITOR_CHANNEL_LABEL: Record<VisitorBookingChannel, string> = {
+  [VisitorBookingChannel.LANGSUNG]: 'Langsung di Tempat',
+  [VisitorBookingChannel.TRAVEL_AGENT]: 'Biro / Driver / Guide',
+  [VisitorBookingChannel.OTA]: 'Platform Daring (OTA)',
+};
+
+/** Platform OTA yang lazim; daftar ini saran, bukan pembatas. */
+export const COMMON_OTA_PLATFORMS = [
+  'Airbnb', 'Booking.com', 'Traveloka', 'Agoda', 'Tiket.com',
+  'Expedia', 'Trip.com', 'Pegipegi', 'OYO', 'RedDoorz',
+] as const;
+
+export enum VisitorSegment {
+  UMUM = 'UMUM',
+  KELUARGA = 'KELUARGA',
+  PELAJAR = 'PELAJAR',
+  INSTANSI = 'INSTANSI',
+  KOMUNITAS = 'KOMUNITAS',
+}
+
+/** Fasilitas REP yang dapat dikunjungi dalam satu kunjungan. */
+export const VISITOR_FACILITIES = [
+  'Taman Etnik / Rumah Adat',
+  'Museum Budaya Mini',
+  'Sewa Pakaian Adat',
+  'Atraksi Seni Pertunjukan',
+  'Yaswar Cafe',
+  'Toko Souvenir',
+  'Homestay',
+] as const;
+
+export interface VisitorLog {
+  id: string;
+  /** Format kanonik "YYYY-MM-DD HH:mm:ss" zona Asia/Jayapura. */
+  date: string;
+  /** Nama rombongan, sekolah, instansi, atau tamu. Opsional untuk perorangan. */
+  groupName?: string;
+
+  // Wajib — dasar laporan kunjungan
+  originType: VisitorOrigin;
+  /** Provinsi untuk wisnus, negara untuk wisman. */
+  originRegion: string;
+  segment: VisitorSegment;
+  paxTotal: number;
+  paxAdult: number;
+  paxChild: number;
+
+  /** Layanan yang dipakai pada kunjungan ini. */
+  serviceTypes?: VisitorServiceType[];
+  /** Dari mana tamu memesan. Default LANGSUNG bila lewat kasir. */
+  bookingChannel?: VisitorBookingChannel;
+  /** Nama platform, hanya bila bookingChannel bernilai OTA. */
+  otaName?: string;
+  facilities?: string[];
+
+  // Tautan ke sumber data lain agar jumlah pengunjung dan
+  // pendapatan tiket tidak pernah saling bertentangan.
+  transactionId?: string;
+  invoiceNumber?: string;
+  ticketRevenue?: number;
+  agentId?: string;
+  agentName?: string;
+
+  notes?: string;
+  recordedById: string;
+  recordedByName: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** 38 provinsi Indonesia, untuk pendataan asal wisatawan nusantara. */
+export const INDONESIAN_PROVINCES = [
+  'Papua Barat Daya', 'Papua Barat', 'Papua', 'Papua Tengah', 'Papua Pegunungan', 'Papua Selatan',
+  'Maluku', 'Maluku Utara',
+  'Aceh', 'Sumatera Utara', 'Sumatera Barat', 'Riau', 'Kepulauan Riau', 'Jambi',
+  'Sumatera Selatan', 'Kepulauan Bangka Belitung', 'Bengkulu', 'Lampung',
+  'DKI Jakarta', 'Jawa Barat', 'Banten', 'Jawa Tengah', 'DI Yogyakarta', 'Jawa Timur',
+  'Bali', 'Nusa Tenggara Barat', 'Nusa Tenggara Timur',
+  'Kalimantan Barat', 'Kalimantan Tengah', 'Kalimantan Selatan', 'Kalimantan Timur', 'Kalimantan Utara',
+  'Sulawesi Utara', 'Gorontalo', 'Sulawesi Tengah', 'Sulawesi Barat', 'Sulawesi Selatan', 'Sulawesi Tenggara',
+] as const;
+
+/** Negara yang sering muncul; daftar ini hanya saran, bukan pembatas. */
+export const COMMON_COUNTRIES = [
+  'Australia', 'Belanda', 'Amerika Serikat', 'Jerman', 'Inggris', 'Prancis',
+  'Jepang', 'Tiongkok', 'Korea Selatan', 'Singapura', 'Malaysia', 'Filipina',
+  'Papua Nugini', 'Selandia Baru', 'Italia', 'Spanyol',
+] as const;

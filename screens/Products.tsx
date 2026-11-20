@@ -6,6 +6,8 @@ import { Product, Category, UserRole } from '../types';
 import { formatIDR, formatNumber, exportToCSV, generateSKU, compressImage, exportToExcel } from '../utils';
 import { Edit2, Trash2, Plus, X, Download, Upload, Tag, Barcode, Image as ImageIcon, Search, Printer, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, FileSpreadsheet, Package, Sparkles, Check } from 'lucide-react';
 import { HPPCalculatorModal } from '../components/HPPCalculatorModal';
+import { CategoryReportGroup, REPORT_GROUP_LABEL, VisitorServiceType, VISITOR_SERVICE_LABEL } from '../types';
+import { legacyGroupFromName, legacyVisitorServiceFromName } from '../utils/categoryMapping';
 
 export const Products: React.FC = () => {
   const products = useData(() => StorageService.getProducts(), [], 'products') || [];
@@ -43,6 +45,9 @@ export const Products: React.FC = () => {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [categoryFormName, setCategoryFormName] = useState('');
+  // '' berarti belum disetel — sistem memakai tebakan nama seperti dulu.
+  const [categoryFormGroup, setCategoryFormGroup] = useState<CategoryReportGroup | ''>('');
+  const [categoryFormService, setCategoryFormService] = useState<VisitorServiceType | ''>('');
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
   const [categoryFeedback, setCategoryFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -209,9 +214,16 @@ export const Products: React.FC = () => {
     const isEdit = !!editingId;
     const oldCat = categories.find(c => c.id === editingId);
 
-    await StorageService.saveCategory({ id: editingId || '', name: trimmed });
+    await StorageService.saveCategory({
+      id: editingId || '',
+      name: trimmed,
+      ...(categoryFormGroup ? { reportGroup: categoryFormGroup } : {}),
+      ...(categoryFormService ? { visitorService: categoryFormService } : {}),
+    });
     
     setCategoryFormName('');
+    setCategoryFormGroup('');
+    setCategoryFormService('');
     setEditingId(null);
     setCategoryFeedback({
       type: 'success',
@@ -226,14 +238,24 @@ export const Products: React.FC = () => {
     const cat = categories.find(c => c.id === id);
     const count = products.filter(p => p.categoryId === id).length;
     const confirmMsg = count > 0 
-      ? `Kategori "${cat?.name}" digunakan oleh ${count} produk.\n\nYakin ingin menghapus kategori ini? Produk terkait akan dipindahkan ke kategori standar.`
+      ? `Kategori "${cat?.name}" masih digunakan oleh ${count} produk.\n\nPenghapusan akan ditolak. Pindahkan produknya ke kategori lain terlebih dahulu.`
       : `Yakin ingin menghapus kategori "${cat?.name}"?`;
 
     if (confirm(confirmMsg)) {
-      await StorageService.deleteCategory(id);
+      try {
+        await StorageService.deleteCategory(id);
+      } catch (error: any) {
+        // Kategori yang masih dipakai produk ditolak oleh StorageService,
+        // agar produk tidak menggantung menunjuk kategori yang hilang.
+        setCategoryFeedback({ type: 'error', message: error?.message || 'Gagal menghapus kategori.' });
+        setTimeout(() => setCategoryFeedback(null), 7000);
+        return;
+      }
       if (editingId === id) {
         setEditingId(null);
         setCategoryFormName('');
+        setCategoryFormGroup('');
+        setCategoryFormService('');
       }
       setCategoryFeedback({
         type: 'success',
@@ -1044,6 +1066,8 @@ export const Products: React.FC = () => {
                     onClick={() => {
                       setEditingId(null);
                       setCategoryFormName('');
+                      setCategoryFormGroup('');
+                      setCategoryFormService('');
                     }}
                     className="text-xs text-slate-500 hover:text-slate-800 underline font-medium"
                   >
@@ -1064,6 +1088,63 @@ export const Products: React.FC = () => {
                   placeholder={editingId ? "Ketik nama kategori baru..." : "Contoh: Tiket Masuk, Kafe & Resto, dsb..."} 
                   onKeyDown={e => e.key === 'Enter' && handleSaveCategory()} 
                 />
+              </div>
+
+              {/* Penyetelan makna kategori. Dibiarkan kosong berarti sistem
+                  menebak dari nama, persis seperti perilaku sebelumnya. */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2.5">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                    Baris di Laporan
+                  </label>
+                  <select
+                    value={categoryFormGroup}
+                    onChange={e => setCategoryFormGroup(e.target.value as CategoryReportGroup | '')}
+                    className="w-full border border-slate-300 bg-white p-2 px-3 rounded-xl text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">Tebak dari nama (bawaan)</option>
+                    {Object.values(CategoryReportGroup).map(g => (
+                      <option key={g} value={g}>{REPORT_GROUP_LABEL[g]}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1 leading-snug">
+                    {categoryFormGroup
+                      ? 'Tetap masuk baris ini walau nama kategori diubah.'
+                      : `Saat ini terbaca sebagai: ${
+                          categoryFormName.trim()
+                            ? REPORT_GROUP_LABEL[legacyGroupFromName(categoryFormName) ?? CategoryReportGroup.LAINNYA]
+                            : '—'
+                        }`}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                    Menandakan Kunjungan Tamu
+                  </label>
+                  <select
+                    value={categoryFormService}
+                    onChange={e => setCategoryFormService(e.target.value as VisitorServiceType | '')}
+                    className="w-full border border-slate-300 bg-white p-2 px-3 rounded-xl text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">Tebak dari nama (bawaan)</option>
+                    {Object.values(VisitorServiceType).map(t => (
+                      <option key={t} value={t}>{VISITOR_SERVICE_LABEL[t]}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1 leading-snug">
+                    {categoryFormService
+                      ? 'Penjualan kategori ini memunculkan pendataan pengunjung.'
+                      : `Saat ini terbaca sebagai: ${
+                          categoryFormName.trim() && legacyVisitorServiceFromName(categoryFormName)
+                            ? VISITOR_SERVICE_LABEL[legacyVisitorServiceFromName(categoryFormName)!]
+                            : 'bukan kunjungan'
+                        }`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-2.5">
                 <button 
                   onClick={handleSaveCategory} 
                   className={`px-4 py-2.5 text-white rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-1.5 shrink-0 ${
@@ -1150,7 +1231,9 @@ export const Products: React.FC = () => {
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button 
                           onClick={() => { 
-                            setCategoryFormName(c.name); 
+                            setCategoryFormName(c.name);
+                            setCategoryFormGroup(c.reportGroup || '');
+                            setCategoryFormService(c.visitorService || '');
                             setEditingId(c.id); 
                           }} 
                           className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${

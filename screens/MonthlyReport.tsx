@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../hooks/useData';
+import { resolveReportRowName } from '../utils/categoryMapping';
 import { StorageService } from '../services/storage';
 import { formatIDR, formatDate, formatDateDateOnly, exportToCSV, exportToExcel, generateId, toMySQLDate } from '../utils';
 import {
@@ -13,7 +14,7 @@ import {
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { CashFlowType, PaymentMethod, TransactionType, StoreSettings, StockAdjustment, PaymentStatus, Transaction, CashFlow, BankAccount } from '../types';
+import { CashFlowType, PaymentMethod, TransactionType, StoreSettings, StockAdjustment, PaymentStatus, Transaction, CashFlow, BankAccount, Product } from '../types';
 
 // WhatsApp Icon SVG
 const WhatsAppIcon = ({ size = 16 }: { size?: number }) => (
@@ -48,6 +49,9 @@ const BASE_SALES_CATEGORIES = [
     "Sewa kostum keluar",
 ];
 
+/** Rujukan tetap agar dependensi useMemo tidak berubah tiap render. */
+const NO_PRODUCTS: Product[] = [];
+
 // Robust Date Parsing for any format (MySQL 'YYYY-MM-DD HH:mm:ss' or ISO 8601)
 const parseSafeDate = (d: any): Date => {
     if (!d) return new Date(0);
@@ -59,19 +63,6 @@ const parseSafeDate = (d: any): Date => {
     return isNaN(fallback.getTime()) ? new Date(0) : fallback;
 };
 
-// Helper to map category name to standardized display name
-const mapCategoryNameToSalesRow = (catName: string): string => {
-    const lower = (catName || '').toLowerCase().trim();
-    if (!lower || lower === "umum" || lower === "tanpa kategori") return "TOKO SOUVENIR";
-    if (lower.includes("sewa kostum keluar") || lower.includes("kostum keluar") || lower === "sewa kostum keluar") return "Sewa kostum keluar";
-    if (lower.includes("taman etnik") || lower.includes("taman") || lower.includes("tiket") || lower.includes("sewa kostum") || lower.includes("kostum")) return "Taman Etnik";
-    if (lower.includes("toko") || lower.includes("souvenir") || lower.includes("sovenir")) return "TOKO SOUVENIR";
-    if (lower.includes("kafe") || lower.includes("cafe") || lower.includes("resto")) return "Kafe & Resto";
-    if (lower.includes("kios")) return "Kios";
-    if (lower.includes("sopendo") || lower.includes("saswar") || lower.includes("edukasi")) return "Paket Sopendo / Saswar / Edukasi";
-    if (lower.includes("fotografer") || lower.includes("foto")) return "Jasa Fotografer";
-    return catName;
-};
 
 // Helper to reliably check if a transaction is a Piutang / BON / Hutang
 const isDebtTransaction = (t: Transaction): boolean => {
@@ -95,6 +86,9 @@ export const MonthlyReport: React.FC = () => {
     const stockAdjustments = useData(() => StorageService.getStockAdjustments(), [], 'stock_adjustments') || [];
     const categories = useData(() => StorageService.getCategories(), [], 'categories') || [];
     const banks = useData(() => StorageService.getBanks(), [], 'banks') || [];
+    // Diperlukan untuk menilai penyesuaian stok: StockAdjustment hanya
+    // menyimpan productId dan qty, harga pokoknya ada di data produk.
+    const products = useData(() => StorageService.getProducts(), [], 'products') ?? NO_PRODUCTS;
     const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
 
     useEffect(() => {
@@ -371,7 +365,7 @@ export const MonthlyReport: React.FC = () => {
 
         // Initialize strictly from master categories (categories)
         const rawMasterCategories = (categories && categories.length > 0)
-            ? categories.filter(c => c && c.name && c.name.trim() && c.name.trim().toLowerCase() !== 'umum').map(c => mapCategoryNameToSalesRow(c.name.trim()))
+            ? categories.filter(c => c && c.name && c.name.trim() && c.name.trim().toLowerCase() !== 'umum').map(c => resolveReportRowName(c.name.trim(), categories))
             : BASE_SALES_CATEGORIES;
 
         const targetCategories = Array.from(new Set(rawMasterCategories));
@@ -404,7 +398,7 @@ export const MonthlyReport: React.FC = () => {
 
             (t.items || []).forEach(item => {
                 const rawName = (item.categoryName || '').trim();
-                const mappedRowName = mapCategoryNameToSalesRow(rawName);
+                const mappedRowName = resolveReportRowName(rawName, categories);
                 const matchedMaster = targetCategories.find(c => c.toLowerCase() === mappedRowName.toLowerCase())
                     || targetCategories.find(c => c.toLowerCase() === rawName.toLowerCase());
                 const rowName = matchedMaster || (targetCategories.length > 0 ? targetCategories[0] : 'Lainnya');
@@ -587,6 +581,14 @@ export const MonthlyReport: React.FC = () => {
             note: string;
         }[] = [];
 
+        // Id transaksi yang pelunasannya sudah dihitung dari paymentHistory.
+        // Dipakai untuk menolak hitungan ganda dari arus kas secara EKSAK
+        // lewat referenceId, menggantikan pencocokan nominal + tanggal
+        // yang dulu dipakai dan bisa salah di dua arah: dua pelanggan
+        // membayar nominal sama di hari sama akan saling menggugurkan,
+        // sementara selisih hari membuat satu pembayaran terhitung dua kali.
+        const txIdSudahDihitung = new Set<string>();
+
         // Check paymentHistory in all transactions for repayments occurring in this period
         transactions.forEach(t => {
             if (!t || !Array.isArray(t.paymentHistory)) return;
@@ -597,6 +599,7 @@ export const MonthlyReport: React.FC = () => {
                     const isInitialPaid = (ph.note || '').toLowerCase().includes('pembayaran awal') && t.paymentMethod !== PaymentMethod.BON && t.paymentMethod !== PaymentMethod.TEMPO;
                     if (!isInitialPaid && (ph.note?.toLowerCase().includes('cicilan') || ph.note?.toLowerCase().includes('pelunasan') || ph.note?.toLowerCase().includes('piutang') || t.paymentMethod === PaymentMethod.BON || t.paymentMethod === PaymentMethod.TEMPO || idx > 0)) {
                         const amt = ph.amount || 0;
+                        if (t.id) txIdSudahDihitung.add(t.id);
                         totalRepaymentsReceived += amt;
                         const m = (ph.method || '').toString().toUpperCase();
                         if (m === 'CASH' || m === 'TUNAI' || !ph.method) {
@@ -623,8 +626,11 @@ export const MonthlyReport: React.FC = () => {
             const catLower = (cf.category || '').toLowerCase();
             const descLower = (cf.description || '').toLowerCase();
             if (cf.type === CashFlowType.IN && (catLower.includes('piutang') || descLower.includes('pelunasan piutang') || descLower.includes('cicilan piutang') || descLower.includes('pelunasan bon'))) {
-                const alreadyCounted = periodRepaymentList.some(r => Math.abs(r.amount - cf.amount) < 1 && parseSafeDate(r.date).toDateString() === parseSafeDate(cf.date).toDateString());
-                if (!alreadyCounted) {
+                // Pelunasan yang dibuat aplikasi selalu menulis dua catatan:
+                // satu baris di paymentHistory transaksinya, dan satu entri
+                // arus kas ber-referenceId. Yang dihitung cukup salah satu.
+                const sudahDihitung = !!cf.referenceId && txIdSudahDihitung.has(cf.referenceId);
+                if (!sudahDihitung) {
                     totalRepaymentsReceived += cf.amount;
                     if (cf.paymentMethod === PaymentMethod.CASH || !cf.paymentMethod) {
                         repaymentsCash += cf.amount;
@@ -813,9 +819,21 @@ export const MonthlyReport: React.FC = () => {
         let opnameShrinkageLoss = 0;
         let opnameSurplusGain = 0;
 
+        // Harga pokok diambil dari data produk lewat productId.
+        //
+        // Sebelumnya baris ini membaca `(adj as any).hpp`, padahal
+        // StockAdjustment tidak pernah menyimpan field tersebut — lihat
+        // objek yang dibuat RealStockCheck. Akibatnya nilai penyesuaian
+        // selalu nol, sehingga kehilangan stok tidak pernah mengurangi
+        // HPP maupun laba kotor pada laporan ini. Layar Pengecekan Stok
+        // sendiri sudah menilai dengan cara yang benar; di sini
+        // disamakan dengannya.
+        const hppByProductId = new Map<string, number>();
+        products.forEach(p => { if (p?.id) hppByProductId.set(p.id, Number(p.hpp) || 0); });
+
         filteredStockAdjustments.forEach(adj => {
-            const estHpp = (adj as any).hpp || 0;
-            const val = adj.qty * estHpp;
+            const estHpp = hppByProductId.get(adj.productId) ?? (Number((adj as any).hpp) || 0);
+            const val = (Number(adj.qty) || 0) * estHpp;
             if (adj.type === 'DECREASE') {
                 opnameShrinkageLoss += val;
             } else {
@@ -829,7 +847,7 @@ export const MonthlyReport: React.FC = () => {
             opnameSurplusGain,
             netInventoryAdjustment
         };
-    }, [filteredStockAdjustments]);
+    }, [filteredStockAdjustments, products]);
 
     // Total Cost of Goods Sold (Total HPP)
     const totalCOGS = salesMetrics.totalHppCost + stockAdjustmentMetrics.netInventoryAdjustment;
