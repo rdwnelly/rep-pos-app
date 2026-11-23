@@ -1,16 +1,26 @@
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Users, Globe, MapPin, CalendarDays, Download, FileSpreadsheet,
   Trash2, Search, TrendingUp, School, Plus, Ticket,
+  Sparkles, Loader2, CheckCircle2, FileText,
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
-import { User, VisitorLog, VisitorOrigin, VisitorSegment, VisitorServiceType, VISITOR_SERVICE_LABEL, VisitorBookingChannel, VISITOR_CHANNEL_LABEL } from '../types';
+import { User, VisitorLog, VisitorOrigin, VisitorSegment, VisitorServiceType, VISITOR_SERVICE_LABEL, VisitorBookingChannel, VISITOR_CHANNEL_LABEL, Transaction, Category } from '../types';
 import { exportToCSV, exportToExcel, formatIDR, formatNumber } from '../utils';
+import {
+  estimateVisitorsFromTransactions,
+  estimateToVisitorLog,
+  VISITOR_SOURCE_ESTIMATE,
+  type DailyVisitorEstimate,
+} from '../utils/visitorEstimate';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { VisitorLogModal } from '../components/VisitorLogModal';
+import { VisitorReportDocument } from '../components/VisitorReportDocument';
+import { exportElementToPdf } from '../utils/pdfExport';
+import { BaganTrenHarian, BaganPeringkat } from '../components/VisitorCharts';
 
 const SEGMENT_LABEL: Record<string, string> = {
   UMUM: 'Umum / Perorangan',
@@ -22,6 +32,8 @@ const SEGMENT_LABEL: Record<string, string> = {
 
 /** Rujukan tetap agar dependensi useMemo tidak berubah tiap render. */
 const NO_LOGS: VisitorLog[] = [];
+const NO_TRANSACTIONS: Transaction[] = [];
+const NO_CATEGORIES: Category[] = [];
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const asDay = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -60,9 +72,143 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
     'visitor_logs',
   ) ?? NO_LOGS;
 
+  // Dipakai hanya untuk panel estimasi di bawah: menurunkan jumlah
+  // pengunjung dari tiket yang terjual pada periode yang sama.
+  const transaksi = useData(
+    () => StorageService.getTransactionsByDateRange(startDate, endDate),
+    [startDate, endDate],
+    'transactions',
+  ) ?? NO_TRANSACTIONS;
+  const kategori = useData(() => StorageService.getCategories(), [], 'categories') ?? NO_CATEGORIES;
+  // Dipakai pada kop laporan resmi.
+  const storeSettings = useData(() => StorageService.getStoreSettings(), [], 'store_settings');
+
+  const [sedangMenyimpan, setSedangMenyimpan] = useState(false);
+  const [hasilSimpan, setHasilSimpan] = useState<string | null>(null);
+
+  /**
+   * Estimasi dihitung dari SELURUH log periode ini, bukan dari `filtered`:
+   * penanda "sudah ada catatan" harus melihat kenyataan di hari itu,
+   * bukan hasil penyaringan yang sedang aktif di layar.
+   */
+  const estimasi = useMemo(
+    () => estimateVisitorsFromTransactions({
+      transactions: transaksi,
+      categories: kategori,
+      existingLogs: logs,
+    }),
+    [transaksi, kategori, logs],
+  );
+
+  /**
+   * Seluruh hari yang masih menyisakan pengunjung untuk dicatat.
+   *
+   * estimateVisitorsFromTransactions sudah mengurangkan pengunjung yang
+   * dicatat petugas, dan membuang hari yang sisanya nol — jadi tidak
+   * ada lagi hari yang dilewati begitu saja, dan tidak ada tamu yang
+   * terhitung dua kali.
+   */
+  const estimasiBaru = estimasi;
+
+  const totalEstimasiBaru = useMemo(
+    () => estimasiBaru.reduce(
+      (a, e) => ({
+        pax: a.pax + e.paxTotal,
+        dewasa: a.dewasa + e.paxAdult,
+        anak: a.anak + e.paxChild,
+        pendapatan: a.pendapatan + e.ticketRevenue,
+      }),
+      { pax: 0, dewasa: 0, anak: 0, pendapatan: 0 },
+    ),
+    [estimasiBaru],
+  );
+
+  /**
+   * Kategori apa saja yang benar-benar terjual pada periode ini.
+   *
+   * Dipakai saat estimasi kosong: tanpa ini, "tidak ada penjualan
+   * tiket" tidak bisa dibedakan dari "tiketnya ada tapi nama
+   * kategorinya belum dikenali", dan layarnya hanya terlihat kosong
+   * tanpa petunjuk apa pun.
+   */
+  const kategoriTerjual = useMemo(() => {
+    const map = new Map<string, number>();
+    transaksi.forEach(tx => {
+      if (!Array.isArray(tx.items)) return;
+      tx.items.forEach((item: any) => {
+        const nama = (item?.categoryName || '').trim() || '(tanpa kategori)';
+        map.set(nama, (map.get(nama) || 0) + (Number(item?.qty) || 0));
+      });
+    });
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  }, [transaksi]);
+
+  const handleSimpanEstimasi = async () => {
+    if (estimasiBaru.length === 0) return;
+    const uid = currentUser?.id || (currentUser as any)?.uid;
+    if (!uid) {
+      alert('Data pengguna tidak terbaca. Muat ulang halaman lalu coba lagi.');
+      return;
+    }
+
+    const setuju = confirm(
+      `Simpan ${estimasiBaru.length} hari (${formatNumber(totalEstimasiBaru.pax)} pengunjung) ` +
+      `sebagai Data Pengunjung?\n\n` +
+      `Baris ini masuk sebagai data resmi di layar ini dan ikut terhitung pada ` +
+      `laporan kunjungan. Asal daerahnya diisi "BELUM DIDATA" dan segmennya "Umum", ` +
+      `karena data transaksi tidak memuat asal maupun segmentasi pengunjung.\n\n` +
+      `Hari yang sudah punya catatan kunjungan dilewati agar tidak terhitung dua kali.`
+    );
+    if (!setuju) return;
+
+    setSedangMenyimpan(true);
+    setHasilSimpan(null);
+    try {
+      let tersimpan = 0;
+      let gagal = 0;
+      for (const e of estimasiBaru) {
+        try {
+          await StorageService.saveVisitorLog(
+            estimateToVisitorLog(e, {
+              id: uid,
+              name: currentUser?.name || currentUser?.username || 'Petugas',
+            }),
+          );
+          tersimpan += 1;
+        } catch (err) {
+          gagal += 1;
+          console.error('Gagal menyimpan estimasi', e.day, err);
+        }
+      }
+      setHasilSimpan(
+        `${tersimpan} hari tersimpan sebagai Data Pengunjung` +
+        (gagal > 0 ? ` — ${gagal} hari GAGAL, periksa console.` : '.'),
+      );
+    } finally {
+      setSedangMenyimpan(false);
+    }
+  };
+
+  /**
+   * Hanya log yang layanan kunjungannya mencakup TIKET_MASUK.
+   *
+   * Tiket masuk adalah satu-satunya indikator bahwa seseorang benar-
+   * benar datang berkunjung. Layanan lain (kostum, homestay, paket
+   * tour) BUKAN penanda kunjungan — kostum adalah layanan tambahan
+   * bagi tamu yang sudah masuk, homestay menghitung malam/kamar, dan
+   * satu paket tour bisa untuk puluhan peserta.
+   *
+   * Dengan penyaringan ini, ringkasan, bagan, tabel, dan ekspor
+   * semuanya menunjukkan angka dari penjualan tiket masuk saja.
+   */
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return logs.filter(l => {
+      // Syarat utama: harus ada layanan TIKET_MASUK
+      const hasTicket = Array.isArray(l.serviceTypes)
+        && l.serviceTypes.includes(VisitorServiceType.TIKET_MASUK);
+      if (!hasTicket) return false;
+
       if (originFilter !== 'ALL' && l.originType !== originFilter) return false;
       if (segmentFilter !== 'ALL' && l.segment !== segmentFilter) return false;
       if (channelFilter !== 'ALL' && (l.bookingChannel || VisitorBookingChannel.LANGSUNG) !== channelFilter) return false;
@@ -140,6 +286,79 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
     return [...map.entries()].sort((a, b) => b[1] - a[1]);
   }, [filtered]);
 
+  /** Rekap harian — diminta instansi untuk melihat sebaran kunjungan. */
+  const perHari = useMemo(() => {
+    const map = new Map<string, { pax: number; wisnus: number; wisman: number; kunjungan: number }>();
+    filtered.forEach(l => {
+      const hari = (l.date || '').slice(0, 10);
+      if (!hari) return;
+      const g = map.get(hari) ?? { pax: 0, wisnus: 0, wisman: 0, kunjungan: 0 };
+      const pax = l.paxTotal || 0;
+      g.pax += pax;
+      g.kunjungan += 1;
+      if (l.originType === VisitorOrigin.MANCANEGARA) g.wisman += pax;
+      else g.wisnus += pax;
+      map.set(hari, g);
+    });
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filtered]);
+
+  /**
+   * Berapa banyak angka dalam laporan ini yang berasal dari estimasi.
+   * Laporan untuk instansi WAJIB menyebutkannya — menyerahkan angka
+   * perkiraan tanpa keterangan sama saja menyatakannya sebagai hasil
+   * pendataan.
+   */
+  const porsiEstimasi = useMemo(() => {
+    let baris = 0;
+    let pax = 0;
+    filtered.forEach(l => {
+      if (l.source !== VISITOR_SOURCE_ESTIMATE) return;
+      baris += 1;
+      pax += l.paxTotal || 0;
+    });
+    return { baris, pax };
+  }, [filtered]);
+
+  /**
+   * Total pengunjung sebenarnya pada periode ini: yang sudah tercatat
+   * DITAMBAH tiket yang belum sempat dicatat.
+   *
+   * Menampilkan angka tercatat saja membuat layar ini melaporkan
+   * jumlah yang lebih kecil dari kenyataan selama masih ada tiket yang
+   * belum dilengkapi — padahal tiketnya sudah terjual dan tamunya
+   * sudah datang. Angka ini tidak berubah setelah tombol "Lengkapi"
+   * ditekan: yang pindah hanyalah porsinya, dari "belum dicatat"
+   * menjadi "tercatat".
+   */
+  const totalPengunjungSeluruhnya = useMemo(
+    () => ringkasan.pax + estimasi.reduce((a, e) => a + e.paxTotal, 0),
+    [ringkasan.pax, estimasi],
+  );
+
+  /** Bentuk data untuk bagan tren harian. */
+  const dataTren = useMemo(
+    () => perHari.map(([hari, v]) => ({
+      hari,
+      // Sumbu cukup menampilkan tanggalnya; bulan sudah jelas dari
+      // rentang yang dipilih di penyaring.
+      label: hari.slice(8, 10),
+      wisnus: v.wisnus,
+      wisman: v.wisman,
+    })),
+    [perHari],
+  );
+
+  const dataDaerah = useMemo(
+    () => perDaerah.map(d => ({ nama: d.nama, nilai: d.pax })),
+    [perDaerah],
+  );
+
+  const dataSegmen = useMemo(
+    () => perSegmen.map(([seg, pax]) => ({ nama: SEGMENT_LABEL[seg] || seg, nilai: pax })),
+    [perSegmen],
+  );
+
   const barisEkspor = () => filtered.map(l => ({
     Tanggal: (l.date || '').slice(0, 10),
     Waktu: (l.date || '').slice(11, 16),
@@ -150,6 +369,7 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
     'Kanal Pemesanan': VISITOR_CHANNEL_LABEL[l.bookingChannel || VisitorBookingChannel.LANGSUNG],
     'Platform OTA': l.otaName || '-',
     Rombongan: l.groupName || '-',
+    Sumber: l.source === VISITOR_SOURCE_ESTIMATE ? 'Estimasi dari tiket' : 'Dicatat petugas',
     Dewasa: l.paxAdult || 0,
     Anak: l.paxChild || 0,
     'Total Pengunjung': l.paxTotal || 0,
@@ -173,6 +393,34 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
     );
   };
 
+  const dokumenRef = useRef<HTMLDivElement>(null);
+  const [menyiapkanPdf, setMenyiapkanPdf] = useState(false);
+
+  const handleUnduhPdf = async () => {
+    if (filtered.length === 0) {
+      alert('Tidak ada data kunjungan pada rentang ini.');
+      return;
+    }
+    setMenyiapkanPdf(true);
+    try {
+      // Dokumennya baru dirender setelah state ini menyala. Dua frame
+      // ditunggu supaya React sempat memasangnya DAN browser sempat
+      // menata letaknya — html2canvas memotret apa yang sudah ada, jadi
+      // memotret terlalu cepat menghasilkan halaman kosong.
+      await new Promise(resolve =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve(null))),
+      );
+      const el = dokumenRef.current;
+      if (!el) throw new Error('Dokumen laporan belum siap dirender.');
+      await exportElementToPdf(el, `Laporan_Kunjungan_${startDate}_sd_${endDate}.pdf`);
+    } catch (err: any) {
+      console.error('Gagal membuat PDF laporan kunjungan:', err);
+      alert(`Gagal membuat PDF: ${err?.message || err}`);
+    } finally {
+      setMenyiapkanPdf(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirmDelete) return;
     try {
@@ -184,11 +432,18 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
     }
   };
 
-  const kartu = [
-    { label: 'Total Pengunjung', nilai: formatNumber(ringkasan.pax), sub: `${ringkasan.kunjungan} kunjungan`, icon: <Users size={16} />, warna: 'bg-blue-50 text-blue-600' },
-    { label: 'Wisnus', nilai: formatNumber(ringkasan.wisnus), sub: 'Wisatawan Nusantara', icon: <MapPin size={16} />, warna: 'bg-emerald-50 text-emerald-600' },
-    { label: 'Wisman', nilai: formatNumber(ringkasan.wisman), sub: 'Wisatawan Mancanegara', icon: <Globe size={16} />, warna: 'bg-amber-50 text-amber-600' },
-    { label: 'Pendapatan Tiket', nilai: formatIDR(ringkasan.pendapatan), sub: `${formatNumber(ringkasan.dewasa)} dewasa · ${formatNumber(ringkasan.anak)} anak`, icon: <TrendingUp size={16} />, warna: 'bg-violet-50 text-violet-600' },
+  /**
+   * Satu angka memimpin layar, sisanya jadi tile pendamping.
+   *
+   * Empat kartu berukuran sama membuat pembaca harus memilih sendiri
+   * mana yang penting. Total pengunjung adalah angka yang dicari orang
+   * saat membuka layar ini, jadi ia tampil paling besar.
+   */
+  const tile = [
+    { label: 'Nusantara', nilai: formatNumber(ringkasan.wisnus), sub: 'Wisatawan domestik', icon: <MapPin size={15} />, warna: 'text-[#eb6834] bg-[#eb6834]/10' },
+    { label: 'Mancanegara', nilai: formatNumber(ringkasan.wisman), sub: 'Wisatawan asing', icon: <Globe size={15} />, warna: 'text-[#2a78d6] bg-[#2a78d6]/10' },
+    { label: 'Dewasa / Anak', nilai: `${formatNumber(ringkasan.dewasa)} / ${formatNumber(ringkasan.anak)}`, sub: 'Komposisi usia', icon: <Users size={15} />, warna: 'text-slate-600 bg-slate-100' },
+    { label: 'Pendapatan Tiket', nilai: formatIDR(ringkasan.pendapatan), sub: 'Tercatat pada periode ini', icon: <TrendingUp size={15} />, warna: 'text-emerald-600 bg-emerald-50' },
   ];
 
   return (
@@ -197,7 +452,7 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">Data Pengunjung</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Pendataan kunjungan wisatawan Rumah Etnik Papua</p>
+          <p className="text-xs text-slate-500 mt-0.5">Pendataan kunjungan wisatawan berdasarkan penjualan Tiket Masuk</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -205,6 +460,16 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
             className="flex items-center gap-1.5 bg-primary text-white px-3 py-2 rounded-xl hover:bg-primary/90 transition-colors text-xs font-bold shadow-sm"
           >
             <Plus size={14} /> Catat Kunjungan
+          </button>
+          <button
+            onClick={handleUnduhPdf}
+            disabled={menyiapkanPdf}
+            className="flex items-center gap-1.5 bg-[#3b1604] text-white px-3 py-2 rounded-xl hover:bg-[#4a1d06] disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-xs font-bold shadow-sm"
+            title="Unduh laporan resmi berkop untuk diserahkan ke instansi"
+          >
+            {menyiapkanPdf
+              ? <><Loader2 size={14} className="animate-spin" /> Menyiapkan...</>
+              : <><FileText size={14} /> PDF Laporan Resmi</>}
           </button>
           <button onClick={handleExportExcel} className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 px-3 py-2 rounded-xl hover:bg-emerald-100 transition-colors text-xs font-bold">
             <FileSpreadsheet size={14} /> Excel
@@ -264,19 +529,56 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
         </div>
       </div>
 
-      {/* Ringkasan */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {kartu.map(k => (
-          <div key={k.label} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider">{k.label}</span>
-              <div className={`p-1.5 rounded-lg ${k.warna}`}>{k.icon}</div>
-            </div>
-            <p className="text-xl font-black text-slate-800">{k.nilai}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{k.sub}</p>
+      {/* Ringkasan: satu angka utama, empat tile pendamping */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div className="bg-gradient-to-br from-[#3b1604] to-[#6b2f0d] text-white p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-white/70">
+              Total Pengunjung
+            </span>
+            <div className="p-1.5 rounded-lg bg-white/15"><Users size={15} /></div>
           </div>
-        ))}
+          <div className="mt-3">
+            <p className="text-4xl font-black leading-none tabular-nums">
+              {formatNumber(totalPengunjungSeluruhnya)}
+            </p>
+            <p className="text-[11px] text-white/70 mt-1.5">
+              {totalEstimasiBaru.pax > 0 ? (
+                <>
+                  {formatNumber(ringkasan.pax)} tercatat ·{' '}
+                  <span className="text-amber-200 font-semibold">
+                    {formatNumber(totalEstimasiBaru.pax)} dari tiket belum dicatat
+                  </span>
+                </>
+              ) : (
+                <>
+                  dari {formatNumber(ringkasan.kunjungan)} kunjungan tercatat
+                  {porsiEstimasi.pax > 0 && ` · ${formatNumber(porsiEstimasi.pax)} dilengkapi dari tiket`}
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 grid grid-cols-2 gap-3">
+          {tile.map(k => (
+            <div key={k.label} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+              <div className="flex items-center justify-between text-slate-500 mb-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider">{k.label}</span>
+                <div className={`p-1.5 rounded-lg ${k.warna}`}>{k.icon}</div>
+              </div>
+              <p className="text-xl font-black text-slate-800 tabular-nums">{k.nilai}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">{k.sub}</p>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {hasilSimpan && (
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+          <CheckCircle2 size={13} /> {hasilSimpan}
+        </div>
+      )}
 
       {/* Jenis layanan */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
@@ -320,6 +622,25 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Bagan statistik. Tren harian lebar penuh karena sumbu waktunya
+          butuh ruang; dua daftar peringkat berdampingan di bawahnya. */}
+      <BaganTrenHarian data={dataTren} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <BaganPeringkat
+          judul="Asal Pengunjung Terbanyak"
+          keterangan="Daerah dan negara asal, diurutkan dari yang terbanyak"
+          data={dataDaerah}
+          pesanKosong="Belum ada data asal pengunjung"
+        />
+        <BaganPeringkat
+          judul="Segmentasi Pengunjung"
+          keterangan="Komposisi pengunjung menurut jenis rombongan"
+          data={dataSegmen}
+          pesanKosong="Belum ada data segmentasi"
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -395,7 +716,68 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 && (
-                <tr><td colSpan={9} className="px-3 py-8 text-center text-slate-400">Belum ada data kunjungan pada rentang ini.</td></tr>
+                <tr>
+                  <td colSpan={9} className="px-4 py-7">
+                    {/* Keadaan kosong yang menjelaskan sebabnya.
+                        "Belum ada data" saja menyisakan pertanyaan
+                        apakah memang tidak ada kunjungan, atau ada
+                        penjualan tiket yang kategorinya tak dikenali. */}
+                    <div className="max-w-xl mx-auto text-center space-y-2">
+                      <p className="text-sm font-bold text-slate-600">
+                        Belum ada catatan kunjungan Tiket Masuk pada rentang ini.
+                      </p>
+                      {transaksi.length === 0 ? (
+                        <p className="text-[11px] text-slate-500">
+                          Tidak ada transaksi penjualan apa pun pada periode ini, jadi tidak ada
+                          tiket yang bisa dipakai untuk melengkapinya.
+                        </p>
+                      ) : estimasiBaru.length > 0 ? (
+                        <div className="space-y-2.5">
+                          <p className="text-[11px] text-slate-500">
+                            Ada <strong>{formatNumber(estimasiBaru.length)} hari</strong> dengan penjualan tiket
+                            yang belum tercatat, setara{' '}
+                            <strong>{formatNumber(totalEstimasiBaru.pax)} pengunjung</strong>.
+                          </p>
+                          <button
+                            onClick={handleSimpanEstimasi}
+                            disabled={sedangMenyimpan}
+                            className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl transition-colors text-xs font-bold shadow-sm"
+                          >
+                            {sedangMenyimpan
+                              ? <><Loader2 size={14} className="animate-spin" /> Melengkapi...</>
+                              : <><Sparkles size={14} /> Lengkapi {estimasiBaru.length} Hari dari Tiket</>}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="text-[11px] text-slate-500">
+                            Ada <strong>{formatNumber(transaksi.length)} transaksi</strong> pada periode ini,
+                            tetapi tidak satu pun memuat penjualan <strong>Tiket Masuk</strong> — hanya
+                            tiket masuk yang jumlahnya berarti orang.
+                          </p>
+                          {kategoriTerjual.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-semibold text-slate-500 mb-1">
+                                Kategori yang terjual pada periode ini:
+                              </p>
+                              <div className="flex flex-wrap justify-center gap-1">
+                                {kategoriTerjual.map(([nama, qty]) => (
+                                  <span key={nama} className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-medium text-slate-700">
+                                    {nama}<span className="text-slate-400">×{formatNumber(qty)}</span>
+                                  </span>
+                                ))}
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-1.5">
+                                Bila tiket sebenarnya terjual, sesuaikan nama kategorinya di
+                                Produk → Kategori, atau setel jenis layanan kunjungannya.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
               )}
               {filtered.map(l => (
                 <tr key={l.id} className="hover:bg-slate-50">
@@ -411,6 +793,14 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
                   <td className="px-3 py-2 text-slate-600">
                     {l.groupName || <span className="text-slate-300">-</span>}
                     <div className="text-[10px] text-slate-400">{SEGMENT_LABEL[l.segment] || l.segment}</div>
+                    {/* Baris hasil perkiraan harus bisa dibedakan dari
+                        pencatatan petugas, karena asal daerah dan
+                        segmentasinya memang tidak diketahui. */}
+                    {l.source === VISITOR_SOURCE_ESTIMATE && (
+                      <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                        <Sparkles size={8} /> Estimasi dari tiket
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-center">{l.paxAdult || 0}</td>
                   <td className="px-3 py-2 text-center">{l.paxChild || 0}</td>
@@ -429,11 +819,35 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
         </div>
       </div>
 
+      {/* Dokumen laporan resmi.
+          Digeser ke luar layar, BUKAN display:none — html2canvas hanya
+          bisa memotret elemen yang benar-benar ditata letaknya oleh
+          browser. Dirender hanya saat PDF sedang dibuat, supaya tidak
+          membebani layar sehari-hari. */}
+      {menyiapkanPdf && (
+        <div style={{ position: 'fixed', left: -10000, top: 0, zIndex: -1 }} aria-hidden="true">
+          <VisitorReportDocument
+            ref={dokumenRef}
+            periodeMulai={startDate}
+            periodeSelesai={endDate}
+            ringkasan={ringkasan}
+            perDaerah={perDaerah}
+            perSegmen={perSegmen}
+            perLayanan={perLayanan}
+            perKanal={perKanal}
+            perHari={perHari}
+            porsiEstimasi={porsiEstimasi}
+            storeSettings={storeSettings}
+            dibuatOleh={currentUser?.name || currentUser?.username || ''}
+          />
+        </div>
+      )}
+
       <VisitorLogModal
         key={`manual-${manualKey}`}
         isOpen={manualOpen}
         onClose={() => setManualOpen(false)}
-        recordedById={currentUser?.id || ''}
+        recordedById={currentUser?.id || (currentUser as any)?.uid || ''}
         recordedByName={currentUser?.name || 'Petugas'}
       />
 
