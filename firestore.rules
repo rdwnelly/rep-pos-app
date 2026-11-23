@@ -219,23 +219,88 @@ service cloud.firestore {
 
     // ─── Cash Flow ───────────────────────────────────────────────
     match /cashflow/{cashflowId} {
+
+      // Catatan kas yang dialirkan dari "Rincian Pengeluaran
+      // Operasional" Berita Acara harian. Petugas yang mencatatnya
+      // harus bisa mengoreksi dan menghapus barisnya sendiri, karena
+      // di modul itu rincian pengeluaran memang diedit berulang kali
+      // sepanjang hari sebelum tutup buku. Lihat
+      // services/beritaAcaraExpenseSync.ts.
+      function isBeritaAcaraEntry() {
+        return resource.data.get('source', '') == 'BERITA_ACARA';
+      }
+
+      function isOwnBeritaAcaraEntry() {
+        return isBeritaAcaraEntry()
+               && resource.data.get('userId', '') == request.auth.uid;
+      }
+
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && isAdmin();
-      allow delete: if isAuthenticated() && isOwnerUp();
+      allow update: if isAuthenticated() && (isAdmin() || isOwnBeritaAcaraEntry());
+
+      // Penghapusan catatan kas pada umumnya tetap hak OWNER ke atas.
+      // Pengecualiannya catatan bersumber Berita Acara: baris itu
+      // cuma cerminan arsip harian, dan ketika barisnya dihapus di
+      // modul Berita Acara, cerminannya WAJIB bisa ikut terhapus —
+      // kalau tidak, nominalnya tertinggal dan beban operasional di
+      // Tutup Buku jadi lebih besar dari kenyataan. Admin (pengelola
+      // buku kas) dan petugas pencatatnya sendiri yang boleh.
+      allow delete: if isAuthenticated()
+                    && (isOwnerUp()
+                        || (isBeritaAcaraEntry() && (isAdmin() || isOwnBeritaAcaraEntry())));
     }
 
     // ─── Stock Adjustments ───────────────────────────────────────
+    // Pengecekan Stok (opname) tersedia di menu semua peran, dan
+    // petugas yang berjaga itulah yang menghitung fisiknya. Sebelumnya
+    // create/delete dibatasi Admin & Gudang, sehingga kasir menekan
+    // simpan lalu kena "Missing or insufficient permissions" — menu
+    // terbuka tapi tulisannya ditolak.
+    //
+    // Nilai kerugian/selisih opname tetap terlihat di Laporan Bulanan
+    // (lihat stockAdjustmentMetrics), jadi koreksi yang salah masih
+    // bisa ditelusuri dan dibersihkan.
     match /stock_adjustments/{adjustmentId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && (isAdmin() || isWarehouse());
-      allow delete: if isAuthenticated() && (isAdmin() || isWarehouse());
+      allow create: if isAuthenticated();
+      allow delete: if isAuthenticated();
     }
 
     // ─── Berita Acara Archives ───────────────────────────────────
+    // "Berita Acara & Laporan Setoran Sesi" adalah modul HARIAN KASIR:
+    // petugas yang berjaga mengisi rekap penjualan, rincian pengeluaran
+    // operasional, dan setoran fisiknya sepanjang sesi, dan halaman itu
+    // menyimpan otomatis setiap kali ada perubahan.
+    //
+    // Sebelumnya tulis dibatasi isAdmin(), sehingga auto-save SELALU
+    // gagal untuk akun kasir ("Auto save archive error: Missing or
+    // insufficient permissions") — modul inti kasir praktis tidak bisa
+    // menyimpan apa pun ke cloud.
     match /berita_acara_archives/{archiveId} {
+
+      function archive() {
+        return request.resource.data;
+      }
+
+      function hasValidArchive() {
+        return archive().keys().hasAll(['date'])
+               && archive().date is string
+               && archive().date.size() > 0;
+      }
+
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isAdmin();
+
+      allow create: if isAuthenticated() && hasValidArchive();
+
+      // Tanggal arsip tidak boleh digeser oleh non-admin: itu yang
+      // menjaga rekap satu hari tetap milik hari itu.
+      allow update: if isAuthenticated()
+                    && hasValidArchive()
+                    && (isAdmin()
+                        || archive().date == resource.data.get('date', archive().date));
+
+      allow delete: if isAuthenticated() && isAdmin();
     }
 
     // ─── Open Bills ──────────────────────────────────────────────
@@ -305,13 +370,25 @@ service cloud.firestore {
                     && hasValidVisitorData()
                     && (isAdmin() || resource.data.recordedById == request.auth.uid);
 
-      allow delete: if isAuthenticated() && isAdmin();
+      // Data Pengunjung tersedia untuk semua peran, termasuk tombol
+      // hapusnya. Membatasi hapus ke Admin membuat tombol itu selalu
+      // gagal bagi petugas yang mencatat, jadi dibuka seperti create
+      // dan update-nya.
+      allow delete: if isAuthenticated();
     }
 
     // ─── Travel Commissions ──────────────────────────────────────
     match /travel_commissions/{commissionId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && !isWarehouse();
+
+      // Create dibuka untuk semua peran karena Kasir (POS) kini bisa
+      // dipakai peran apa pun, dan checkout dengan agen travel otomatis
+      // menulis komisinya. Tanpa ini, transaksi beragen gagal di tengah
+      // jalan untuk peran GUDANG.
+      allow create: if isAuthenticated();
+
+      // Koreksi dan pelunasan komisi tetap bukan pekerjaan Gudang.
+      allow update, delete: if isAuthenticated() && !isWarehouse();
     }
   }
 }

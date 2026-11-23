@@ -69,10 +69,16 @@ export default function Login() {
 
       <div className="bg-white/95 backdrop-blur-md p-8 rounded-xl shadow-2xl w-full max-w-md border-t-4 border-accent relative z-10">
         <div className="text-center mb-8">
+          {/* Logo lembaga pemilik di atas, logo pengembang di bawahnya. */}
+          <img
+            src="/logo-rep.png"
+            alt="Rumah Etnik Papua — Wisata Budaya Papua"
+            className="mx-auto w-full max-w-[230px] h-auto mb-4"
+          />
           <img
             src="/rely-studio.jpg"
             alt="RELY STUDIO — Application & Web Development"
-            className="mx-auto w-full max-w-[260px] h-auto mb-5 rounded-xl"
+            className="mx-auto w-full max-w-[160px] h-auto mb-5 rounded-xl opacity-80"
           />
           <h1 className="text-2xl font-bold text-gray-800">Selamat Datang di KASIR RELY</h1>
           <p className="text-sm text-gray-600 mt-2">

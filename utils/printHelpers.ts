@@ -1,6 +1,61 @@
 import { Transaction, StoreSettings, Purchase, BankAccount } from '../types';
 import { formatDateDateOnly, formatIDR, formatNumber } from '../utils';
 
+/** Berkas logo lembaga, dipakai di seluruh dokumen cetak & PDF. */
+export const REPORT_LOGO_SRC = '/logo-rep.png';
+
+/**
+ * Kop surat standar untuk laporan yang dicetak lewat jendela baru
+ * (Riwayat Pelanggan, Barang Terjual, Pengecekan Stok, dan seterusnya).
+ *
+ * Dipusatkan di sini supaya kedelapan laporan itu memakai kop yang sama
+ * persis — sebelumnya masing-masing hanya mencetak judul tanpa identitas
+ * lembaga, jadi hasil PDF-nya tidak bisa dibedakan dari dokumen mana pun.
+ */
+export const buildReportLetterhead = (
+    title: string,
+    subtitle?: string,
+): string => `
+    <div class="rep-letterhead">
+        <img class="rep-letterhead__logo" src="${REPORT_LOGO_SRC}" alt="Rumah Etnik Papua" />
+        <div class="rep-letterhead__title">${title}</div>
+        ${subtitle ? `<div class="rep-letterhead__subtitle">${subtitle}</div>` : ''}
+    </div>
+`;
+
+/** Gaya pendamping buildReportLetterhead; disisipkan ke dalam <style>. */
+export const REPORT_LETTERHEAD_STYLES = `
+    .rep-letterhead { text-align: center; border-bottom: 2px solid #b4762c; padding-bottom: 10px; margin-bottom: 16px; }
+    .rep-letterhead__logo { height: 54px; width: auto; object-fit: contain; display: block; margin: 0 auto 6px; }
+    .rep-letterhead__title { font-size: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; color: #1f2937; }
+    .rep-letterhead__subtitle { font-size: 11px; color: #4b5563; margin-top: 2px; }
+    @media print { .rep-letterhead { break-inside: avoid; } }
+`;
+
+/**
+ * Skrip pencetak yang MENUNGGU gambar selesai dimuat.
+ *
+ * Penting sejak kop memakai logo: memanggil window.print() langsung di
+ * body membuka dialog cetak sebelum logonya terunduh, sehingga logo
+ * hilang dari hasil PDF. `load` baru menyala setelah seluruh gambar siap.
+ */
+export const REPORT_PRINT_SCRIPT = `
+    <script>
+        (function () {
+            var fired = false;
+            function go() {
+                if (fired) return;
+                fired = true;
+                window.print();
+            }
+            window.addEventListener('load', go);
+            // Jaring pengaman bila ada gambar yang gagal dimuat.
+            setTimeout(go, 1500);
+            window.addEventListener('afterprint', function () { window.close(); });
+        })();
+    </script>
+`;
+
 const formatDateWithTime = (dateStr: string) => {
     const date = new Date(dateStr);
     const datePart = date.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -377,7 +432,7 @@ export const generatePrintInvoice = (tx: Transaction, settings: StoreSettings, f
         const isSlip = !!printOptions?.isTemporarySlip;
         let headerHtml = `
             <div style="text-align: center; margin-bottom: 4px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
-                ${settings.showLogo !== false ? `<img src="/logokasir.jpg" alt="Logo" style="width: 50px; height: 50px; border-radius: 6px; margin-bottom: 3px; object-fit: cover;" />` : ''}
+                ${settings.showLogo !== false ? `<img src="/logo-rep.png" alt="Logo Rumah Etnik Papua" style="width: 150px; max-width: 100%; height: auto; margin: 0 auto 3px; display: block; object-fit: contain;" />` : ''}
                 <h3 style="font-family: 'Lora', serif; margin: 0; font-size: 13px; text-transform: uppercase;">${settings.name || 'Toko'}</h3>
                 ${settings.showAddress !== false && settings.address ? `<p style="margin: 1px 0; font-size: 9px;">${settings.address}</p>` : ''}
                 ${settings.showPhone !== false && settings.phone ? `<p style="margin: 1px 0; font-size: 9px;">WA: ${settings.phone}</p>` : ''}

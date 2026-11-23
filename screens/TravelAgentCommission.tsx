@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { buildReportLetterhead, REPORT_LETTERHEAD_STYLES, REPORT_PRINT_SCRIPT, REPORT_LOGO_SRC } from '../utils/printHelpers';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { TravelAgent, TravelBookingCommission, CommissionMethod, CommissionStatus, PaymentMethod, User, StoreSettings, BankAccount } from '../types';
@@ -588,10 +589,12 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
             .sig-section { display: flex; justify-content: space-between; margin-top: 40px; text-align: center; font-size: 10pt; }
             .sig-box { width: 40%; }
             .sig-space { height: 60px; }
+          ${REPORT_LETTERHEAD_STYLES}
           </style>
         </head>
         <body>
           <div class="header">
+            <img src="${REPORT_LOGO_SRC}" alt="Rumah Etnik Papua" style="height:48px;width:auto;object-fit:contain;display:block;margin:0 auto 6px;" />
             <h1>${settings.name}</h1>
             <p>${settings.address || ''} • Telp: ${settings.phone || ''}</p>
           </div>
@@ -663,7 +666,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
             </div>
           </div>
 
-          <script>window.addEventListener('afterprint', function() { window.close(); }); window.print();</script>
+          ${REPORT_PRINT_SCRIPT}
         </body>
       </html>
     `;

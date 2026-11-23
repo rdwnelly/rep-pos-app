@@ -4,7 +4,7 @@ import { PaymentMethod, User, Transaction, Purchase, StoreSettings } from '../ty
 import { Loading } from '../components/Loading';
 import { ArrowRightLeft, Search, Calendar, ArrowUpRight, ArrowDownLeft, Printer, FileSpreadsheet, Download, Filter, RotateCcw, X, Building2, CreditCard, DollarSign, Eye, FileText, CheckCircle2 } from 'lucide-react';
 import { formatIDR, formatDate, exportToCSV, exportToExcel } from '../utils';
-import { generatePrintInvoice, generatePrintPurchaseDetail } from '../utils/printHelpers';
+import { generatePrintInvoice, generatePrintPurchaseDetail, buildReportLetterhead, REPORT_LETTERHEAD_STYLES, REPORT_PRINT_SCRIPT, REPORT_LOGO_SRC } from '../utils/printHelpers';
 
 interface TransferHistoryProps {
     currentUser: User;
@@ -223,10 +223,12 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
                             .total-box { bg-color: #f8fafc; padding: 8px; border-radius: 6px; text-align: center; margin-top: 10px; border: 1px solid #e2e8f0; }
                             .total-val { font-size: 18px; font-weight: bold; color: ${item.flow === 'IN' ? '#16a34a' : '#dc2626'}; }
                             .footer { text-align: center; font-size: 10px; color: #94a3b8; margin-top: 15px; border-top: 1px dashed #94a3b8; padding-top: 8px; }
+                        ${REPORT_LETTERHEAD_STYLES}
                         </style>
                     </head>
                     <body>
                         <div class="header">
+                            <img src="${REPORT_LOGO_SRC}" alt="Rumah Etnik Papua" style="height:38px;width:auto;object-fit:contain;display:block;margin:0 auto 4px;" />
                             <h3>${defaultSettings.name}</h3>
                             <p>${defaultSettings.address}</p>
                             <p>Telp: ${defaultSettings.phone}</p>
@@ -248,7 +250,7 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
                             <p>Status: LUNAS / BERHASIL DITERIMA</p>
                             <p>Simpan nota ini sebagai bukti transaksi sah</p>
                         </div>
-                        <script>window.print();</script>
+                        ${REPORT_PRINT_SCRIPT}
                     </body>
                 </html>
             `;
@@ -381,10 +383,11 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
                         table { width: 100%; border-collapse: collapse; }
                         th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; vertical-align: top; }
                         th { background-color: #f1f5f9; font-weight: bold; text-align: center; }
+                    ${REPORT_LETTERHEAD_STYLES}
                     </style>
                 </head>
                 <body>
-                    <h2>Laporan Riwayat Transfer Bank & E-Wallet</h2>
+                    ${buildReportLetterhead('Laporan Riwayat Transfer Bank & E-Wallet')}
                     <p class="subtitle">Dicetak pada: ${new Date().toLocaleString('id-ID')} | Periode: ${startDate ? formatDate(startDate) : 'Semua'} - ${endDate ? formatDate(endDate) : 'Semua'}</p>
                     <table>
                         <thead>
@@ -403,7 +406,7 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
                             ${rows}
                         </tbody>
                     </table>
-                    <script>window.print();</script>
+                    ${REPORT_PRINT_SCRIPT}
                 </body>
             </html>
         `;

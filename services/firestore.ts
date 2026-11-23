@@ -169,10 +169,25 @@ const saveEntityBulk = async <T extends { id?: string }>(
  * 2. Firestore Rules BUKAN filter: query yang berpotensi mengembalikan
  *    dokumen tak boleh dibaca ditolak seluruhnya. Rules membatasi kasir
  *    dan gudang hanya ke transaksi miliknya, jadi query mereka WAJIB
- *    menyertakan where('cashierId','==',uid).
+ *    menyertakan where('cashierId','==',uid) — dan karena menggabungkan
+ *    kesetaraan itu dengan orderBy/filter lain menuntut composite index
+ *    yang harus dibuat dulu di server, seluruh query transaksi lewat
+ *    satu pintu: queryTransactions() di bawah.
  */
 
-const SELF_SCOPED_ROLES = ['CASHIER', 'GUDANG'];
+/**
+ * Peran yang boleh membaca seluruh koleksi transaksi (sejalan dengan
+ * isAdmin() di firestore.rules). Sisanya diperlakukan sebagai peran
+ * yang hanya boleh melihat transaksinya sendiri.
+ *
+ * Sengaja daftar-putih, bukan daftar-hitam. Versi sebelumnya memakai
+ * daftar ['CASHIER','GUDANG'], sehingga peran yang namanya di luar
+ * daftar itu — akun lama bernilai 'KASIR', atau peran yang gagal
+ * terbaca dari localStorage — dianggap admin lalu query-nya ditolak
+ * rules secara utuh. Dengan daftar-putih, nilai tak dikenal jatuh ke
+ * sisi yang aman: melihat lebih sedikit, bukan ditolak.
+ */
+const FULL_READ_ROLES = ['SUPERADMIN', 'OWNER', 'ADMIN'];
 
 const currentUser = (): { uid?: string; role?: string } => {
   if (typeof window === 'undefined') return {};
@@ -187,15 +202,57 @@ const currentUser = (): { uid?: string; role?: string } => {
 };
 
 /**
- * Menambahkan batasan kepemilikan untuk peran yang hanya boleh melihat
- * datanya sendiri. Tanpa ini query kasir ditolak rules secara utuh —
- * itulah sebabnya layar riwayat selama ini kosong bagi akun kasir.
+ * Query transaksi yang aman untuk semua peran, TANPA menuntut
+ * composite index apa pun di server.
+ *
+ * Dua kendala Firestore bertemu di sini:
+ *
+ * 1. Rules bukan filter. Karena transaksi dibatasi per-dokumen
+ *    (`cashierId == request.auth.uid`), query peran non-admin WAJIB
+ *    menyertakan where('cashierId','==',uid) — kalau tidak, seluruh
+ *    query ditolak dengan "Missing or insufficient permissions".
+ *
+ * 2. Menggabungkan where('cashierId') dengan orderBy('date') atau
+ *    dengan filter lain menuntut composite index yang harus dibuat
+ *    lebih dulu di server. Selama indeks itu belum ada, query gagal
+ *    dengan "The query requires an index" — persis masalah yang
+ *    sebelumnya dialami akun kasir.
+ *
+ * Jalan keluarnya: untuk peran ter-scope, server hanya dikirimi satu
+ * kesetaraan (`cashierId`), yang dilayani single-field index bawaan.
+ * Penyaringan dan pengurutan sisanya dikerjakan di klien atas data
+ * milik petugas itu sendiri — jumlahnya kecil, dan hasilnya sama.
+ * Peran admin tetap query penuh di server seperti sebelumnya.
  */
-const scopedToSelf = (constraints: QueryConstraint[]): QueryConstraint[] => {
+const queryTransactions = async ({
+  filters = [],
+  matches,
+}: {
+  /** Batasan yang dikirim ke server untuk peran dengan akses penuh. */
+  filters?: QueryConstraint[];
+  /** Batasan setara di sisi klien untuk peran yang ter-scope. */
+  matches?: (transaction: Transaction) => boolean;
+} = {}): Promise<Transaction[]> => {
   const { uid, role } = currentUser();
-  return role && SELF_SCOPED_ROLES.includes(role) && uid
-    ? [where('cashierId', '==', uid), ...constraints]
-    : constraints;
+  const hasFullRead = FULL_READ_ROLES.includes(String(role ?? ''));
+
+  if (hasFullRead || !uid) {
+    return runQuery<Transaction>("transactions", [
+      ...filters,
+      orderBy("date", "desc"),
+    ]);
+  }
+
+  const own = await runQuery<Transaction>("transactions", [
+    where("cashierId", "==", uid),
+  ]);
+  const filtered = matches ? own.filter(matches) : own;
+
+  // Diurutkan seperti server mengurutkannya: perbandingan string
+  // mentah atas field `date`, menurun.
+  return filtered.sort((a, b) =>
+    String(b.date ?? '').localeCompare(String(a.date ?? '')),
+  );
 };
 
 const runQuery = async <T>(name: string, constraints: QueryConstraint[]): Promise<T[]> => {
@@ -323,14 +380,13 @@ export const FirestoreService = {
     endDay: string,
   ): Promise<Transaction[]> => {
     const { start, end } = dayRangeBounds(startDay, endDay);
-    return runQuery<Transaction>(
-      "transactions",
-      scopedToSelf([
-        where("date", ">=", start),
-        where("date", "<=", end),
-        orderBy("date", "desc"),
-      ]),
-    );
+    return queryTransactions({
+      filters: [where("date", ">=", start), where("date", "<=", end)],
+      matches: (t) => {
+        const d = String(t.date ?? '');
+        return d >= start && d <= end;
+      },
+    });
   },
 
   /**
@@ -342,23 +398,19 @@ export const FirestoreService = {
    * Yang membatasi di sini adalah statusnya, bukan waktunya.
    */
   getOutstandingTransactions: async (): Promise<Transaction[]> =>
-    runQuery<Transaction>(
-      "transactions",
-      scopedToSelf([
-        where("paymentStatus", "in", ["SEBAGIAN", "BELUM_LUNAS"]),
-        orderBy("date", "desc"),
-      ]),
-    ),
+    queryTransactions({
+      filters: [where("paymentStatus", "in", ["SEBAGIAN", "BELUM_LUNAS"])],
+      matches: (t) =>
+        t.paymentStatus === PaymentStatus.PARTIAL ||
+        t.paymentStatus === PaymentStatus.UNPAID,
+    }),
 
   /** Riwayat satu pelanggan, tanpa mengunduh transaksi pelanggan lain. */
   getTransactionsByCustomer: async (customerId: string): Promise<Transaction[]> =>
-    runQuery<Transaction>(
-      "transactions",
-      scopedToSelf([
-        where("customerId", "==", customerId),
-        orderBy("date", "desc"),
-      ]),
-    ),
+    queryTransactions({
+      filters: [where("customerId", "==", customerId)],
+      matches: (t) => t.customerId === customerId,
+    }),
 
   getCashFlowByDateRange: async (
     startDay: string,
@@ -391,8 +443,18 @@ export const FirestoreService = {
       orderBy("date", "desc"),
     ]),
 
-  getTransactions: async (): Promise<Transaction[]> =>
-    getCollectionOrdered<Transaction>("transactions", "date", "desc"),
+  /**
+   * Seluruh transaksi (untuk peran ter-scope: seluruh transaksinya
+   * sendiri). WAJIB lewat queryTransactions.
+   *
+   * Versi sebelumnya memakai getCollectionOrdered tanpa batasan apa
+   * pun, sehingga setiap layar yang memanggilnya — Berita Acara,
+   * Laporan Bulanan, Riwayat & Utang, Riwayat Pelanggan, Barang
+   * Terjual, Riwayat Transfer/Retur — gagal dengan "Missing or
+   * insufficient permissions" begitu dibuka akun kasir atau gudang.
+   * Bukan kosong, tapi error.
+   */
+  getTransactions: async (): Promise<Transaction[]> => queryTransactions(),
   addTransaction: async (transaction: Transaction) => {
     const txRef = transaction.id
       ? doc(collectionRef("transactions"), transaction.id)

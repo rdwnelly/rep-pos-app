@@ -4,7 +4,7 @@ import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Purchase, PaymentStatus, Supplier, UserRole, User, PaymentMethod, StoreSettings, PurchaseType } from '../types';
 import { formatIDR, formatDate, exportToCSV, exportToExcel } from '../utils';
-import { generatePrintPurchaseDetail } from '../utils/printHelpers';
+import { generatePrintPurchaseDetail, buildReportLetterhead, REPORT_LETTERHEAD_STYLES, REPORT_PRINT_SCRIPT } from '../utils/printHelpers';
 import { Download, Search, Filter, RotateCcw, X, Eye, Printer, FileSpreadsheet, Truck as TruckIcon, Calendar } from 'lucide-react';
 
 interface SupplierHistoryProps {
@@ -231,10 +231,11 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
                         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
                         th { background-color: #f2f2f2; font-weight: bold; }
                         .summary { margin-bottom: 20px; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; }
+                    ${REPORT_LETTERHEAD_STYLES}
                     </style>
                 </head>
                 <body>
-                    <h2>Riwayat Pembelian dari Supplier</h2>
+                    ${buildReportLetterhead('Riwayat Pembelian dari Supplier')}
                     <div class="summary">
                         <p><strong>Supplier:</strong> ${selectedSupplier?.name || 'Semua Supplier'}</p>
                         <p><strong>Periode:</strong> ${startDate ? new Date(startDate).toLocaleDateString('id-ID') : 'Semua'} - ${endDate ? new Date(endDate).toLocaleDateString('id-ID') : 'Semua'}</p>
@@ -261,7 +262,7 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
                             ${rows}
                         </tbody>
                     </table>
-                    <script>window.print();</script>
+                    ${REPORT_PRINT_SCRIPT}
                 </body>
             </html>
         `;

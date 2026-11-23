@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { buildReportLetterhead, REPORT_LETTERHEAD_STYLES, REPORT_PRINT_SCRIPT, REPORT_LOGO_SRC } from '../utils/printHelpers';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { TransactionType, UserRole, User } from '../types';
@@ -331,10 +332,12 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                         th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; font-size: 10px; }
                         th { background-color: #f1f5f9; font-weight: bold; text-transform: uppercase; }
                         .footer { margin-top: 20px; text-align: right; font-size: 10px; color: #64748b; }
+                    ${REPORT_LETTERHEAD_STYLES}
                     </style>
                 </head>
                 <body>
                     <div class="header">
+                        <img src="${REPORT_LOGO_SRC}" alt="Rumah Etnik Papua" style="height:48px;width:auto;object-fit:contain;display:block;margin:0 auto 6px;" />
                         <h1 class="title">Sub-Laporan Barang Terjual (Per Produk)</h1>
                         <div class="subtitle">Kategori: <strong>${catName}</strong> | Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
                     </div>
@@ -382,7 +385,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                         <p>Dicetak dari Sistem Kasir POS pada ${new Date().toLocaleString('id-ID')}</p>
                     </div>
 
-                    <script>window.onafterprint = function() { window.close(); }; window.print();</script>
+                    ${REPORT_PRINT_SCRIPT}
                 </body>
             </html>
         `);
@@ -579,13 +582,14 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                         table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
                         th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
                         th { background-color: #f1f5f9; font-weight: bold; text-align: center; font-size: 11px; }
+                    ${REPORT_LETTERHEAD_STYLES}
                     </style>
                 </head>
                 <body>
-                    <h2>Laporan Barang Terjual Per Kategori</h2>
+                    ${buildReportLetterhead('Laporan Barang Terjual Per Kategori')}
                     <p class="subtitle">Periode: ${startDate ? new Date(startDate).toLocaleDateString('id-ID') : 'Semua'} - ${endDate ? new Date(endDate).toLocaleDateString('id-ID') : 'Semua'}</p>
                     ${contentHtml}
-                    <script>window.print();</script>
+                    ${REPORT_PRINT_SCRIPT}
                 </body>
             </html>
         `;

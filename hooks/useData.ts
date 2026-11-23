@@ -28,8 +28,26 @@ export function useData<T>(fetcher: () => Promise<T>, deps: any[] = [], relevant
             try {
                 const result = await fetcher();
                 if (isMounted) setData(result);
-            } catch (error) {
-                console.error("Failed to fetch data", error);
+            } catch (error: any) {
+                // Nama koleksinya disebutkan. Tanpa ini, kegagalan baca
+                // hanya muncul sebagai "Missing or insufficient
+                // permissions" tanpa petunjuk koleksi mana yang ditolak,
+                // dan satu layar bisa membaca selusin koleksi.
+                const label = relevantEntities
+                    ? (Array.isArray(relevantEntities) ? relevantEntities.join(', ') : relevantEntities)
+                    : 'tidak diketahui';
+                const isPermission =
+                    error?.code === 'permission-denied' ||
+                    /insufficient permissions/i.test(String(error?.message ?? ''));
+                console.error(
+                    `Gagal memuat data [${label}]` +
+                    (isPermission
+                        ? ' — DITOLAK aturan Firestore. Catatan: aturan yang menyaring'
+                          + ' per-dokumen (mis. transactions dibatasi cashierId) membuat'
+                          + ' pembacaan SELURUH koleksi ditolak untuk peran non-admin.'
+                        : ''),
+                    error,
+                );
             }
         };
 

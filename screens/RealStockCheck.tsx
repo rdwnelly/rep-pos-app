@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { buildReportLetterhead, REPORT_LETTERHEAD_STYLES, REPORT_PRINT_SCRIPT, REPORT_LOGO_SRC } from '../utils/printHelpers';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Product, StockAdjustment, User, Category, StoreSettings } from '../types';
@@ -689,10 +690,12 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                         th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 6px; text-transform: uppercase; font-size: 10px; color: #334155; }
                         .signature-section { margin-top: 25px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; text-align: center; }
                         .signature-box { border-top: 1px dashed #94a3b8; margin-top: 45px; padding-top: 4px; font-weight: 600; font-size: 11px; }
+                    ${REPORT_LETTERHEAD_STYLES}
                     </style>
                 </head>
                 <body>
                     <div class="header">
+                        <img src="${REPORT_LOGO_SRC}" alt="Rumah Etnik Papua" style="height:48px;width:auto;object-fit:contain;display:block;margin:0 auto 6px;" />
                         <h1 class="title">📋 LEMBAR KERJA HITUNG FISIK (STOCK OPNAME HARIAN)</h1>
                         <p class="subtitle">${storeSettings?.name || 'Toko Retail & Grosir POS'} • ${storeSettings?.address || ''}</p>
                     </div>
@@ -815,11 +818,13 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                         th { background: #f1f5f9; font-weight: 700; padding: 5px 6px; text-transform: uppercase; font-size: 9px; color: #334155; }
                         .sign-grid { margin-top: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; text-align: center; }
                         .sign-box { border-top: 1px dashed #64748b; margin-top: 38px; padding-top: 4px; font-weight: 600; font-size: 10px; }
+                    ${REPORT_LETTERHEAD_STYLES}
                     </style>
                 </head>
                 <body>
                     <div class="header">
                         <div>
+                            <img src="${REPORT_LOGO_SRC}" alt="Rumah Etnik Papua" style="height:48px;width:auto;object-fit:contain;display:block;margin:0 auto 6px;" />
                             <h1 class="title">📜 ${customTitle || 'BERITA ACARA & LAPORAN AUDIT STOCK OPNAME HARIAN'}</h1>
                             <p class="subtitle">${storeSettings?.name || 'Toko Retail & Grosir POS'} • ${storeSettings?.address || ''}</p>
                         </div>

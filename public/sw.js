@@ -16,7 +16,11 @@
  * sendiri di IndexedDB; mencampurinya hanya akan merusak sinkronisasi.
  */
 
-const VERSION = 'v1';
+// v2: logo & ikon aplikasi diganti menjadi logo Rumah Etnik Papua.
+// Versi WAJIB dinaikkan setiap aset berubah — nama berkasnya tetap
+// sama, jadi tanpa ini perangkat yang sudah memasang PWA akan terus
+// menyajikan ikon lama dari cache gambar.
+const VERSION = 'v2';
 const SHELL_CACHE = `kasir-rep-shell-${VERSION}`;
 const STATIC_CACHE = `kasir-rep-static-${VERSION}`;
 const IMAGE_CACHE = `kasir-rep-image-${VERSION}`;

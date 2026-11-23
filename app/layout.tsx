@@ -12,9 +12,18 @@ export const metadata: Metadata = {
   description: 'KASIR RELY — aplikasi kasir terintegrasi oleh RELY STUDIO',
   manifest: '/manifest.json', // Still commonly used as a fallback, Next.js auto handles /manifest.ts too
   icons: {
-    // favicon.svg 739 B dan icon-192x192.png 3 KB, bukan foto logo.
-    icon: '/favicon.svg',
-    apple: '/icon-192x192.png',
+    // Logo Rumah Etnik Papua sebagai badge: kotak warna lembaga
+    // dengan logo dicetak putih. Logonya berbentuk lanskap 2:1, jadi
+    // kalau ditaruh utuh di kanvas persegi, pada 32 px tingginya
+    // tinggal separuh dan hasilnya cuma garis tipis yang tak terbaca
+    // di tab. Dibalik begini bentuknya tetap kenali pada ukuran kecil.
+    icon: [
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon.png', sizes: '64x64', type: 'image/png' },
+    ],
+    // Ikon layar utama iOS, 180 px: tanpa sudut membulat buatan
+    // sendiri, karena iOS yang membentuknya.
+    apple: '/apple-touch-icon.png',
   },
 };
 

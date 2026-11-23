@@ -73,3 +73,6 @@ Desktop.ini
 .directory
 .Trash-*
 .nfs*
+
+# Claude Code: pengaturan & izin personal (jangan di-commit)
+.claude/settings.local.json

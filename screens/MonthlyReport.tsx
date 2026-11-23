@@ -1,7 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useData } from '../hooks/useData';
 import { resolveReportRowName } from '../utils/categoryMapping';
 import { StorageService } from '../services/storage';
+import { syncBeritaAcaraExpensesToCashFlow } from '../services/beritaAcaraExpenseSync';
+import { resolveBeritaAcaraExpenseAmount, findSuspectedDuplicateOpex } from '../services/beritaAcaraExpensePlan';
+import type { BeritaAcaraExpenseRow } from '../services/beritaAcaraExpensePlan';
 import { formatIDR, formatDate, formatDateDateOnly, exportToCSV, exportToExcel, generateId, toMySQLDate } from '../utils';
 import {
     Calculator, Calendar, Tag, TrendingDown, TrendingUp, PiggyBank, Printer,
@@ -14,7 +17,7 @@ import {
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { CashFlowType, PaymentMethod, TransactionType, StoreSettings, StockAdjustment, PaymentStatus, Transaction, CashFlow, BankAccount, Product } from '../types';
+import { CashFlowType, PaymentMethod, TransactionType, StoreSettings, StockAdjustment, PaymentStatus, Transaction, CashFlow, BankAccount, Product, UserRole } from '../types';
 
 // WhatsApp Icon SVG
 const WhatsAppIcon = ({ size = 16 }: { size?: number }) => (
@@ -64,6 +67,26 @@ const parseSafeDate = (d: any): Date => {
 };
 
 
+/**
+ * Catatan kas yang dialirkan dari "Rincian Pengeluaran Operasional"
+ * pada Berita Acara harian (lihat services/beritaAcaraExpenseSync.ts).
+ *
+ * Nilainya tetap dihitung penuh sebagai beban operasional di laporan
+ * ini, tapi sumber kebenarannya ada di dokumen arsip Berita Acara.
+ * Karena itu koreksinya harus dilakukan di modul tersebut: perubahan
+ * yang dipaksakan dari sini akan tertulis ulang begitu Berita Acara
+ * tanggal itu tersimpan lagi.
+ */
+const BERITA_ACARA_SOURCE = 'BERITA_ACARA';
+
+const isBeritaAcaraEntry = (cf?: CashFlow | null): boolean =>
+    !!cf && cf.source === BERITA_ACARA_SOURCE;
+
+const beritaAcaraGuardMessage = (cf: CashFlow): string =>
+    `Catatan pengeluaran ini berasal dari Berita Acara tanggal ${cf.beritaAcaraDate || (cf.date || '').slice(0, 10) || '-'}.\n\n` +
+    `Silakan ubah atau hapus barisnya langsung di menu Berita Acara pada tanggal tersebut. ` +
+    `Perubahan dari halaman ini akan tertimpa saat Berita Acara itu tersimpan ulang.`;
+
 // Helper to reliably check if a transaction is a Piutang / BON / Hutang
 const isDebtTransaction = (t: Transaction): boolean => {
     if (!t || t.type === TransactionType.RETURN) return false;
@@ -89,6 +112,19 @@ export const MonthlyReport: React.FC = () => {
     // Diperlukan untuk menilai penyesuaian stok: StockAdjustment hanya
     // menyimpan productId dan qty, harga pokoknya ada di data produk.
     const products = useData(() => StorageService.getProducts(), [], 'products') ?? NO_PRODUCTS;
+    /**
+     * Arsip "Berita Acara & Laporan Setoran Sesi". Dipantau supaya
+     * Beban Operasional (OPEX) laporan ini ikut terisi otomatis setiap
+     * kali petugas menambah atau mengubah Rincian Pengeluaran
+     * Operasional di modul tersebut. Nilai mentahnya dipertahankan
+     * (tanpa `|| []`) agar "belum dimuat" bisa dibedakan dari
+     * "benar-benar kosong".
+     */
+    const beritaAcaraArchives = useData<any[]>(
+        () => StorageService.getBeritaAcaraArchives(),
+        [],
+        'berita_acara_archives',
+    );
     const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
 
     useEffect(() => {
@@ -155,6 +191,30 @@ export const MonthlyReport: React.FC = () => {
         bankId: ''
     });
     const [isSubmittingExpense, setIsSubmittingExpense] = useState<boolean>(false);
+    /**
+     * Hanya peran yang berwenang atas buku kas yang menjalankan
+     * pengambilan otomatis. Kasir tidak perlu: rincian yang dia catat
+     * sudah dialirkan ke `cashflow` oleh halaman Berita Acara saat
+     * disimpan, dan menariknya dari sini hanya akan membuat catatan
+     * kas milik petugas lain teratribusi ke dirinya.
+     */
+    const isLedgerManager = useMemo(() => {
+        const role = String(currentUser?.role || '');
+        return role === UserRole.SUPERADMIN || role === UserRole.OWNER || role === UserRole.ADMIN;
+    }, [currentUser]);
+
+    const [isPullingBeritaAcara, setIsPullingBeritaAcara] = useState<boolean>(false);
+    const [beritaAcaraPullState, setBeritaAcaraPullState] = useState<{
+        archives: number;
+        rows: number;
+        written: number;
+        removed: number;
+        skipped: number;
+        failed: number;
+        totalAmount: number;
+        at: string;
+        error: string | null;
+    } | null>(null);
 
     // Months Array
     const months = [
@@ -1045,6 +1105,10 @@ export const MonthlyReport: React.FC = () => {
     };
 
     const handleEditExpense = (cf: CashFlow) => {
+        if (isBeritaAcaraEntry(cf)) {
+            alert(beritaAcaraGuardMessage(cf));
+            return;
+        }
         setEditingExpenseId(cf.id);
         const isStandard = OPEX_CATEGORIES.includes(cf.category);
         const numAmount = cf.amount || 0;
@@ -1155,7 +1219,240 @@ export const MonthlyReport: React.FC = () => {
         }
     };
 
+    /**
+     * Tarik "Rincian Pengeluaran Operasional" dari seluruh arsip
+     * Berita Acara & Laporan Setoran Sesi pada periode ini ke koleksi
+     * `cashflow`, yang menjadi sumber Beban Operasional (OPEX) laporan
+     * Tutup Buku.
+     *
+     * Dipakai dua jalur:
+     * - otomatis (`silent: true`) dari useEffect di bawah, setiap kali
+     *   periode berganti atau arsip Berita Acara berubah;
+     * - manual lewat tombol, untuk memaksa penarikan ulang.
+     *
+     * Operasinya idempoten dan hanya menulis baris yang benar-benar
+     * berubah, jadi pemanggilan berulang tidak menggandakan nilai dan
+     * tidak menghabiskan kuota tulis.
+     */
+    const pullBeritaAcaraExpenses = async ({ silent = false }: { silent?: boolean } = {}) => {
+        setIsPullingBeritaAcara(true);
+        try {
+            const [archives, latestCashFlows] = await Promise.all([
+                StorageService.getBeritaAcaraArchives(),
+                StorageService.getCashFlow(),
+            ]);
+
+            const archivesInPeriod = (archives || []).filter(arch => {
+                if (!arch?.date) return false;
+                const t = parseSafeDate(arch.date).getTime();
+                return t >= periodRange.startTime && t <= periodRange.endTime;
+            });
+
+            // Satu tanggal diproses sekali saja. Kalau sampai ada dua
+            // dokumen arsip untuk tanggal yang sama (sisa data lama),
+            // yang dipakai adalah yang paling akhir disimpan — tanpa
+            // ini, arsip kedua akan menghapus baris arsip pertama
+            // karena menganggapnya baris yang sudah dibuang.
+            const archiveByDate = new Map<string, any>();
+            archivesInPeriod.forEach(arch => {
+                const current = archiveByDate.get(arch.date);
+                if (!current || Number(arch.updatedAt || 0) >= Number(current.updatedAt || 0)) {
+                    archiveByDate.set(arch.date, arch);
+                }
+            });
+
+            let written = 0;
+            let unchanged = 0;
+            let removed = 0;
+            let skipped = 0;
+            let blockedRemovals = 0;
+            let failed = 0;
+            let totalAmount = 0;
+
+            // Daftar kas diambil sekali di awal dan dipakai untuk semua
+            // tanggal. Itu sudah cukup: id dokumen hasil sinkronisasi
+            // selalu memuat tanggalnya (`ba_<tanggal>_<baris>`), jadi
+            // tulisan untuk satu tanggal tidak pernah mempengaruhi
+            // pengenalan baris pada tanggal lain.
+            const existingCashFlows = latestCashFlows || [];
+            for (const arch of archiveByDate.values()) {
+                const rows = Array.isArray(arch.customExpenses) ? arch.customExpenses : [];
+                if (rows.length === 0) continue;
+
+                const result = await syncBeritaAcaraExpensesToCashFlow({
+                    date: arch.date,
+                    rows,
+                    existingCashFlows,
+                    // Nama petugas diambil dari arsipnya supaya jejak
+                    // audit menunjuk pencatat aslinya, bukan orang yang
+                    // kebetulan membuka laporan ini.
+                    user: { ...currentUser, name: arch.kasir || currentUser?.name },
+                });
+                written += result.written;
+                unchanged += result.unchanged;
+                removed += result.removed;
+                skipped += result.skipped;
+                blockedRemovals += result.blockedRemovals;
+                failed += result.failed;
+                totalAmount += result.totalAmount;
+            }
+
+            if (written > 0 || removed > 0) {
+                StorageService.notifyChange('cashflow');
+            }
+
+            setBeritaAcaraPullState({
+                archives: archiveByDate.size,
+                rows: written + unchanged,
+                written,
+                removed,
+                skipped,
+                failed,
+                totalAmount,
+                at: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                error: null,
+            });
+
+            if (silent) return;
+
+            if (written === 0 && removed === 0 && unchanged === 0) {
+                alert(
+                    `Tidak ada rincian pengeluaran Berita Acara yang bisa ditarik pada periode ${periodRange.label}.\n\n` +
+                    `Diperiksa: ${archiveByDate.size} arsip Berita Acara.`
+                );
+            } else {
+                alert(
+                    `Selesai menarik pengeluaran Berita Acara periode ${periodRange.label}.\n\n` +
+                    `• Arsip diperiksa: ${archiveByDate.size}\n` +
+                    `• Baris tercatat di laporan: ${written + unchanged} (${formatIDR(totalAmount)})\n` +
+                    `• Baru ditambahkan / diperbarui: ${written}\n` +
+                    `• Sudah sesuai sebelumnya: ${unchanged}\n` +
+                    `• Baris lama dibersihkan: ${removed}` +
+                    (skipped > 0 ? `\n• Dilewati (catatan kas milik pengguna lain): ${skipped}` : '') +
+                    (blockedRemovals > 0 ? `\n• Sisa yang perlu dibersihkan OWNER: ${blockedRemovals}` : '') +
+                    (failed > 0 ? `\n• GAGAL: ${failed} baris — cek console, kemungkinan aturan Firestore belum ter-deploy` : '')
+                );
+            }
+        } catch (err: any) {
+            console.error(err);
+            setBeritaAcaraPullState(prev => ({
+                archives: prev?.archives ?? 0,
+                rows: prev?.rows ?? 0,
+                written: 0,
+                removed: 0,
+                skipped: 0,
+                failed: 0,
+                totalAmount: prev?.totalAmount ?? 0,
+                at: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                error: String(err?.message || err),
+            }));
+            if (!silent) {
+                alert(`Gagal menarik pengeluaran dari Berita Acara: ${err.message || err}`);
+            }
+        } finally {
+            setIsPullingBeritaAcara(false);
+        }
+    };
+
+    /**
+     * Penarikan manual: tetap ada sebagai jalan paksa bila yang
+     * otomatis belum jalan (mis. baru selesai offline).
+     */
+    const handlePullBeritaAcaraExpenses = () => {
+        void pullBeritaAcaraExpenses({ silent: false });
+    };
+
+    /**
+     * Sidik jari isi Rincian Pengeluaran Operasional pada periode ini.
+     *
+     * Berubah hanya kalau ada arsip Berita Acara yang masuk/keluar
+     * periode, barisnya bertambah/berkurang, nominalnya berubah, atau
+     * arsipnya tersimpan ulang (`updatedAt`). Dipakai sebagai pemicu
+     * penarikan otomatis, supaya penarikan tidak jalan pada setiap
+     * render melainkan hanya saat datanya memang berbeda.
+     */
+    const beritaAcaraExpenseSignature = useMemo(() => {
+        if (!Array.isArray(beritaAcaraArchives)) return '';
+
+        const parts = beritaAcaraArchives
+            .filter(arch => {
+                if (!arch?.date) return false;
+                const t = parseSafeDate(arch.date).getTime();
+                return t >= periodRange.startTime && t <= periodRange.endTime;
+            })
+            .map(arch => {
+                const rows: BeritaAcaraExpenseRow[] = Array.isArray(arch.customExpenses)
+                    ? arch.customExpenses
+                    : [];
+                const active = rows.filter(r => resolveBeritaAcaraExpenseAmount(r) > 0);
+                const total = active.reduce(
+                    (sum: number, r: BeritaAcaraExpenseRow) => sum + resolveBeritaAcaraExpenseAmount(r),
+                    0,
+                );
+                return `${arch.date}:${active.length}:${total}:${arch.updatedAt || ''}`;
+            })
+            .sort();
+
+        return `${periodRange.startTime}-${periodRange.endTime}|${parts.join('|')}`;
+    }, [beritaAcaraArchives, periodRange]);
+
+    const lastAutoPullSignatureRef = useRef<string>('');
+
+    /**
+     * Penarikan otomatis Beban Operasional (OPEX) dari Berita Acara.
+     *
+     * Berjalan saat laporan dibuka, saat periode diganti, dan setiap
+     * kali rincian pengeluaran di Berita Acara berubah. Tidak memakai
+     * daftar `cashFlows` sebagai pemicu — penarikan mengambil kas
+     * terbaru langsung dari server, sehingga hasil tulisannya tidak
+     * memicu putaran penarikan berikutnya.
+     */
+    useEffect(() => {
+        if (!isLedgerManager) return;
+        if (!beritaAcaraExpenseSignature) return;
+        if (isPullingBeritaAcara) return;
+        if (lastAutoPullSignatureRef.current === beritaAcaraExpenseSignature) return;
+
+        lastAutoPullSignatureRef.current = beritaAcaraExpenseSignature;
+        void pullBeritaAcaraExpenses({ silent: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [beritaAcaraExpenseSignature, isLedgerManager]);
+
+    /**
+     * Dugaan penghitungan dobel.
+     *
+     * Sebelum beban operasional terambil otomatis, biaya dari Berita
+     * Acara kemungkinan diinput ulang manual lewat "+ Input Pengeluaran
+     * (OPEX)" supaya muncul di laporan. Begitu pengambilan otomatis
+     * menyala, input manual itu menjadi kembaran yang menggandakan
+     * nilai. Deteksi ini menandai baris manual yang tanggal dan
+     * nominalnya sama persis dengan baris asal Berita Acara, satu
+     * lawan satu, supaya bisa dihapus.
+     */
+    const suspectedDuplicateOpex = useMemo(
+        () => findSuspectedDuplicateOpex(expenseBreakdown.periodExpenseList),
+        [expenseBreakdown.periodExpenseList],
+    );
+
+    /**
+     * Ringkasan baris OPEX periode ini yang berasal dari Berita Acara.
+     * Dihitung dari isi laporan (bukan dari hasil penarikan terakhir),
+     * jadi angkanya selalu mencerminkan apa yang benar-benar terhitung.
+     */
+    const beritaAcaraOpexSummary = useMemo(() => {
+        const items = expenseBreakdown.periodExpenseList.filter(isBeritaAcaraEntry);
+        return {
+            count: items.length,
+            amount: items.reduce((sum, cf) => sum + (cf.amount || 0), 0),
+        };
+    }, [expenseBreakdown.periodExpenseList]);
+
     const handleDeleteExpense = async (id: string) => {
+        const target = expenseBreakdown.periodExpenseList.find(cf => cf.id === id);
+        if (isBeritaAcaraEntry(target)) {
+            alert(beritaAcaraGuardMessage(target as CashFlow));
+            return;
+        }
         if (!confirm('Yakin ingin menghapus catatan pengeluaran ini?')) return;
         try {
             await StorageService.deleteCashFlow(id);
@@ -1750,9 +2047,9 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                                 <div className="flex items-center justify-between">
                                     <div className="w-[18%] flex items-center justify-start">
                                         <img
-                                            src="/logokasir.jpg"
-                                            alt="Logo Kasir"
-                                            style={{ height: '46px', objectFit: 'contain' }}
+                                            src="/logo-rep.png"
+                                            alt="Logo Rumah Etnik Papua"
+                                            style={{ height: '46px', width: 'auto', objectFit: 'contain' }}
                                             onError={(e: any) => {
                                                 e.target.onerror = null;
                                                 e.target.style.display = 'none';
@@ -2070,6 +2367,41 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                                             </tr>
                                         </tbody>
                                     </table>
+
+                                    {/* Jejak sumber data. Disembunyikan saat dicetak supaya
+                                        dokumen resminya tetap bersih. */}
+                                    <div className="print:hidden px-2 py-1.5 bg-slate-50 border-t border-slate-200 text-[9px] leading-snug text-slate-500 flex items-start gap-1.5">
+                                        {beritaAcaraPullState?.error ? (
+                                            <>
+                                                <AlertCircle size={11} className="text-rose-600 flex-shrink-0 mt-px" />
+                                                <span className="text-rose-700 font-semibold">
+                                                    Gagal mengambil data Berita Acara otomatis ({beritaAcaraPullState.error}). Buka tab &quot;Rincian Arus Kas&quot; lalu tekan &quot;Tarik ulang&quot;.
+                                                </span>
+                                            </>
+                                        ) : isPullingBeritaAcara ? (
+                                            <>
+                                                <Loader2 size={11} className="animate-spin text-amber-600 flex-shrink-0 mt-px" />
+                                                <span>Mengambil Rincian Pengeluaran Operasional dari Berita Acara...</span>
+                                            </>
+                                        ) : beritaAcaraOpexSummary.count > 0 ? (
+                                            <>
+                                                <CheckCircle2 size={11} className="text-emerald-600 flex-shrink-0 mt-px" />
+                                                <span>
+                                                    Termasuk <strong className="text-slate-700">{beritaAcaraOpexSummary.count} baris</strong> ({formatIDR(beritaAcaraOpexSummary.amount)}) yang terambil otomatis dari
+                                                    Rincian Pengeluaran Operasional pada Berita Acara &amp; Laporan Setoran Sesi
+                                                    {beritaAcaraPullState?.at ? ` — diperbarui ${beritaAcaraPullState.at}` : ''}.
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Info size={11} className="text-slate-400 flex-shrink-0 mt-px" />
+                                                <span>
+                                                    Beban operasional terisi otomatis dari Rincian Pengeluaran Operasional pada Berita Acara &amp; Laporan Setoran Sesi.
+                                                    Belum ada rincian yang terinput pada periode ini.
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Section VI: REKAPITULASI KEUANGAN & SETORAN KASIR */}
@@ -2714,17 +3046,57 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                 {/* ======================================================== */}
                 {activeTab === 'cash_flow' && (
                     <div className="p-4 sm:p-6 space-y-6">
-                        <div className="flex justify-between items-center">
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                             <div>
                                 <h3 className="text-sm font-black text-slate-900">Rincian Arus Kas & Pos Beban Operasional</h3>
                                 <p className="text-xs text-slate-500">Kelola dan input seluruh arus kas masuk serta pengeluaran biaya operasional toko</p>
+
+                                {/* Status jembatan otomatis dari Berita Acara */}
+                                <div className="mt-1.5 text-[11px] font-semibold flex items-center gap-1.5">
+                                    {beritaAcaraPullState?.error ? (
+                                        <span className="inline-flex items-center gap-1.5 text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+                                            <AlertCircle size={11} /> Pengambilan otomatis gagal — tekan &quot;Tarik ulang&quot;
+                                        </span>
+                                    ) : isPullingBeritaAcara ? (
+                                        <span className="inline-flex items-center gap-1.5 text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                                            <Loader2 size={11} className="animate-spin" /> Mengambil data Berita Acara...
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5 text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                            <CheckCircle2 size={11} />
+                                            Otomatis dari Berita Acara: {beritaAcaraOpexSummary.count} baris ({formatIDR(beritaAcaraOpexSummary.amount)})
+                                            {beritaAcaraPullState?.at ? ` • ${beritaAcaraPullState.at}` : ''}
+                                        </span>
+                                    )}
+                                    {(beritaAcaraPullState?.skipped ?? 0) > 0 && (
+                                        <span className="inline-flex items-center gap-1.5 text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+                                            <Info size={11} /> {beritaAcaraPullState?.skipped} baris dilewati (milik pengguna lain)
+                                        </span>
+                                    )}
+                                </div>
                             </div>
-                            <button
-                                onClick={handleOpenExpenseModal}
-                                className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-                            >
-                                <PlusCircle size={15} /> + Input Pengeluaran (OPEX)
-                            </button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {isLedgerManager && (
+                                    <button
+                                        onClick={handlePullBeritaAcaraExpenses}
+                                        disabled={isPullingBeritaAcara}
+                                        className="px-3.5 py-2 bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                                        title="Beban operasional sudah terambil otomatis dari Berita Acara. Tombol ini untuk memaksa pengambilan ulang."
+                                    >
+                                        {isPullingBeritaAcara ? (
+                                            <><Loader2 size={15} className="animate-spin" /> Menarik data...</>
+                                        ) : (
+                                            <><RefreshCw size={15} /> Tarik ulang dari Berita Acara</>
+                                        )}
+                                    </button>
+                                )}
+                                <button
+                                    onClick={handleOpenExpenseModal}
+                                    className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+                                >
+                                    <PlusCircle size={15} /> + Input Pengeluaran (OPEX)
+                                </button>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2767,6 +3139,18 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
 
                         {/* List of Recent Operational Expenses in this Period */}
                         <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                            {suspectedDuplicateOpex.count > 0 && (
+                                <div className="p-3 bg-amber-50 border-b border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
+                                    <AlertCircle size={14} className="text-amber-700 flex-shrink-0 mt-px" />
+                                    <span>
+                                        <strong>Dugaan dobel: {suspectedDuplicateOpex.count} baris ({formatIDR(suspectedDuplicateOpex.amount)})</strong>.
+                                        Baris input manual berikut tanggal dan nominalnya sama persis dengan baris yang kini terambil otomatis dari
+                                        Berita Acara, jadi kemungkinan biaya yang sama terhitung dua kali. Periksa baris bertanda
+                                        <span className="mx-1 px-1 py-0.5 bg-white border border-amber-300 rounded font-bold">Dugaan dobel</span>
+                                        di bawah lalu hapus yang manual bila memang kembaran.
+                                    </span>
+                                </div>
+                            )}
                             <div className="p-3.5 bg-slate-50 border-b border-slate-200 font-extrabold text-slate-800 text-xs flex justify-between items-center">
                                 <span className="flex items-center gap-2">
                                     <TrendingDown size={16} className="text-rose-600" />
@@ -2806,7 +3190,21 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                                                             {exp.category}
                                                         </span>
                                                     </td>
-                                                    <td className="p-3 text-slate-800">{exp.description}</td>
+                                                    <td className="p-3 text-slate-800">
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <span>{exp.description}</span>
+                                                            {isBeritaAcaraEntry(exp) && (
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded w-fit">
+                                                                    <FileText size={9} /> Dari Berita Acara {exp.beritaAcaraDate || ''}
+                                                                </span>
+                                                            )}
+                                                            {suspectedDuplicateOpex.ids.has(exp.id) && (
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-800 bg-rose-50 border border-rose-300 px-1.5 py-0.5 rounded w-fit">
+                                                                    <AlertCircle size={9} /> Dugaan dobel — kembaran baris Berita Acara
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
                                                     <td className="p-3 text-center">
                                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${exp.paymentMethod === PaymentMethod.CASH ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'}`}>
                                                             {exp.paymentMethod || 'CASH'}
@@ -2819,15 +3217,21 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                                                         <div className="flex items-center justify-center gap-1.5">
                                                             <button
                                                                 onClick={() => handleEditExpense(exp)}
-                                                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                                title="Edit Catatan Pengeluaran Ini"
+                                                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-40 disabled:hover:text-slate-400 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                                                                disabled={isBeritaAcaraEntry(exp)}
+                                                                title={isBeritaAcaraEntry(exp)
+                                                                    ? 'Diinput dari Berita Acara — koreksi di modul tersebut'
+                                                                    : 'Edit Catatan Pengeluaran Ini'}
                                                             >
                                                                 <Edit3 size={14} />
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDeleteExpense(exp.id)}
-                                                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                                                title="Hapus Catatan Pengeluaran Ini"
+                                                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40 disabled:hover:text-slate-400 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                                                                disabled={isBeritaAcaraEntry(exp)}
+                                                                title={isBeritaAcaraEntry(exp)
+                                                                    ? 'Diinput dari Berita Acara — hapus barisnya di modul tersebut'
+                                                                    : 'Hapus Catatan Pengeluaran Ini'}
                                                             >
                                                                 <Trash2 size={14} />
                                                             </button>

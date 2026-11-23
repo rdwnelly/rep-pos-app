@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useData } from "../../../hooks/useData";
 import { StorageService, notifyListeners } from "../../../services/storage";
+import { syncBeritaAcaraExpensesToCashFlow } from "../../../services/beritaAcaraExpenseSync";
 import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
 import { formatIDR, formatNumber } from "../../../utils";
 import { resolveReportRowName } from "../../../utils/categoryMapping";
@@ -286,9 +287,36 @@ export default function BeritaAcaraPage() {
     const transactions = useData(() => StorageService.getTransactions(), [], 'transactions') || [];
     const categories = useData(() => StorageService.getCategories(), [], 'categories') || [];
     const products = useData(() => StorageService.getProducts(), [], 'products') || [];
-    const cashflows = useData(() => StorageService.getCashFlow(), [], 'cashflow') || [];
+    // Nilai mentahnya dipertahankan: useData mengembalikan undefined
+    // selama data belum terbaca. Membedakan "belum dimuat" dari
+    // "benar-benar kosong" itu penting, karena sinkronisasi pengeluaran
+    // ke `cashflow` memakai daftar ini untuk mengenali baris yang sudah
+    // punya dokumen kas. Kalau jalan sebelum daftarnya siap, baris lama
+    // akan dibuatkan dokumen baru dan nilainya terhitung dua kali.
+    const cashflowsRaw = useData(() => StorageService.getCashFlow(), [], 'cashflow');
+    const cashflows = cashflowsRaw || [];
+    const isCashflowLoaded = Array.isArray(cashflowsRaw);
     const archives = useData(() => StorageService.getBeritaAcaraArchives(), [], 'berita_acara_archives') || [];
+
+    // Petugas yang sedang login. Dipakai sebagai pemilik catatan kas
+    // keluar yang dialirkan dari rincian pengeluaran di halaman ini —
+    // aturan Firestore memakai userId itu untuk menentukan siapa yang
+    // boleh mengoreksinya nanti.
+    const [currentUser] = useState(() => {
+        try {
+            const raw = typeof window !== 'undefined' ? localStorage.getItem('pos_current_user') : null;
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            console.error('Gagal membaca data pengguna aktif:', e);
+            return null;
+        }
+    });
+
     const [activeTab, setActiveTab] = useState("input");
+    // Di HP, dokumen A4 dilipat secara bawaan. Elemennya TIDAK di-display:none
+    // melainkan digeser ke luar layar, supaya dimensinya tetap utuh dan
+    // pembuatan PDF lewat html2canvas tidak terpengaruh sama sekali.
+    const [showDocMobile, setShowDocMobile] = useState(false);
     const [viewingArchive, setViewingArchive] = useState(null);
     const [archiveSearchQuery, setArchiveSearchQuery] = useState("");
 
@@ -641,6 +669,7 @@ export default function BeritaAcaraPage() {
                     if (matchingExpenses.length > 0) {
                         setCustomExpenses(matchingExpenses.map((c, idx) => ({
                             id: c.id || Date.now() + idx,
+                            cashflowId: c.id || undefined,
                             category: mapCashflowCategoryToOption(c.category, categoryOptions),
                             keterangan: c.description || c.category || 'Pengeluaran Kasir',
                             qty: '1',
@@ -698,6 +727,10 @@ export default function BeritaAcaraPage() {
                 if (matchingExpenses.length > 0) {
                     setCustomExpenses(matchingExpenses.map((c, idx) => ({
                         id: c.id || Date.now() + idx,
+                        // Jejak dokumen kas asalnya, supaya penyimpanan
+                        // balik ke `cashflow` memperbarui dokumen yang
+                        // sama alih-alih membuat duplikat.
+                        cashflowId: c.id || undefined,
                         category: mapCashflowCategoryToOption(c.category, categoryOptions),
                         keterangan: c.description || c.category || 'Pengeluaran Kasir',
                         qty: '1',
@@ -928,6 +961,10 @@ export default function BeritaAcaraPage() {
                 if ((syncCashflow || isCustomExpensesEmpty) && matchingExpenses.length > 0) {
                     finalCustomExpenses = matchingExpenses.map((c, idx) => ({
                         id: c.id || Date.now() + idx,
+                        // Jejak dokumen kas asalnya, supaya penyimpanan
+                        // balik ke `cashflow` memperbarui dokumen yang
+                        // sama alih-alih membuat duplikat.
+                        cashflowId: c.id || undefined,
                         category: mapCashflowCategoryToOption(c.category, categoryOptions),
                         keterangan: c.description || c.category || 'Pengeluaran Kasir',
                         qty: '1',
@@ -1090,6 +1127,35 @@ export default function BeritaAcaraPage() {
         }
     };
 
+    /**
+     * Alirkan "Rincian Pengeluaran Operasional" ke koleksi `cashflow`.
+     *
+     * Tanpa ini, biaya yang diketik di sini hanya tersimpan di dalam
+     * dokumen arsip Berita Acara, sedangkan Laporan Bulanan
+     * ("Laporan Pemasukan & Tutup Buku") membaca beban operasionalnya
+     * dari `cashflow` — sehingga Section V di laporan itu selalu
+     * kosong dan laba bersihnya kelihatan lebih besar dari kenyataan.
+     */
+    const syncExpensesToCashflowLedger = async (rowsToSync) => {
+        if (!tanggal || viewingArchive) return null;
+        if (!isCashflowLoaded) return null;
+        try {
+            const result = await syncBeritaAcaraExpensesToCashFlow({
+                date: tanggal,
+                rows: Array.isArray(rowsToSync) ? rowsToSync : [],
+                existingCashFlows: cashflows,
+                user: currentUser
+            });
+            if (result && (result.written > 0 || result.removed > 0)) {
+                notifyListeners('cashflow');
+            }
+            return result;
+        } catch (err) {
+            console.error('Gagal mengalirkan pengeluaran ke arus kas:', err);
+            return null;
+        }
+    };
+
     const [autoSaveStatus, setAutoSaveStatus] = useState("idle");
 
     // Auto-save Berita Acara to localStorage (immediate) & StorageService (debounced)
@@ -1155,6 +1221,13 @@ export default function BeritaAcaraPage() {
                 };
 
                 await StorageService.saveBeritaAcaraArchive(archiveData, false);
+
+                // Arsip sudah aman; sekarang alirkan rincian
+                // pengeluarannya ke `cashflow` supaya Laporan Bulanan
+                // ikut menghitungnya. Operasinya idempoten, jadi aman
+                // dipanggil pada setiap auto-save.
+                await syncExpensesToCashflowLedger(customExpenses);
+
                 setAutoSaveStatus("saved");
             } catch (err) {
                 console.error("Auto save archive error:", err);
@@ -1210,7 +1283,12 @@ export default function BeritaAcaraPage() {
             // 1. Save directly to Firebase Firestore with notify=true to trigger real-time updates
             await StorageService.saveBeritaAcaraArchive(archiveData, true);
 
-            // 2. Save local draft
+            // 2. Alirkan rincian pengeluarannya ke koleksi `cashflow`
+            //    supaya ikut terbaca Laporan Bulanan (Laporan Pemasukan
+            //    & Tutup Buku) dan layar Keuangan.
+            const ledgerResult = await syncExpensesToCashflowLedger(customExpenses);
+
+            // 3. Save local draft
             try {
                 localStorage.setItem(`rep_ba_draft_${tanggal}`, JSON.stringify(archiveData));
             } catch (e) {
@@ -1218,9 +1296,31 @@ export default function BeritaAcaraPage() {
             }
 
             setAutoSaveStatus("saved");
+
+            const ledgerNotes = [];
+            if (ledgerResult) {
+                const ledgerRows = ledgerResult.written + ledgerResult.unchanged;
+                if (ledgerRows > 0) {
+                    ledgerNotes.push(`${ledgerRows} baris (${formatIDR(ledgerResult.totalAmount)}) tercatat di Laporan Bulanan`);
+                }
+                if (ledgerResult.removed > 0) {
+                    ledgerNotes.push(`${ledgerResult.removed} baris lama dihapus dari arus kas`);
+                }
+                if (ledgerResult.skipped > 0) {
+                    ledgerNotes.push(`${ledgerResult.skipped} baris milik catatan kas lain dilewati (perlu Admin)`);
+                }
+                if (ledgerResult.blockedRemovals > 0) {
+                    ledgerNotes.push(`${ledgerResult.blockedRemovals} baris sisa perlu dibersihkan Admin/Owner`);
+                }
+                if (ledgerResult.failed > 0) {
+                    ledgerNotes.push(`${ledgerResult.failed} baris GAGAL dialirkan ke arus kas (cek console)`);
+                }
+            }
+
             setExpenseSaveFeedback({
-                type: 'success',
-                message: `Data Rincian Pengeluaran Operasional (${customExpenses.length} baris) berhasil disimpan ke Firebase Cloud & siap dilihat di semua perangkat!`
+                type: ledgerResult && ledgerResult.failed > 0 ? 'error' : 'success',
+                message: `Data Rincian Pengeluaran Operasional (${customExpenses.length} baris) berhasil disimpan ke Firebase Cloud`
+                    + (ledgerNotes.length > 0 ? ` — ${ledgerNotes.join(', ')}.` : ' & siap dilihat di semua perangkat!')
             });
 
             setTimeout(() => {
@@ -1888,7 +1988,7 @@ export default function BeritaAcaraPage() {
                     {/* Header */}
                     <div className="flex items-center justify-between border-b-2 border-amber-900 pb-2 mb-3">
                         <div className="w-1/4">
-                            <img src="/logokasir.jpg" alt="Logo" style={{ height: '55px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
+                            <img src="/logo-rep.png" alt="Logo Rumah Etnik Papua" style={{ height: '55px', width: 'auto', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
                         </div>
                         <div className="w-3/4 text-center">
                             <h1 className="text-lg font-bold uppercase tracking-wider mb-0.5">BERITA ACARA</h1>
@@ -2384,7 +2484,7 @@ export default function BeritaAcaraPage() {
                                 {/* Formal Page 2 Header */}
                                 <div className="flex items-center justify-between border-b-2 border-amber-900 pb-2 mb-3">
                                     <div className="w-1/4">
-                                        <img src="/logokasir.jpg" alt="Logo" style={{ height: '48px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
+                                        <img src="/logo-rep.png" alt="Logo Rumah Etnik Papua" style={{ height: '48px', width: 'auto', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
                                     </div>
                                     <div className="w-3/4 text-center">
                                         <h1 className="text-base font-bold uppercase tracking-wider mb-0.5">BERITA ACARA - LAMPIRAN</h1>
@@ -2493,58 +2593,58 @@ export default function BeritaAcaraPage() {
             {activeTab === 'input' && !viewingArchive && (
                 <div className="space-y-6">
                     {/* Metric Summary Cards Banner (Live Form) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 print:hidden">
-                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 lg:gap-3.5 print:hidden">
+                        <div className="bg-white p-2.5 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Penjualan Tunai</p>
-                                <h3 className="text-lg font-extrabold text-slate-900 mt-1">{formatIDR(totalSalesTunai)}</h3>
-                                <p className="text-[11px] text-slate-400 mt-0.5">Penerimaan Tunai Kasir</p>
+                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Total Penjualan Tunai</p>
+                                <h3 className="text-[13px] sm:text-base lg:text-lg font-extrabold text-slate-900 mt-1">{formatIDR(totalSalesTunai)}</h3>
+                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Penerimaan Tunai Kasir</p>
                             </div>
-                            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
                                 <FileText size={22} />
                             </div>
                         </div>
 
-                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div className="bg-white p-2.5 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Non-Tunai / QR</p>
-                                <h3 className="text-lg font-extrabold text-purple-700 mt-1">{formatIDR(totalSalesQR)}</h3>
-                                <p className="text-[11px] text-slate-400 mt-0.5">Transfer & QRIS Bank</p>
+                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Total Non-Tunai / QR</p>
+                                <h3 className="text-[13px] sm:text-base lg:text-lg font-extrabold text-purple-700 mt-1">{formatIDR(totalSalesQR)}</h3>
+                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Transfer & QRIS Bank</p>
                             </div>
-                            <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
+                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
                                 <Info size={22} />
                             </div>
                         </div>
 
-                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div className="bg-white p-2.5 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Pendapatan Kotor</p>
-                                <h3 className="text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(totalAllSales)}</h3>
-                                <p className="text-[11px] text-slate-400 mt-0.5">Tunai + Non-Tunai</p>
+                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Total Pendapatan Kotor</p>
+                                <h3 className="text-[13px] sm:text-base lg:text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(totalAllSales)}</h3>
+                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Tunai + Non-Tunai</p>
                             </div>
-                            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
                                 <CheckCircle2 size={22} />
                             </div>
                         </div>
 
-                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div className="bg-white p-2.5 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pengeluaran Sesi</p>
-                                <h3 className="text-lg font-extrabold text-rose-600 mt-1">{formatIDR(totalPengeluaran)}</h3>
-                                <p className="text-[11px] text-slate-400 mt-0.5">Operasional Kasir</p>
+                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Pengeluaran Sesi</p>
+                                <h3 className="text-[13px] sm:text-base lg:text-lg font-extrabold text-rose-600 mt-1">{formatIDR(totalPengeluaran)}</h3>
+                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Operasional Kasir</p>
                             </div>
-                            <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
                                 <Trash2 size={22} />
                             </div>
                         </div>
 
-                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div className="col-span-2 order-first lg:order-none lg:col-span-1 bg-gradient-to-br from-amber-50 to-white p-3 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border-2 border-amber-300 shadow-sm flex items-center justify-between gap-2">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Setoran Bersih (Netto)</p>
-                                <h3 className="text-lg font-extrabold text-amber-700 mt-1">{formatIDR(netto)}</h3>
-                                <p className="text-[11px] text-slate-400 mt-0.5">Tunai Dikurangi Pengeluaran</p>
+                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Setoran Bersih (Netto)</p>
+                                <h3 className="text-lg sm:text-xl lg:text-lg font-black text-amber-700 mt-0.5">{formatIDR(netto)}</h3>
+                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Tunai Dikurangi Pengeluaran</p>
                             </div>
-                            <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
                                 <Save size={22} />
                             </div>
                         </div>
@@ -2681,7 +2781,7 @@ export default function BeritaAcaraPage() {
                     )}
 
                     {/* Modern Expense Input Section */}
-                    <div className="bg-white p-5 rounded-2xl shadow-sm print:hidden border border-slate-200">
+                    <div className="bg-white p-3 sm:p-5 rounded-xl sm:rounded-2xl shadow-sm print:hidden border border-slate-200">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
                             <div>
                                 <div className="flex flex-wrap items-center gap-2">
@@ -2750,7 +2850,111 @@ export default function BeritaAcaraPage() {
                             </div>
                         )}
 
-                        <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        {/* Layar HP: tiap pengeluaran jadi satu kartu.
+                            Tabel 6 kolom di bawah punya lebar tetap ±640px,
+                            sehingga di layar sempit berubah jadi tabel yang
+                            harus digeser-geser dengan kolom input berdesakan. */}
+                        <div className="md:hidden space-y-2.5">
+                            {customExpenses.length === 0 && (
+                                <p className="text-center text-xs text-slate-400 py-6 border border-dashed border-slate-200 rounded-xl">
+                                    Belum ada rincian pengeluaran.
+                                </p>
+                            )}
+                            {customExpenses.map((exp, idx) => (
+                                <div key={exp.id} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                                    <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-100">
+                                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                                            Pengeluaran {idx + 1}
+                                        </span>
+                                        <button
+                                            onClick={() => removeCustomExpense(exp.id)}
+                                            className="p-1.5 -mr-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                            title="Hapus"
+                                        >
+                                            <Trash2 size={15} />
+                                        </button>
+                                    </div>
+
+                                    <div className="p-3 space-y-2.5">
+                                        <div>
+                                            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Kategori</label>
+                                            <select
+                                                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-amber-500 text-sm font-medium text-gray-700"
+                                                value={exp.category}
+                                                onChange={(e) => handleCategorySelect(exp.id, e.target.value)}
+                                            >
+                                                <optgroup label="Pilih Kategori">
+                                                    {categoryOptions.map(cat => (
+                                                        <option key={cat} value={cat}>{cat}</option>
+                                                    ))}
+                                                    {exp.category && !categoryOptions.includes(exp.category) && (
+                                                        <option value={exp.category}>{exp.category}</option>
+                                                    )}
+                                                </optgroup>
+                                                <optgroup label="Opsi Tambahan">
+                                                    <option value="__ADD_NEW__">➕ + Tambah Kategori Baru...</option>
+                                                </optgroup>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Keterangan</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Keterangan pengeluaran..."
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+                                                value={exp.keterangan}
+                                                onChange={(e) => updateCustomExpense(exp.id, 'keterangan', e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Qty</label>
+                                                <input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    placeholder="0"
+                                                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-amber-500 text-sm text-center"
+                                                    value={exp.qty}
+                                                    onChange={(e) => updateCustomExpense(exp.id, 'qty', e.target.value)}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Harga Satuan</label>
+                                                <input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    placeholder="0"
+                                                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-amber-500 text-sm text-right"
+                                                    value={exp.harga}
+                                                    onChange={(e) => updateCustomExpense(exp.id, 'harga', e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-1 border-t border-dashed border-slate-200">
+                                            <label className="text-[10px] font-bold uppercase tracking-wider text-amber-700 block mb-1">
+                                                Total {(Number(exp.qty) > 0 && Number(exp.harga) > 0) && <span className="font-normal normal-case text-slate-400">· terisi otomatis</span>}
+                                            </label>
+                                            <input
+                                                type="number"
+                                                inputMode="numeric"
+                                                placeholder="0"
+                                                className="w-full border border-amber-300 bg-amber-50/60 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-amber-500 text-base text-right font-extrabold text-gray-900"
+                                                value={exp.total}
+                                                onChange={(e) => updateCustomExpense(exp.id, 'total', e.target.value)}
+                                            />
+                                            {Number(exp.total) > 0 && (
+                                                <p className="text-[11px] text-slate-500 mt-1 text-right">{formatIDR(Number(exp.total))}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200">
                             <table className="w-full text-sm text-left text-gray-600">
                                 <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                                     <tr>
@@ -2835,17 +3039,17 @@ export default function BeritaAcaraPage() {
                             </table>
                         </div>
                         <div className="mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
                                 <button
                                     onClick={addCustomExpense}
-                                    className="flex items-center gap-2 text-sm font-medium text-white bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl transition-colors shadow-sm"
+                                    className="flex items-center justify-center gap-2 text-sm font-medium text-white bg-slate-800 hover:bg-slate-700 px-4 py-3 sm:py-2.5 rounded-xl transition-colors shadow-sm"
                                 >
                                     <Plus size={16} /> Tambah Pengeluaran
                                 </button>
                                 <button
                                     onClick={handleSaveExpensesToCloud}
                                     disabled={isSavingExpenses}
-                                    className="flex items-center gap-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-75 disabled:cursor-not-allowed px-4 py-2.5 rounded-xl transition-all shadow-sm"
+                                    className="flex items-center justify-center gap-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-75 disabled:cursor-not-allowed px-4 py-3 sm:py-2.5 rounded-xl transition-all shadow-sm"
                                 >
                                     {isSavingExpenses ? (
                                         <>
@@ -2866,7 +3070,89 @@ export default function BeritaAcaraPage() {
                     </div>
 
                     {/* Printable Document Preview Area (Editable Live Form) */}
-                    {renderPrintableDocument(false)}
+                    {/* Rincian ringkas khusus layar HP — agar karyawan tidak
+                        perlu membuka dokumen A4 hanya untuk melihat angkanya. */}
+                    <div className="lg:hidden print:hidden space-y-2.5">
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">Penjualan per Kategori</span>
+                                <span className="text-[11px] font-bold text-slate-500">{formatIDR(totalAllSales)}</span>
+                            </div>
+                            <div className="divide-y divide-slate-100">
+                                {currentSalesRows.filter(r => (Number(r.tunai) || 0) !== 0 || (Number(r.qr) || 0) !== 0).length === 0 && (
+                                    <p className="px-3 py-4 text-center text-[11px] text-slate-400">Belum ada penjualan pada sesi ini.</p>
+                                )}
+                                {currentSalesRows
+                                    .filter(r => (Number(r.tunai) || 0) !== 0 || (Number(r.qr) || 0) !== 0)
+                                    .map((r, i) => (
+                                        <div key={i} className="px-3 py-2 flex items-center justify-between gap-2">
+                                            <span className="text-[11px] font-semibold text-slate-700 truncate flex-1">{r.name}</span>
+                                            <div className="flex items-center gap-2 flex-shrink-0 text-right">
+                                                <span className="text-[11px] font-bold text-slate-800 tabular-nums">{formatIDR(Number(r.tunai) || 0)}</span>
+                                                <span className="text-[10px] font-semibold text-purple-600 tabular-nums w-20">{formatIDR(Number(r.qr) || 0)}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                            </div>
+                            <div className="px-3 py-1.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                                <span>Tunai</span><span className="w-20 text-right">Non-Tunai</span>
+                            </div>
+                        </div>
+
+                        {currentExpenseRows.some(r => (Number(r.amount) || 0) !== 0) && (
+                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                <div className="px-3 py-2 bg-rose-50 border-b border-rose-100 flex items-center justify-between">
+                                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-rose-700">Pengeluaran Sesi</span>
+                                    <span className="text-[11px] font-bold text-rose-700">{formatIDR(totalPengeluaran)}</span>
+                                </div>
+                                <div className="divide-y divide-slate-100">
+                                    {currentExpenseRows
+                                        .filter(r => (Number(r.amount) || 0) !== 0)
+                                        .map((r, i) => (
+                                            <div key={i} className="px-3 py-2 flex items-center justify-between gap-2">
+                                                <span className="text-[11px] font-semibold text-slate-700 truncate flex-1">{r.name}</span>
+                                                <span className="text-[11px] font-bold text-rose-600 tabular-nums flex-shrink-0">{formatIDR(Number(r.amount) || 0)}</span>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-3.5 shadow-md text-white">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-100">Wajib Disetor (Kas Fisik)</p>
+                            <p className="text-2xl font-black mt-0.5 tabular-nums">{formatIDR(netto)}</p>
+                            <p className="text-[10px] text-amber-100/90 mt-1 leading-snug">
+                                Penjualan tunai {formatIDR(totalSalesTunai)} dikurangi pengeluaran {formatIDR(totalPengeluaran)}.
+                                Penjualan non-tunai tidak ikut disetor.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Dokumen A4: tampil penuh di desktop, dilipat di HP */}
+                    <div className="print:hidden lg:hidden">
+                        <button
+                            onClick={() => setShowDocMobile(v => !v)}
+                            className="w-full flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm active:scale-[0.99] transition-transform"
+                        >
+                            <span className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                                <FileText size={16} className="text-amber-600" />
+                                Dokumen Berita Acara (A4)
+                            </span>
+                            <span className="text-[11px] font-semibold text-amber-700">
+                                {showDocMobile ? 'Tutup' : 'Buka'}
+                            </span>
+                        </button>
+                        {!showDocMobile && (
+                            <p className="text-[11px] text-slate-400 mt-1.5 px-1 leading-snug">
+                                Dokumen resmi berukuran A4 — lebih nyaman dibuka di layar lebar.
+                                Ringkasan di atas sudah memuat seluruh angkanya.
+                            </p>
+                        )}
+                    </div>
+
+                    <div className={showDocMobile ? '' : 'max-lg:absolute max-lg:-left-[9999px] max-lg:top-0 max-lg:w-[210mm] max-lg:pointer-events-none print:static print:left-auto print:top-auto print:w-auto print:pointer-events-auto'}>
+    {renderPrintableDocument(false)}
+                    </div>
                 </div>
             )}
 
@@ -3122,58 +3408,58 @@ export default function BeritaAcaraPage() {
                     )}
 
                     {/* 5 Dedicated Metric Cards for this specific Archive */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 print:hidden">
-                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 lg:gap-3.5 print:hidden">
+                        <div className="bg-white p-2.5 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Penjualan Tunai</p>
-                                <h3 className="text-lg font-extrabold text-slate-900 mt-1">{formatIDR(totalSalesTunai)}</h3>
-                                <p className="text-[11px] text-slate-400 mt-0.5">Penerimaan Tunai Kasir</p>
+                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Total Penjualan Tunai</p>
+                                <h3 className="text-[13px] sm:text-base lg:text-lg font-extrabold text-slate-900 mt-1">{formatIDR(totalSalesTunai)}</h3>
+                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Penerimaan Tunai Kasir</p>
                             </div>
-                            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
                                 <FileText size={22} />
                             </div>
                         </div>
 
-                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div className="bg-white p-2.5 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Non-Tunai / QR</p>
-                                <h3 className="text-lg font-extrabold text-purple-700 mt-1">{formatIDR(totalSalesQR)}</h3>
-                                <p className="text-[11px] text-slate-400 mt-0.5">Transfer & QRIS Bank</p>
+                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Total Non-Tunai / QR</p>
+                                <h3 className="text-[13px] sm:text-base lg:text-lg font-extrabold text-purple-700 mt-1">{formatIDR(totalSalesQR)}</h3>
+                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Transfer & QRIS Bank</p>
                             </div>
-                            <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
+                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
                                 <Info size={22} />
                             </div>
                         </div>
 
-                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div className="bg-white p-2.5 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Pendapatan Kotor</p>
-                                <h3 className="text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(totalAllSales)}</h3>
-                                <p className="text-[11px] text-slate-400 mt-0.5">Tunai + Non-Tunai</p>
+                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Total Pendapatan Kotor</p>
+                                <h3 className="text-[13px] sm:text-base lg:text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(totalAllSales)}</h3>
+                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Tunai + Non-Tunai</p>
                             </div>
-                            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
                                 <CheckCircle2 size={22} />
                             </div>
                         </div>
 
-                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div className="bg-white p-2.5 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pengeluaran Sesi</p>
-                                <h3 className="text-lg font-extrabold text-rose-600 mt-1">{formatIDR(totalPengeluaran)}</h3>
-                                <p className="text-[11px] text-slate-400 mt-0.5">Operasional Kasir</p>
+                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Pengeluaran Sesi</p>
+                                <h3 className="text-[13px] sm:text-base lg:text-lg font-extrabold text-rose-600 mt-1">{formatIDR(totalPengeluaran)}</h3>
+                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Operasional Kasir</p>
                             </div>
-                            <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
                                 <Trash2 size={22} />
                             </div>
                         </div>
 
-                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div className="col-span-2 order-first lg:order-none lg:col-span-1 bg-gradient-to-br from-amber-50 to-white p-3 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border-2 border-amber-300 shadow-sm flex items-center justify-between gap-2">
                             <div>
-                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Setoran Bersih (Netto)</p>
-                                <h3 className="text-lg font-extrabold text-amber-700 mt-1">{formatIDR(netto)}</h3>
-                                <p className="text-[11px] text-slate-400 mt-0.5">Tunai Dikurangi Pengeluaran</p>
+                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Setoran Bersih (Netto)</p>
+                                <h3 className="text-lg sm:text-xl lg:text-lg font-black text-amber-700 mt-0.5">{formatIDR(netto)}</h3>
+                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Tunai Dikurangi Pengeluaran</p>
                             </div>
-                            <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
                                 <Save size={22} />
                             </div>
                         </div>
@@ -3186,7 +3472,31 @@ export default function BeritaAcaraPage() {
                     </div>
 
                     {/* Printable Document Preview (Read-Only Mode) */}
-                    {renderPrintableDocument(true)}
+                    {/* Dokumen A4: tampil penuh di desktop, dilipat di HP */}
+                    <div className="print:hidden lg:hidden">
+                        <button
+                            onClick={() => setShowDocMobile(v => !v)}
+                            className="w-full flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm active:scale-[0.99] transition-transform"
+                        >
+                            <span className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                                <FileText size={16} className="text-amber-600" />
+                                Dokumen Berita Acara (A4)
+                            </span>
+                            <span className="text-[11px] font-semibold text-amber-700">
+                                {showDocMobile ? 'Tutup' : 'Buka'}
+                            </span>
+                        </button>
+                        {!showDocMobile && (
+                            <p className="text-[11px] text-slate-400 mt-1.5 px-1 leading-snug">
+                                Dokumen resmi berukuran A4 — lebih nyaman dibuka di layar lebar.
+                                Ringkasan di atas sudah memuat seluruh angkanya.
+                            </p>
+                        )}
+                    </div>
+
+                    <div className={showDocMobile ? '' : 'max-lg:absolute max-lg:-left-[9999px] max-lg:top-0 max-lg:w-[210mm] max-lg:pointer-events-none print:static print:left-auto print:top-auto print:w-auto print:pointer-events-auto'}>
+    {renderPrintableDocument(true)}
+                    </div>
                 </div>
             )}
 

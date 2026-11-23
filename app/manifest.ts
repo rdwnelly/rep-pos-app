@@ -14,7 +14,11 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: '#f8fafc',
     theme_color: '#0f172a',
     icons: [
-      // Ikon PNG 3 KB dan 9,8 KB, bukan foto logo.
+      // Logo Rumah Etnik Papua sebagai badge: warna lembaga mengisi
+      // penuh sampai tepi, logo dicetak putih di tengah dengan margin
+      // 18%. Warna harus mencapai tepi karena peluncur memotong ikon
+      // jadi lingkaran atau squircle, dan marginnya itulah safe area
+      // yang menjaga logo tidak ikut terpotong.
       { src: '/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: '/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
       { src: '/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },

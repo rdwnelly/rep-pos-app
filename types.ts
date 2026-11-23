@@ -264,6 +264,17 @@ export interface CashFlow {
   referenceId?: string; // New: Link to Transaction/Purchase ID
   divisionId?: string; // New: If related to a specific division (e.g., Kasbon)
   divisionName?: string; // New: Snapshot of division name
+
+  /**
+   * Modul asal catatan kas ini. Diisi 'BERITA_ACARA' untuk baris yang
+   * dialirkan dari "Rincian Pengeluaran Operasional" Berita Acara
+   * harian (lihat services/beritaAcaraExpenseSync.ts). Dipakai untuk
+   * menandai asal data di Laporan Bulanan dan untuk membatasi
+   * pembersihan otomatis hanya pada dokumen milik modul itu.
+   */
+  source?: string;
+  /** Tanggal Berita Acara (YYYY-MM-DD) asal baris ini. */
+  beritaAcaraDate?: string;
 }
 
 export interface DashboardStats {

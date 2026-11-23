@@ -4,7 +4,7 @@ import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Transaction, PaymentStatus, CashFlow, CashFlowType, Purchase, Supplier, PaymentMethod, CashFlow as CashFlowTypeInterface, StoreSettings, BankAccount, User, UserRole, TransactionType, PurchaseType, Category } from '../types';
 import { formatIDR, formatDate, formatDateDateOnly, formatTimeOnly, exportToCSV, generateId, exportToExcel, toCanonicalDate } from '../utils';
-import { generatePrintInvoice, generatePrintTransactionDetail, generatePrintPurchaseDetail, generatePrintPurchaseNote } from '../utils/printHelpers';
+import { generatePrintInvoice, generatePrintTransactionDetail, generatePrintPurchaseDetail, generatePrintPurchaseNote, buildReportLetterhead, REPORT_LETTERHEAD_STYLES, REPORT_PRINT_SCRIPT, REPORT_LOGO_SRC } from '../utils/printHelpers';
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
 import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet, Bluetooth, Receipt, UserCheck, Truck, DollarSign, PieChart, BookOpen, RefreshCw, Tag, Layers, CreditCard, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react';
@@ -2032,10 +2032,11 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
                     th, td { border: 1px solid #000; padding: 8px; font-size: 12px; }
                     th { background-color: #eee; }
+                ${REPORT_LETTERHEAD_STYLES}
                 </style>
             </head>
             <body>
-                <h2>${title}</h2>
+                ${buildReportLetterhead(title)}
                 <p style="text-align:center; font-size:12px;">Periode: ${startDate || 'Awal'} s/d ${endDate || 'Sekarang'}</p>
                 ${summaryHtml}
                 <table>

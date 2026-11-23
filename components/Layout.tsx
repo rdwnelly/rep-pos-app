@@ -110,14 +110,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
       { id: 'sold_items', label: 'Barang Terjual', icon: ShoppingBag },
     ];
 
-    // Sembunyikan halaman Kasir (POS) untuk Superadmin dan Gudang (Admin sekarang bisa akses)
-    if (userRole === UserRole.SUPERADMIN || userRole === UserRole.WAREHOUSE) {
-      items = items.filter(item => item.id !== 'pos');
-    }
+    // Kasir (POS) dan Data Pengunjung terbuka untuk SEMUA peran, termasuk
+    // Superadmin dan Gudang. Keduanya dipakai bergantian oleh siapa pun
+    // yang sedang berjaga di depan, jadi tidak lagi dibatasi per peran.
+    // Aturan Firestore tetap yang menentukan apa yang boleh disimpan
+    // (lihat firestore.rules: transactions & visitor_logs).
+    const ALL_ROLE_PAGES = ['pos', 'visitor_data'];
 
-    // Role GUDANG hanya bisa akses Produk dan Stock Check
+    // Selain dua halaman di atas, role GUDANG hanya bisa akses Produk
+    // dan Pengecekan Stok.
     if (userRole === UserRole.WAREHOUSE) {
-      items = items.filter(item => item.id === 'products' || item.id === 'real_stock_check');
+      items = items.filter(
+        item =>
+          ALL_ROLE_PAGES.includes(item.id) ||
+          item.id === 'products' ||
+          item.id === 'real_stock_check',
+      );
     }
 
     if (userRole === UserRole.OWNER || userRole === UserRole.SUPERADMIN || userRole === UserRole.ADMIN) {
@@ -163,7 +171,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
 
         <div className="p-6 border-b border-white/10 flex items-center justify-between h-[72px] relative z-10">
           <div className="flex items-center gap-3">
-            <img src="/logokasir.jpg" alt="Logo" className="w-10 h-10 rounded-xl shadow-md border-2 border-white/20" />
+            <img src="/icon-192x192.png" alt="Logo Rumah Etnik Papua" className="w-10 h-10 rounded-xl shadow-md border-2 border-white/20 object-contain" />
             {(isSidebarOpen || mobileMenuOpen) && (
               <h1 className="text-2xl font-bold text-white tracking-tighter whitespace-nowrap transition-opacity duration-150">
                 KASIR RELY

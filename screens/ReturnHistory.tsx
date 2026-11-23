@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { buildReportLetterhead, REPORT_LETTERHEAD_STYLES, REPORT_PRINT_SCRIPT } from '../utils/printHelpers';
 import { ApiService } from '../services/api';
 import { Transaction, Purchase, User, TransactionType, PurchaseType } from '../types';
 import { Loading } from '../components/Loading';
@@ -172,10 +173,11 @@ export const ReturnHistory: React.FC<ReturnHistoryProps> = ({ currentUser }) => 
                         table { width: 100%; border-collapse: collapse; }
                         th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; vertical-align: top; }
                         th { background-color: #f1f5f9; font-weight: bold; text-align: center; }
+                    ${REPORT_LETTERHEAD_STYLES}
                     </style>
                 </head>
                 <body>
-                    <h2>Laporan Riwayat Retur ${isSales ? 'Penjualan' : 'Pembelian'}</h2>
+                    ${buildReportLetterhead('Laporan Riwayat Retur ' + (isSales ? 'Penjualan' : 'Pembelian'))}
                     <p class="subtitle">Dicetak pada: ${new Date().toLocaleString('id-ID')} | Periode: ${startDate ? formatDate(startDate) : 'Semua'} - ${endDate ? formatDate(endDate) : 'Semua'}</p>
                     <table>
                         <thead>
@@ -194,7 +196,7 @@ export const ReturnHistory: React.FC<ReturnHistoryProps> = ({ currentUser }) => 
                             ${rows}
                         </tbody>
                     </table>
-                    <script>window.print();</script>
+                    ${REPORT_PRINT_SCRIPT}
                 </body>
             </html>
         `;
