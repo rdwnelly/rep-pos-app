@@ -15,6 +15,8 @@ import {
   where,
   onSnapshot,
   limit,
+  deleteField,
+  FieldValue,
   Unsubscribe,
   type QueryConstraint,
 } from "firebase/firestore";
@@ -27,7 +29,6 @@ import {
   CashFlowType,
   Category,
   Customer,
-  PaymentStatus,
   PaymentMethod,
   Product,
   Purchase,
@@ -117,7 +118,11 @@ const cleanUndefined = (obj: any): any => {
   if (Array.isArray(obj)) {
     return obj.map(cleanUndefined);
   } else if (typeof obj === 'object') {
-    if (obj.constructor && obj.constructor.name === 'FieldValue') return obj;
+    // instanceof, BUKAN obj.constructor.name: nama kelas hilang saat
+    // kode diminifikasi untuk produksi, sehingga sentinel seperti
+    // deleteField() akan diperlakukan sebagai objek biasa lalu rusak —
+    // bug yang hanya muncul di build produksi, tidak di dev lokal.
+    if (obj instanceof FieldValue) return obj;
     if (typeof obj.toMillis === 'function' || ('seconds' in obj && 'nanoseconds' in obj)) return obj;
     return Object.fromEntries(
       Object.entries(obj)
@@ -126,6 +131,31 @@ const cleanUndefined = (obj: any): any => {
     );
   }
   return obj;
+};
+
+/**
+ * Hapus password dari dokumen user — bukan sekadar tidak mengirimnya.
+ *
+ * saveEntity menulis dengan `merge: true`, jadi field yang sudah ada di
+ * dokumen TETAP bertahan meski tidak ikut dikirim. Aturan Firestore
+ * untuk koleksi users menolak penyimpanan bila hasil akhirnya masih
+ * memuat `password`:
+ *
+ *     allow write: if ... && !('password' in request.resource.data);
+ *
+ * Akun yang dibuat SEBELUM aturan itu ada masih menyimpan password di
+ * dokumennya. Saat diedit, password lama ikut bertahan lewat merge,
+ * aturan menolaknya, dan muncul "Gagal menyimpan user: Missing or
+ * insufficient permissions" — sementara membuat user BARU tetap
+ * berhasil karena dokumennya memang tidak punya field itu.
+ *
+ * deleteField() membuat hasil akhirnya benar-benar tanpa password,
+ * sekaligus membersihkan kredensial yang masih tertinggal di dokumen
+ * lama. Password sepenuhnya urusan Firebase Auth.
+ */
+const stripStoredPassword = (user: User): User => {
+  const { password: _ignored, ...rest } = user as User & { password?: unknown };
+  return { ...rest, password: deleteField() } as unknown as User;
 };
 
 const saveEntity = async <T extends { id?: string }>(
@@ -176,84 +206,34 @@ const saveEntityBulk = async <T extends { id?: string }>(
  */
 
 /**
- * Peran yang boleh membaca seluruh koleksi transaksi (sejalan dengan
- * isAdmin() di firestore.rules). Sisanya diperlakukan sebagai peran
- * yang hanya boleh melihat transaksinya sendiri.
+ * Satu pintu untuk seluruh query transaksi.
  *
- * Sengaja daftar-putih, bukan daftar-hitam. Versi sebelumnya memakai
- * daftar ['CASHIER','GUDANG'], sehingga peran yang namanya di luar
- * daftar itu — akun lama bernilai 'KASIR', atau peran yang gagal
- * terbaca dari localStorage — dianggap admin lalu query-nya ditolak
- * rules secara utuh. Dengan daftar-putih, nilai tak dikenal jatuh ke
- * sisi yang aman: melihat lebih sedikit, bukan ditolak.
+ * Sebelumnya di sini ada penyempitan otomatis: peran non-admin hanya
+ * dikirimi where('cashierId','==',uid), karena rules membatasi baca
+ * per-dokumen. Penyempitan itu DIHAPUS, dan rules-nya yang dilonggarkan
+ * (lihat firestore.rules pada match /transactions), dengan dua alasan:
+ *
+ * 1. Berita Acara Tutup Buku dan Laporan Setoran Sesi memang merekap
+ *    penjualan seluruh toko. Dengan penyempitan itu, rekapitulasi
+ *    keuangan, pemasukan tunai/non-tunai, piutang, pengeluaran, dan
+ *    laba bersih tampil kosong bagi peran selain admin.
+ *
+ * 2. Keputusan izin tidak boleh bergantung pada localStorage. Peran
+ *    dibaca dari `pos_current_user`, yang ditulis AuthContext pada
+ *    onAuthStateChanged — sementara useData memulai fetch-nya pada
+ *    event yang sama. Urutannya tidak dijamin, jadi query pertama bisa
+ *    berjalan saat localStorage masih kosong lalu ditolak server, dan
+ *    layarnya diam-diam tampil kosong.
+ *
+ * Yang tetap berlaku: field `date` wajib berformat kanonik
+ * "YYYY-MM-DD HH:mm:ss" (lihat toCanonicalDate di utils.ts), karena
+ * Firestore membandingkan string mentah — data berformat campur
+ * membuat hasil query salah tanpa memunculkan error sama sekali.
  */
-const FULL_READ_ROLES = ['SUPERADMIN', 'OWNER', 'ADMIN'];
-
-const currentUser = (): { uid?: string; role?: string } => {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem('pos_current_user');
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return { uid: parsed.id, role: parsed.role };
-  } catch {
-    return {};
-  }
-};
-
-/**
- * Query transaksi yang aman untuk semua peran, TANPA menuntut
- * composite index apa pun di server.
- *
- * Dua kendala Firestore bertemu di sini:
- *
- * 1. Rules bukan filter. Karena transaksi dibatasi per-dokumen
- *    (`cashierId == request.auth.uid`), query peran non-admin WAJIB
- *    menyertakan where('cashierId','==',uid) — kalau tidak, seluruh
- *    query ditolak dengan "Missing or insufficient permissions".
- *
- * 2. Menggabungkan where('cashierId') dengan orderBy('date') atau
- *    dengan filter lain menuntut composite index yang harus dibuat
- *    lebih dulu di server. Selama indeks itu belum ada, query gagal
- *    dengan "The query requires an index" — persis masalah yang
- *    sebelumnya dialami akun kasir.
- *
- * Jalan keluarnya: untuk peran ter-scope, server hanya dikirimi satu
- * kesetaraan (`cashierId`), yang dilayani single-field index bawaan.
- * Penyaringan dan pengurutan sisanya dikerjakan di klien atas data
- * milik petugas itu sendiri — jumlahnya kecil, dan hasilnya sama.
- * Peran admin tetap query penuh di server seperti sebelumnya.
- */
-const queryTransactions = async ({
-  filters = [],
-  matches,
-}: {
-  /** Batasan yang dikirim ke server untuk peran dengan akses penuh. */
-  filters?: QueryConstraint[];
-  /** Batasan setara di sisi klien untuk peran yang ter-scope. */
-  matches?: (transaction: Transaction) => boolean;
-} = {}): Promise<Transaction[]> => {
-  const { uid, role } = currentUser();
-  const hasFullRead = FULL_READ_ROLES.includes(String(role ?? ''));
-
-  if (hasFullRead || !uid) {
-    return runQuery<Transaction>("transactions", [
-      ...filters,
-      orderBy("date", "desc"),
-    ]);
-  }
-
-  const own = await runQuery<Transaction>("transactions", [
-    where("cashierId", "==", uid),
-  ]);
-  const filtered = matches ? own.filter(matches) : own;
-
-  // Diurutkan seperti server mengurutkannya: perbandingan string
-  // mentah atas field `date`, menurun.
-  return filtered.sort((a, b) =>
-    String(b.date ?? '').localeCompare(String(a.date ?? '')),
-  );
-};
+const queryTransactions = async (
+  filters: QueryConstraint[] = [],
+): Promise<Transaction[]> =>
+  runQuery<Transaction>("transactions", [...filters, orderBy("date", "desc")]);
 
 const runQuery = async <T>(name: string, constraints: QueryConstraint[]): Promise<T[]> => {
   const snapshot = await getDocs(query(collectionRef(name), ...constraints));
@@ -380,13 +360,7 @@ export const FirestoreService = {
     endDay: string,
   ): Promise<Transaction[]> => {
     const { start, end } = dayRangeBounds(startDay, endDay);
-    return queryTransactions({
-      filters: [where("date", ">=", start), where("date", "<=", end)],
-      matches: (t) => {
-        const d = String(t.date ?? '');
-        return d >= start && d <= end;
-      },
-    });
+    return queryTransactions([where("date", ">=", start), where("date", "<=", end)]);
   },
 
   /**
@@ -398,19 +372,11 @@ export const FirestoreService = {
    * Yang membatasi di sini adalah statusnya, bukan waktunya.
    */
   getOutstandingTransactions: async (): Promise<Transaction[]> =>
-    queryTransactions({
-      filters: [where("paymentStatus", "in", ["SEBAGIAN", "BELUM_LUNAS"])],
-      matches: (t) =>
-        t.paymentStatus === PaymentStatus.PARTIAL ||
-        t.paymentStatus === PaymentStatus.UNPAID,
-    }),
+    queryTransactions([where("paymentStatus", "in", ["SEBAGIAN", "BELUM_LUNAS"])]),
 
   /** Riwayat satu pelanggan, tanpa mengunduh transaksi pelanggan lain. */
   getTransactionsByCustomer: async (customerId: string): Promise<Transaction[]> =>
-    queryTransactions({
-      filters: [where("customerId", "==", customerId)],
-      matches: (t) => t.customerId === customerId,
-    }),
+    queryTransactions([where("customerId", "==", customerId)]),
 
   getCashFlowByDateRange: async (
     startDay: string,
@@ -444,15 +410,9 @@ export const FirestoreService = {
     ]),
 
   /**
-   * Seluruh transaksi (untuk peran ter-scope: seluruh transaksinya
-   * sendiri). WAJIB lewat queryTransactions.
-   *
-   * Versi sebelumnya memakai getCollectionOrdered tanpa batasan apa
-   * pun, sehingga setiap layar yang memanggilnya — Berita Acara,
-   * Laporan Bulanan, Riwayat & Utang, Riwayat Pelanggan, Barang
-   * Terjual, Riwayat Transfer/Retur — gagal dengan "Missing or
-   * insufficient permissions" begitu dibuka akun kasir atau gudang.
-   * Bukan kosong, tapi error.
+   * Seluruh transaksi, diurutkan terbaru lebih dulu. Dipakai layar yang
+   * memang merekap keseluruhan: Berita Acara, Laporan Bulanan, Riwayat
+   * & Utang, Riwayat Pelanggan, Barang Terjual, Riwayat Transfer/Retur.
    */
   getTransactions: async (): Promise<Transaction[]> => queryTransactions(),
   addTransaction: async (transaction: Transaction) => {
@@ -677,8 +637,8 @@ export const FirestoreService = {
   },
 
   getUsers: async (): Promise<User[]> => getCollection<User>("users"),
-  saveUser: async (user: User) => saveEntity<User>("users", user),
-  updateUser: async (user: User) => saveEntity<User>("users", user),
+  saveUser: async (user: User) => saveEntity<User>("users", stripStoredPassword(user)),
+  updateUser: async (user: User) => saveEntity<User>("users", stripStoredPassword(user)),
   deleteUser: async (id: string) => deleteDoc(doc(collectionRef("users"), id)),
 
   // Divisions

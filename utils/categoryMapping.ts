@@ -1,5 +1,5 @@
+import type { Category } from '../types';
 import {
-  Category,
   CategoryReportGroup,
   REPORT_GROUP_LABEL,
   VisitorServiceType,

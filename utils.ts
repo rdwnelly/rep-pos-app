@@ -184,9 +184,29 @@ export const toCanonicalDay = (date: Date = new Date()): string =>
  * "2026-10-31 08:00:00" <= "2026-10-31" bernilai false, sehingga batas
  * tanggal-saja membuang seluruh transaksi di hari terakhir rentang.
  */
+/**
+ * Batas rentang tanggal untuk query Firestore, yang membandingkan
+ * `date` sebagai STRING MENTAH.
+ *
+ * Batasnya sengaja dibuat lebih longgar daripada format kanonik
+ * "YYYY-MM-DD HH:mm:ss", supaya baris lama yang tersimpan dalam format
+ * ISO ("2026-08-31T14:00:00.000Z") ikut terjaring:
+ *
+ * - Awal memakai tanggalnya saja. "2026-08-01" lebih kecil daripada
+ *   "2026-08-01 08:00:00" maupun "2026-08-01T08:00:00Z", jadi keduanya
+ *   masuk. Memakai "...-01 00:00:00" seperti sebelumnya justru
+ *   MEMBUANG baris yang hanya berisi tanggal tanpa jam.
+ * - Akhir memakai "T23:59:59.999Z". Spasi (0x20) lebih kecil daripada
+ *   "T" (0x54), sehingga "2026-08-31 23:59:59" tetap masuk, sekaligus
+ *   menampung baris ISO di hari terakhir — yang pada batas lama
+ *   "...-31 23:59:59" selalu terlewat, karena "T" > " ".
+ *
+ * Akibat batas lama itu, transaksi pada HARI TERAKHIR rentang bisa
+ * hilang dari laporan tanpa error apa pun.
+ */
 export const dayRangeBounds = (startDay: string, endDay: string) => ({
-  start: `${startDay.slice(0, 10)} 00:00:00`,
-  end: `${endDay.slice(0, 10)} 23:59:59`,
+  start: startDay.slice(0, 10),
+  end: `${endDay.slice(0, 10)}T23:59:59.999Z`,
 });
 
 /** @deprecated Pakai toCanonicalDate(). Dipertahankan agar pemanggil lama tetap jalan. */

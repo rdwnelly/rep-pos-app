@@ -12,7 +12,7 @@ import { playBeep } from '../utils/soundEffect';
 import { PaymentQRCode } from '../components/ui/PaymentQRCode';
 import { VisitorLogModal, VisitorPrefill } from '../components/VisitorLogModal';
 import { VisitorServiceType } from '../types';
-import { resolveVisitorService } from '../utils/categoryMapping';
+import { analyzeVisitorServices } from '../utils/visitorEstimate';
 
 const FlyingItem = ({ item, cartRect }: { item: any, cartRect?: DOMRect }) => {
   const [animate, setAnimate] = useState(false);
@@ -54,42 +54,6 @@ const FlyingItem = ({ item, cartRect }: { item: any, cartRect?: DOMRect }) => {
  * dijual sebagai produk biasa, jadi penandanya hanya nama kategori.
  * Pola pencocokan disamakan dengan pemetaan kategori pada Berita Acara.
  */
-/**
- * Jumlah pengunjung hanya boleh ditebak dari layanan yang kuantitasnya
- * memang berarti orang. Satu paket tour bisa untuk 30 peserta, dan satu
- * baris homestay berarti malam atau kamar — bukan jumlah tamu. Untuk
- * keduanya kasir yang mengisi jumlah sebenarnya.
- */
-const PAX_FROM_QTY: VisitorServiceType[] = [
-  VisitorServiceType.TIKET_MASUK,
-  VisitorServiceType.SEWA_KOSTUM,
-];
-
-const analyzeVisitorServices = (items: CartItem[], categories: Category[]) => {
-  const services = new Set<VisitorServiceType>();
-  const terjual: string[] = [];
-  let suggestedPax = 0;
-  let revenue = 0;
-
-  items.forEach(item => {
-    const jenis = resolveVisitorService(item.categoryName || '', categories);
-    if (!jenis) return;
-
-    const qty = Number(item.qty) || 0;
-    services.add(jenis);
-    revenue += (Number(item.finalPrice) || 0) * qty;
-    terjual.push(`${item.name} ×${qty}`);
-    if (PAX_FROM_QTY.includes(jenis)) suggestedPax += qty;
-  });
-
-  return {
-    serviceTypes: [...services],
-    suggestedPax,
-    revenue,
-    soldSummary: terjual.join(', '),
-  };
-};
-
 export const POS: React.FC = () => {
   const bluetooth = useBluetoothPrinter();
   const products = useData(() => StorageService.getProducts(), [], 'products') || [];

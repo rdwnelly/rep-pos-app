@@ -171,7 +171,15 @@ export default function ProtectedLayout({
     const props: Record<string, any> = {};
 
     if (pageEntry.requiresCurrentUser) {
-      props.currentUser = user;
+      // Firebase menyebut id penggunanya `uid`, sementara tipe User di
+      // aplikasi ini memakai `id` — dan layar-layar yang menerima prop
+      // ini membacanya sebagai `.id`. Tanpa penyetaraan di sini,
+      // `currentUser.id` bernilai undefined, dan akibatnya tidak
+      // seragam: Data Pengunjung menolak menyimpan ("Data pengguna
+      // tidak terbaca"), Riwayat & Utang menulis transaksi atas nama
+      // "SYSTEM" yang ditolak aturan Firestore untuk non-admin, dan
+      // Pengecekan Stok kehilangan jejak siapa yang mengoreksi.
+      props.currentUser = { ...user, id: user.uid };
     }
     if (pageEntry.defaultTab) {
       props.defaultTab = pageEntry.defaultTab;

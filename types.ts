@@ -522,6 +522,13 @@ export interface VisitorLog {
   notes?: string;
   recordedById: string;
   recordedByName: string;
+
+  /**
+   * Asal baris ini. Kosong berarti dicatat langsung oleh petugas.
+   * 'ESTIMASI_TIKET' berarti diturunkan dari penjualan tiket untuk
+   * periode yang belum sempat dicatat — lihat utils/visitorEstimate.ts.
+   */
+  source?: string;
   createdAt?: string;
   updatedAt?: string;
 }

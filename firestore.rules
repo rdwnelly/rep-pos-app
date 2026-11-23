@@ -178,8 +178,22 @@ service cloud.firestore {
         return incoming().cashierId == request.auth.uid;
       }
 
-      allow read: if isAuthenticated()
-                  && (isAdmin() || resource.data.cashierId == request.auth.uid);
+      // Baca dibuka untuk semua yang login.
+      //
+      // Membatasinya ke transaksi milik sendiri terdengar aman, tapi
+      // tidak cocok dengan cara aplikasi ini dipakai: BERITA ACARA
+      // REKAPITULASI KEUANGAN & TUTUP BUKU — juga Laporan Setoran Sesi
+      // harian — memang merekap penjualan SELURUH toko, dan dibuka oleh
+      // petugas yang berjaga, bukan hanya Admin. Dengan batasan itu,
+      // rekapitulasi, pemasukan tunai/non-tunai, piutang, dan laba
+      // bersih tampil kosong bagi peran selain admin.
+      //
+      // Batasan itu juga tidak pernah benar-benar menahan apa pun:
+      // layarnya tetap menampilkan rekap seluruh toko kepada mereka.
+      // Yang tetap dijaga ketat adalah TULISNYA — kasir tidak bisa
+      // membuat atau mengubah transaksi atas nama orang lain (lihat
+      // isAttributedToSelf dan aturan update di bawah).
+      allow read: if isAuthenticated();
 
       allow create: if isAuthenticated()
                     && hasRequiredKeys()
