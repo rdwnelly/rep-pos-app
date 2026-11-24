@@ -55,7 +55,7 @@ export const analyzeVisitorServices = (
   let revenue = 0;
 
   items.forEach(item => {
-    const jenis = resolveVisitorService(item.categoryName || '', categories);
+    const jenis = resolveVisitorService(item.categoryName || '', categories, item.name || '');
     if (!jenis) return;
 
     const qty = Number(item.qty) || 0;
@@ -161,7 +161,7 @@ export const estimateVisitorsFromTransactions = ({
     const sold: string[] = [];
 
     tx.items.forEach((item: any) => {
-      const jenis = resolveVisitorService(item?.categoryName || '', categories);
+      const jenis = resolveVisitorService(item?.categoryName || '', categories, item?.name || '');
       // Baris estimasi mewakili orang yang masuk lewat tiket, jadi
       // layanan lain tidak ikut — baik jumlah, pendapatan, maupun
       // jenis layanannya.

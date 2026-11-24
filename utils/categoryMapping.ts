@@ -87,11 +87,37 @@ export const legacyVisitorServiceFromName = (catName: string): VisitorServiceTyp
 export const resolveVisitorService = (
   catName: string,
   categories?: Category[],
+  itemName?: string,
 ): VisitorServiceType | null => {
   const found = findCategory(catName, categories);
-  if (found && found.visitorService) return found.visitorService;
-  // Kategori yang sudah disetel tetapi sengaja dikosongkan jenis
-  // layanannya tidak boleh jatuh ke tebakan nama.
-  if (found && 'visitorService' in found) return null;
-  return legacyVisitorServiceFromName(catName);
+
+  let dariKategori: VisitorServiceType | null;
+  if (found && found.visitorService) {
+    dariKategori = found.visitorService;
+  } else if (found && 'visitorService' in found) {
+    // Kategori yang sudah disetel tetapi sengaja dikosongkan jenis
+    // layanannya tidak boleh jatuh ke tebakan nama.
+    dariKategori = null;
+  } else {
+    dariKategori = legacyVisitorServiceFromName(catName);
+  }
+
+  // Kategori yang bukan layanan kunjungan berhenti di sini. Nama produk
+  // TIDAK boleh memunculkan layanan dari ketiadaan: menu "Paket Nasi
+  // Goreng" di kategori Kafe & Resto bukan paket wisata.
+  if (!dariKategori) return null;
+
+  // Bila kategorinya memang layanan kunjungan, nama produk dipakai untuk
+  // MEMPERTAJAM jenisnya. Satu baris bernama "Sewa Kostum" adalah sewa
+  // kostum, di kategori mana pun ia diletakkan.
+  //
+  // Tanpa ini, produk kostum yang dititipkan ke kategori "Taman Etnik"
+  // terbaca sebagai tiket masuk — sehingga 3 tiket + 3 kostum dihitung
+  // 6 pengunjung, padahal orangnya tiga.
+  if (itemName) {
+    const dariNama = legacyVisitorServiceFromName(itemName);
+    if (dariNama) return dariNama;
+  }
+
+  return dariKategori;
 };
