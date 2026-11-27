@@ -21,6 +21,7 @@ const JWKS = createRemoteJWKSet(
 // panggilan server-ke-server, atau tiket SSO sekali pakai), sehingga tidak memakai ID token.
 const PUBLIC_PATHS: string[] = [
   '/api/portal/summary',
+  '/api/portal/rekap-keuangan', // rekap per unit usaha untuk SIK-REP (dilindungi PORTAL_INTEGRATION_SECRET)
   '/api/portal/sso/ticket',
   '/api/portal/sso/redeem',
 ];
