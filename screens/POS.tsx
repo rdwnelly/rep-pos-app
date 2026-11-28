@@ -849,7 +849,26 @@ export const POS: React.FC = () => {
 
     } catch (error) {
       console.error(error);
-      alert('Gagal memproses transaksi. Silakan coba lagi.');
+      // "Silakan coba lagi" saja menyesatkan kalau yang menolak adalah
+      // aturan Firestore: mengulang akan gagal lagi dengan cara yang
+      // sama. Penyebab paling sering adalah stok yang sudah habis
+      // diambil perangkat lain — penjaga stok di server menolak
+      // transaksi yang membuat stok berakhir minus.
+      const err = error as { code?: string; message?: string };
+      const ditolakAturan =
+        err?.code === 'permission-denied' ||
+        /permission|insufficient/i.test(String(err?.message ?? ''));
+      alert(
+        ditolakAturan
+          ? 'Transaksi DITOLAK server.\n\n'
+            + 'Penyebab paling sering: stok barang sudah habis diambil '
+            + 'perangkat/kasir lain, sehingga penjualan ini akan membuat '
+            + 'stoknya minus.\n\n'
+            + 'Muat ulang halaman untuk melihat stok terbaru, lalu '
+            + 'sesuaikan jumlahnya. Mengulang tanpa mengubah jumlah akan '
+            + 'ditolak lagi.'
+          : 'Gagal memproses transaksi. Silakan coba lagi.',
+      );
     }
   };
 

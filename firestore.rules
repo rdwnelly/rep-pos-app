@@ -61,13 +61,41 @@ service cloud.firestore {
     // Hanya Admin/Gudang yang bisa create/delete produk.
     match /products/{productId} {
       allow read: if isAuthenticated();
-      allow create, delete: if isAuthenticated() && (isAdmin() || isWarehouse());
+      allow create: if isAuthenticated() && (isAdmin() || isWarehouse())
+                    && request.resource.data.get('stock', 0) >= 0;
+      allow delete: if isAuthenticated() && (isAdmin() || isWarehouse());
+
+      /**
+       * Stok tidak boleh berakhir negatif.
+       *
+       * Seluruh perubahan stok di aplikasi memakai increment() di dalam
+       * batch, tanpa membaca stok lebih dulu. Pengecekan di POS hanya
+       * melindungi satu perangkat: dua kasir yang menjual barang terakhir
+       * pada saat bersamaan sama-sama lolos, dan stok berakhir minus
+       * tanpa ada yang menolak. Hanya server yang bisa menengahi balapan
+       * itu, jadi penjaganya harus di sini.
+       *
+       * Aturan Firestore memang melihat HASIL dari increment(), bukan
+       * nilai lamanya — diverifikasi di emulator, lihat
+       * tests/rules-stok.mjs.
+       *
+       * Syarat keduanya penting: dokumen yang stoknya terlanjur minus
+       * akibat bug lama akan tertolak pada setiap update kalau hanya
+       * dicek ">= 0", sehingga tidak bisa diperbaiki lagi. Menaikkan
+       * stok selalu diizinkan, termasuk dari -5 ke -2.
+       */
+      function stokTidakBerakhirMinus() {
+        return request.resource.data.get('stock', 0) >= 0
+               || request.resource.data.get('stock', 0) >= resource.data.get('stock', 0);
+      }
 
       // Admin/Gudang boleh mengubah data master apa pun.
       // Peran lain (kasir) HANYA boleh menyentuh field 'stock', karena
       // itulah satu-satunya yang perlu berubah saat transaksi berjalan.
       // Tanpa batasan ini kasir bisa mengubah price dan hpp lewat SDK.
-      allow update: if isAuthenticated() && (
+      allow update: if isAuthenticated()
+                    && stokTidakBerakhirMinus()
+                    && (
                       isAdmin()
                       || isWarehouse()
                       || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock'])

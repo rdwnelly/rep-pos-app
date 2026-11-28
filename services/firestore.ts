@@ -522,11 +522,20 @@ export const FirestoreService = {
       console.warn("Could not query linked cash flows by referenceId:", e);
     }
 
-    // 4. Find and delete linked travel agent commissions if any
+    // 4. Hapus komisi agen travel yang menempel pada transaksi ini.
+    //
+    // Koleksinya "travel_commissions" — sama dengan yang ditulis
+    // addTravelCommission dan checkout beragen di POS. Sebelumnya baris
+    // ini menanyakan "travel_booking_commissions", koleksi yang tidak
+    // pernah ada dan tidak punya aturan di firestore.rules, jadi
+    // kuerinya ditolak lalu ditelan catch di bawah. Akibatnya setiap
+    // transaksi beragen yang dihapus meninggalkan komisi yatim yang
+    // tetap ikut terhitung di Laporan Komisi Agen, tanpa satu pun
+    // tanda di layar.
     try {
       const invoiceNum = txData.invoiceNumber;
       if (invoiceNum) {
-        const commQuery = query(collectionRef("travel_booking_commissions"), where("bookingCode", "==", invoiceNum));
+        const commQuery = query(collectionRef("travel_commissions"), where("bookingCode", "==", invoiceNum));
         const commSnap = await getDocs(commQuery);
         commSnap.docs.forEach((commDoc) => {
           batch.delete(commDoc.ref);
