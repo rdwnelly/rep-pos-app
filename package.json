@@ -10,9 +10,10 @@
     "lint": "eslint .",
     "test:rules": "firebase emulators:exec --only firestore \"node tests/rules-stok.mjs && node tests/rules-bersama.mjs\"",
     "test:load": "tsx tests/load-status.ts",
-    "test": "npm run test:load && npm run test:tanggal && npm run test:guard && npm run test:rules",
+    "test": "npm run test:load && npm run test:tanggal && npm run test:komisi && npm run test:guard && npm run test:rules",
     "test:guard": "tsx tests/no-localstorage-role.ts",
-    "test:tanggal": "tsx tests/date-window.ts"
+    "test:tanggal": "tsx tests/date-window.ts",
+    "test:komisi": "node tests/klasifikasi-komisi.mjs"
   },
   "dependencies": {
     "@icons-pack/react-simple-icons": "^13.13.0",
