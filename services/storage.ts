@@ -22,6 +22,62 @@ export const subscribeToChanges = (listener: ChangeListener) => {
   };
 };
 
+const KUNCI_OPEN_BILLS_LAMA = 'pos_open_bills';
+const KUNCI_MIGRASI_OPEN_BILLS = 'pos_open_bills_migrated_v1';
+const KUNCI_AKUN_BIAYA_LAMA = 'custom_expense_categories';
+
+const bacaDaftarLokal = (kunci: string): unknown[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(kunci);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const bacaAkunBiayaLokal = (): string[] =>
+  bacaDaftarLokal(KUNCI_AKUN_BIAYA_LAMA).filter((o): o is string => typeof o === 'string');
+
+/**
+ * Memindahkan open bill yang masih tertinggal di localStorage ke Firestore.
+ *
+ * Dijalankan sekali per perangkat. Salinan localStorage-nya SENGAJA tidak
+ * dihapus: kalau pemindahannya bermasalah, pesanan meja yang belum dibayar
+ * adalah hal terakhir yang boleh hilang, dan datanya masih bisa dibaca
+ * manual dari perangkat itu.
+ *
+ * Penanda migrasi baru ditulis setelah pengunggahannya berhasil, jadi
+ * kegagalan akan dicoba lagi pada pembacaan berikutnya.
+ */
+let migrasiBerjalan: Promise<void> | null = null;
+
+const migrasiOpenBills = (): Promise<void> => {
+  if (typeof window === 'undefined') return Promise.resolve();
+  if (localStorage.getItem(KUNCI_MIGRASI_OPEN_BILLS)) return Promise.resolve();
+  // Beberapa pemanggilan bersamaan harus berbagi satu proses yang sama,
+  // supaya bill yang sama tidak terunggah dua kali.
+  if (migrasiBerjalan) return migrasiBerjalan;
+
+  migrasiBerjalan = (async () => {
+    try {
+      const bills = bacaDaftarLokal(KUNCI_OPEN_BILLS_LAMA) as OpenBill[];
+      if (bills.length > 0) {
+        await ApiService.saveOpenBillsBulk(bills);
+      }
+      localStorage.setItem(KUNCI_MIGRASI_OPEN_BILLS, new Date().toISOString());
+    } catch (error) {
+      console.error('Gagal memindahkan open bill ke Firestore, akan dicoba lagi:', error);
+    } finally {
+      migrasiBerjalan = null;
+    }
+  })();
+
+  return migrasiBerjalan;
+};
+
 export const StorageService = {
   notifyChange: (entity?: string) => {
     notifyListeners(entity);
@@ -594,35 +650,53 @@ export const StorageService = {
     notifyListeners('travel_commissions');
   },
 
-  // Open Bills (Tagihan Terbuka)
+  // Open Bills (Tagihan Terbuka) — kini di Firestore, lihat migrasi di bawah.
   getOpenBills: async (): Promise<OpenBill[]> => {
-    try {
-      const raw = typeof window !== 'undefined' ? localStorage.getItem('pos_open_bills') : null;
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
+    await migrasiOpenBills();
+    return ApiService.getOpenBills();
   },
   saveOpenBill: async (bill: OpenBill) => {
-    const bills = await StorageService.getOpenBills();
-    const index = bills.findIndex(b => b.id === bill.id);
-    if (index >= 0) {
-      bills[index] = bill;
-    } else {
-      bills.push(bill);
-    }
+    await ApiService.saveOpenBill(bill);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('pos_open_bills', JSON.stringify(bills));
       window.dispatchEvent(new CustomEvent('open_bills_updated'));
     }
     notifyListeners('open_bills');
   },
   deleteOpenBill: async (id: string) => {
-    const bills = (await StorageService.getOpenBills()).filter(b => b.id !== id);
+    await ApiService.deleteOpenBill(id);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('pos_open_bills', JSON.stringify(bills));
       window.dispatchEvent(new CustomEvent('open_bills_updated'));
     }
     notifyListeners('open_bills');
+  },
+
+  /** Daftar akun biaya Berita Acara, dipakai bersama semua perangkat. */
+  getExpenseAccounts: async (): Promise<string[]> => {
+    const tersimpan = await ApiService.getExpenseAccounts();
+    if (tersimpan.length > 0) return tersimpan;
+
+    // Belum pernah disimpan ke Firestore. Kalau perangkat ini masih
+    // memegang daftar lamanya di localStorage, daftar itulah yang
+    // dipakai sebagai isi awal — supaya akun biaya yang sudah disusun
+    // karyawan tidak hilang saat pindah ke penyimpanan bersama.
+    const warisan = bacaAkunBiayaLokal();
+    if (warisan.length > 0) {
+      // Kegagalan menyimpan tidak boleh menggagalkan pembacaan: daftarnya
+      // sudah ada di tangan, dan melempar di sini hanya akan memunculkan
+      // banner merah untuk masalah yang tidak dirasakan pengguna.
+      // Penyimpanannya akan dicoba lagi pada pemuatan berikutnya.
+      try {
+        await ApiService.saveExpenseAccounts(warisan);
+      } catch (error) {
+        console.error('Gagal memindahkan akun biaya ke Firestore, akan dicoba lagi:', error);
+      }
+      return warisan;
+    }
+    return [];
+  },
+
+  saveExpenseAccounts: async (options: string[]) => {
+    await ApiService.saveExpenseAccounts(options);
+    notifyListeners('expense_accounts');
   },
 };

@@ -345,6 +345,24 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && isAdmin();
     }
 
+    // ─── Akun Biaya Berita Acara ─────────────────────────────────
+    // Satu dokumen "default" berisi array terurut. Urutannya bermakna:
+    // nomor di depan tiap akun ikut tercetak di dokumen setoran.
+    //
+    // Sebelumnya daftar ini hanya ada di localStorage tiap perangkat,
+    // jadi akun biaya di HP satu karyawan berbeda dengan di HP yang
+    // lain — dan rekap yang dikirim ke SIK-REP tidak bisa dibandingkan.
+    match /expense_accounts/{docId} {
+      allow read: if isAuthenticated();
+
+      // Gudang tidak mengerjakan setoran, jadi tidak perlu mengubah
+      // daftar akun biaya. Peran lain boleh, karena menambah akun baru
+      // adalah hal yang wajar dilakukan kasir di tengah sesi.
+      allow write: if isAuthenticated()
+                   && !isWarehouse()
+                   && request.resource.data.options is list;
+    }
+
     // ─── Open Bills ──────────────────────────────────────────────
     match /open_bills/{billId} {
       allow read: if isAuthenticated();

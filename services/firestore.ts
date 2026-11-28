@@ -29,6 +29,7 @@ import {
   CashFlowType,
   Category,
   Customer,
+  OpenBill,
   PaymentMethod,
   Product,
   Purchase,
@@ -301,6 +302,79 @@ export const FirestoreService = {
   saveStoreSettings: async (settings: StoreSettings) => {
     const ref = doc(collectionRef("store_settings"), "settings");
     await setDoc(ref, { ...settings, id: "settings" }, { merge: true });
+  },
+
+  /**
+   * Open bill (pesanan meja yang belum dibayar).
+   *
+   * Dulu hanya ada di localStorage perangkat yang membukanya, sehingga
+   * pesanan meja hilang begitu kasir berpindah HP atau cache dibersihkan
+   * — dan tidak ada kasir lain yang bisa melanjutkan pesanan itu.
+   * Aturannya (match /open_bills) sudah lama ada di firestore.rules,
+   * hanya belum pernah dipakai.
+   *
+   * Firestore menyimpan tulisannya ke IndexedDB lebih dulu, jadi
+   * membuka bill tetap jalan saat internet mati.
+   */
+  getOpenBills: async (): Promise<OpenBill[]> =>
+    getCollectionOrdered<OpenBill>("open_bills", "createdAt", "desc"),
+
+  /**
+   * Tulisan open bill dibungkus queueWrite, bukan `await setDoc` biasa.
+   *
+   * Saat perangkat offline, promise setDoc TIDAK resolve sampai server
+   * mengakui — jadi `await` di tombol "Simpan Open Bill" akan
+   * menggantung selamanya. Dulu open bill ada di localStorage dan
+   * tersimpan seketika; tanpa pembungkus ini, memindahkannya ke
+   * Firestore justru membuat kasir tidak bisa menyimpan pesanan meja
+   * saat internet mati — persis saat fitur itu paling dibutuhkan.
+   */
+  saveOpenBill: async (bill: OpenBill) =>
+    queueWrite(
+      saveEntity<OpenBill>("open_bills", bill),
+      `Open bill ${bill.billNumber || bill.id}`,
+    ),
+
+  saveOpenBillsBulk: async (bills: OpenBill[]) =>
+    queueWrite(
+      saveEntityBulk<OpenBill>("open_bills", bills),
+      `Pemindahan ${bills.length} open bill`,
+    ),
+
+  deleteOpenBill: async (id: string) =>
+    queueWrite(deleteDoc(doc(collectionRef("open_bills"), id)), `Tutup open bill ${id}`),
+
+  /**
+   * Daftar akun biaya Berita Acara.
+   *
+   * Disimpan sebagai SATU dokumen berisi array, bukan satu dokumen per
+   * akun, karena urutannya bermakna: nomor di depan tiap akun ("1) ",
+   * "2) ") ikut tercetak di dokumen setoran. Koleksi biasa tidak
+   * menjamin urutan tanpa menambah field sortOrder yang harus dijaga
+   * sendiri.
+   *
+   * Sebelumnya daftar ini ada di localStorage, jadi tiap HP karyawan
+   * punya akun biaya yang berbeda-beda — dan rekap yang dikirim ke
+   * SIK-REP jadi tidak bisa dibandingkan antarperangkat.
+   */
+  getExpenseAccounts: async (): Promise<string[]> => {
+    const doc = await getDocument<{ options?: unknown }>("expense_accounts", "default");
+    const options = doc?.options;
+    return Array.isArray(options) ? options.filter((o): o is string => typeof o === "string") : [];
+  },
+
+  saveExpenseAccounts: async (options: string[]) => {
+    const ref = doc(collectionRef("expense_accounts"), "default");
+    // Sama seperti open bill: menambah akun biaya saat internet mati
+    // tidak boleh menggantungkan layar Berita Acara.
+    await queueWrite(
+      setDoc(
+        ref,
+        { id: "default", options, updatedAt: new Date().toISOString() },
+        { merge: true },
+      ),
+      "Daftar akun biaya",
+    );
   },
 
   getBanks: async (): Promise<BankAccount[]> =>

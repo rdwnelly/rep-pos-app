@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "eslint .",
-    "test:rules": "firebase emulators:exec --only firestore \"node tests/rules-stok.mjs\"",
+    "test:rules": "firebase emulators:exec --only firestore \"node tests/rules-stok.mjs && node tests/rules-bersama.mjs\"",
     "test:load": "tsx tests/load-status.ts",
     "test": "npm run test:load && npm run test:rules"
   },

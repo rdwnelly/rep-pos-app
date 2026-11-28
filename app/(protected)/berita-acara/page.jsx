@@ -376,24 +376,49 @@ export default function BeritaAcaraPage() {
         { name: "", amount: "" }
     ]);
 
-    // Custom Categories State & Management
-    const [categoryOptions, setCategoryOptions] = useState(() => {
-        const defaultList = buildDefaultCategoryOptions(BASE_SALES_CATEGORIES);
-        if (typeof window !== 'undefined') {
-            try {
-                const saved = localStorage.getItem('custom_expense_categories');
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        return parsed;
-                    }
-                }
-            } catch (e) {
-                console.error('Error loading custom expense categories:', e);
-            }
-        }
-        return defaultList;
-    });
+    /**
+     * Daftar akun biaya — kini dipakai BERSAMA semua perangkat.
+     *
+     * Dulu daftarnya dibaca dari localStorage di sini, jadi tiap HP
+     * karyawan punya akun biaya yang berbeda-beda dan rekap yang dikirim
+     * ke SIK-REP tidak bisa dibandingkan antarperangkat. Sekarang
+     * sumbernya satu dokumen di Firestore; daftar bawaan hanya dipakai
+     * sampai daftar bersama itu tiba.
+     *
+     * Daftar lama yang masih tertinggal di localStorage tidak hilang:
+     * StorageService.getExpenseAccounts memakainya sebagai isi awal bila
+     * Firestore belum pernah menyimpan apa pun.
+     */
+    const akunBiayaBersama = useData(
+        () => StorageService.getExpenseAccounts(),
+        [],
+        'expense_accounts',
+    );
+
+    /**
+     * Daftarnya DITURUNKAN dari dokumen bersama, bukan disalin ke state
+     * lokal lewat useEffect. Menyalinnya akan menambah satu lagi
+     * set-state-in-effect — pola yang sudah menghasilkan 23 error lint
+     * di proyek ini dan jadi sumber klasik data basi di layar.
+     *
+     * Semua perubahan ditulis ke Firestore, lalu notifyListeners
+     * memicu useData memuat ulang. Saat offline pun tetap mulus:
+     * tulisannya masuk cache lokal Firestore lebih dulu, jadi pembacaan
+     * berikutnya sudah membawa daftar yang baru.
+     */
+    const categoryOptions = useMemo(
+        () => (Array.isArray(akunBiayaBersama) && akunBiayaBersama.length > 0
+            ? akunBiayaBersama
+            : buildDefaultCategoryOptions(BASE_SALES_CATEGORIES)),
+        [akunBiayaBersama],
+    );
+
+    /** Menyimpan daftar ke Firestore; kegagalannya muncul lewat banner. */
+    const simpanAkunBiaya = (daftar) => {
+        StorageService.saveExpenseAccounts(daftar).catch((e) => {
+            console.error('Gagal menyimpan akun biaya:', e);
+        });
+    };
 
     // Otomatis sinkronkan unit usaha master ke salesRows (hanya tampilkan unit usaha yang terdaftar di Kelola Unit Usaha)
     const salesCategoriesKey = useMemo(() => allSalesCategories.join(','), [allSalesCategories]);
@@ -418,23 +443,33 @@ export default function BeritaAcaraPage() {
         });
     }, [salesCategoriesKey]);
 
-    // Otomatis sinkronkan unit usaha master baru ke categoryOptions dropdown
+    /**
+     * Unit usaha master yang baru ikut ditambahkan ke daftar akun biaya.
+     *
+     * Hanya MENULIS, tidak menyentuh state: hasilnya kembali sendiri
+     * lewat useData. Ref di bawah mencegah penulisan berulang untuk
+     * himpunan yang sama — tanpa itu, satu penyimpanan yang gagal akan
+     * membuat efek ini menulis lagi pada setiap pemuatan ulang, dan
+     * jadi lingkaran tulis yang menghabiskan kuota Firestore.
+     */
+    const sinkronAkunBiayaRef = useRef('');
     useEffect(() => {
-        setCategoryOptions(prevOptions => {
-            const currentClean = new Set(prevOptions.map(opt => opt.replace(/^\d+\)\s*/, '').toLowerCase().trim()));
-            const missing = allSalesCategories.filter(cat => !currentClean.has(cat.toLowerCase().trim()));
-            if (missing.length === 0) return prevOptions;
+        if (!Array.isArray(akunBiayaBersama)) return; // daftar bersama belum tiba
 
-            const newOptions = [...prevOptions];
-            missing.forEach(cat => {
-                newOptions.push(`${newOptions.length + 1}) ${cat}`);
-            });
-            try {
-                localStorage.setItem('custom_expense_categories', JSON.stringify(newOptions));
-            } catch (e) { }
-            return newOptions;
+        const currentClean = new Set(categoryOptions.map(opt => opt.replace(/^\d+\)\s*/, '').toLowerCase().trim()));
+        const missing = allSalesCategories.filter(cat => !currentClean.has(cat.toLowerCase().trim()));
+        if (missing.length === 0) return;
+
+        const sidik = `${salesCategoriesKey}|${categoryOptions.length}`;
+        if (sinkronAkunBiayaRef.current === sidik) return;
+        sinkronAkunBiayaRef.current = sidik;
+
+        const newOptions = [...categoryOptions];
+        missing.forEach(cat => {
+            newOptions.push(`${newOptions.length + 1}) ${cat}`);
         });
-    }, [salesCategoriesKey]);
+        simpanAkunBiaya(newOptions);
+    }, [salesCategoriesKey, categoryOptions, akunBiayaBersama, allSalesCategories]);
 
     // Modern Dynamic Expenses (Hidden on print)
     const [customExpenses, setCustomExpenses] = useState([
@@ -456,15 +491,26 @@ export default function BeritaAcaraPage() {
                 return r;
             }));
 
-            // 2. Update categoryOptions
-            setCategoryOptions(prev => prev.map(opt => {
-                const clean = opt.replace(/^\d+\)\s*/, '').toLowerCase().trim();
-                if (clean === oldLower) {
-                    const numMatch = opt.match(/^(\d+\)\s*)/);
-                    return numMatch ? `${numMatch[1]}${newName}` : newName;
-                }
-                return opt;
-            }));
+            // 2. Ikut ganti nama di daftar akun biaya bersama.
+            //    Daftarnya diambil ulang, bukan dari closure: efek ini
+            //    didaftarkan sekali dengan deps [], jadi nilai yang
+            //    tertangkap di sini akan basi selamanya.
+            StorageService.getExpenseAccounts()
+                .then(daftar => {
+                    const sumber = Array.isArray(daftar) && daftar.length > 0
+                        ? daftar
+                        : buildDefaultCategoryOptions(BASE_SALES_CATEGORIES);
+                    let berubah = false;
+                    const diganti = sumber.map(opt => {
+                        const clean = opt.replace(/^\d+\)\s*/, '').toLowerCase().trim();
+                        if (clean !== oldLower) return opt;
+                        berubah = true;
+                        const numMatch = opt.match(/^(\d+\)\s*)/);
+                        return numMatch ? `${numMatch[1]}${newName}` : newName;
+                    });
+                    if (berubah) simpanAkunBiaya(diganti);
+                })
+                .catch(e => console.error('Gagal mengganti nama akun biaya:', e));
 
             // 3. Update customExpenses
             setCustomExpenses(prev => prev.map(item => {
@@ -1752,16 +1798,9 @@ export default function BeritaAcaraPage() {
         const trimmed = (catNameInput || "").trim();
         if (!trimmed) return;
 
-        setCategoryOptions(prev => {
-            if (prev.includes(trimmed)) return prev;
-            const updated = [...prev, trimmed];
-            try {
-                localStorage.setItem('custom_expense_categories', JSON.stringify(updated));
-            } catch (e) {
-                console.error('Error saving custom categories:', e);
-            }
-            return updated;
-        });
+        if (!categoryOptions.includes(trimmed)) {
+            simpanAkunBiaya([...categoryOptions, trimmed]);
+        }
 
         if (targetExpId) {
             updateCustomExpense(targetExpId, 'category', trimmed);
@@ -1770,27 +1809,16 @@ export default function BeritaAcaraPage() {
 
     const handleDeleteCategory = (catName) => {
         if (confirm(`Apakah Anda yakin ingin menghapus akun biaya "${catName}"?`)) {
-            setCategoryOptions(prev => {
-                const updated = prev.filter(c => c !== catName);
-                try {
-                    localStorage.setItem('custom_expense_categories', JSON.stringify(updated));
-                } catch (e) {
-                    console.error('Error deleting category:', e);
-                }
-                return updated;
-            });
+            simpanAkunBiaya(categoryOptions.filter(c => c !== catName));
         }
     };
 
     const handleResetCategories = () => {
         if (confirm("Kembalikan daftar akun biaya ke akun bawaan?")) {
-            const defaultList = buildDefaultCategoryOptions(allSalesCategories);
-            setCategoryOptions(defaultList);
-            try {
-                localStorage.removeItem('custom_expense_categories');
-            } catch (e) {
-                console.error('Error resetting categories:', e);
-            }
+            // Reset ikut tersimpan ke daftar bersama: kalau hanya dibersihkan
+            // di perangkat ini, daftar lama akan kembali dari Firestore pada
+            // pemuatan berikutnya dan reset-nya terlihat tidak berfungsi.
+            simpanAkunBiaya(buildDefaultCategoryOptions(allSalesCategories));
         }
     };
 
