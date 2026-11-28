@@ -6,7 +6,7 @@ import { useCurrentUser } from "../../../hooks/useCurrentUser";
 import { StorageService, notifyListeners } from "../../../services/storage";
 import { syncBeritaAcaraExpensesToCashFlow } from "../../../services/beritaAcaraExpenseSync";
 import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
-import { formatIDR, formatNumber } from "../../../utils";
+import { formatIDR, formatNumber, dayWindow } from "../../../utils";
 import { resolveReportRowName } from "../../../utils/categoryMapping";
 import { StatTile } from "../../../components/Bento";
 import {
@@ -286,7 +286,24 @@ export default function BeritaAcaraPage() {
     const [kasir, setKasir] = useState("");
     const [lokasi, setLokasi] = useState("Aimas - Klamono KM 21, Kabupaten Sorong, Papua Barat Daya");
 
-    const transactions = useData(() => StorageService.getTransactions(), [], 'transactions') || [];
+    /**
+     * Transaksi dibatasi pada jendela ±1 hari di sekitar `tanggal`,
+     * bukan seluruh riwayat.
+     *
+     * Halaman ini hanya pernah memakai transaksi hari itu — semuanya
+     * lewat isTransactionOnDate. Dulu seluruh koleksi `transactions`
+     * diunduh setiap kali halaman dibuka, dan biayanya tumbuh terus
+     * seiring umur data. Jendelanya diberi bantalan sehari di kiri dan
+     * kanan karena pencocoknya juga mem-parse nilai tanggal: baris
+     * berstempel UTC bisa jatuh ke hari sebelah. Penyaringan presisinya
+     * tetap di isTransactionOnDate, persis seperti sebelumnya.
+     */
+    const jendelaTx = useMemo(() => dayWindow(tanggal), [tanggal]);
+    const transactions = useData(
+        () => StorageService.getTransactionsByDateRange(jendelaTx.dari, jendelaTx.sampai),
+        [jendelaTx.dari, jendelaTx.sampai],
+        'transactions',
+    ) || [];
     const categories = useData(() => StorageService.getCategories(), [], 'categories') || [];
     const products = useData(() => StorageService.getProducts(), [], 'products') || [];
     // Nilai mentahnya dipertahankan: useData mengembalikan undefined
@@ -295,7 +312,11 @@ export default function BeritaAcaraPage() {
     // ke `cashflow` memakai daftar ini untuk mengenali baris yang sudah
     // punya dokumen kas. Kalau jalan sebelum daftarnya siap, baris lama
     // akan dibuatkan dokumen baru dan nilainya terhitung dua kali.
-    const cashflowsRaw = useData(() => StorageService.getCashFlow(), [], 'cashflow');
+    const cashflowsRaw = useData(
+        () => StorageService.getCashFlowForBeritaAcara(tanggal),
+        [tanggal],
+        'cashflow',
+    );
     const cashflows = cashflowsRaw || [];
     const isCashflowLoaded = Array.isArray(cashflowsRaw);
     const archives = useData(() => StorageService.getBeritaAcaraArchives(), [], 'berita_acara_archives') || [];
@@ -938,9 +959,9 @@ export default function BeritaAcaraPage() {
 
             // 1. Fetch fresh data directly from backend
             const [freshTx, freshCats, freshCf, freshProds, freshArch] = await Promise.all([
-                StorageService.getTransactions(),
+                StorageService.getTransactionsByDateRange(jendelaTx.dari, jendelaTx.sampai),
                 StorageService.getCategories(),
-                StorageService.getCashFlow(),
+                StorageService.getCashFlowForBeritaAcara(tanggal),
                 StorageService.getProducts(),
                 StorageService.getBeritaAcaraArchives()
             ]);
@@ -1089,9 +1110,9 @@ export default function BeritaAcaraPage() {
 
             // 1. Fetch fresh data directly from backend
             const [freshTx, freshCats, freshCf, freshProds, freshArchList] = await Promise.all([
-                StorageService.getTransactions(),
+                StorageService.getTransactionsByDateRange(jendelaTx.dari, jendelaTx.sampai),
                 StorageService.getCategories(),
-                StorageService.getCashFlow(),
+                StorageService.getCashFlowForBeritaAcara(tanggal),
                 StorageService.getProducts(),
                 StorageService.getBeritaAcaraArchives()
             ]);

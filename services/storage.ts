@@ -1,4 +1,4 @@
-import { Product, Transaction, User, CashFlow, Category, Division, Customer, Supplier, Purchase, StoreSettings, BankAccount, TravelAgent, TravelBookingCommission, OpenBill, VisitorLog } from "../types";
+import { Product, Transaction, User, CashFlow, Category, Division, Customer, Supplier, Purchase, StoreSettings, BankAccount, TravelAgent, TravelBookingCommission, OpenBill, VisitorLog, StockAdjustment } from "../types";
 import { ApiService } from "./api";
 
 // Simple Event Bus for Data Changes
@@ -411,6 +411,11 @@ export const StorageService = {
   getTransactionsByCustomer: async (customerId: string): Promise<Transaction[]> => {
     return await ApiService.getTransactionsByCustomer(customerId);
   },
+  /** Arus kas untuk satu lembar Berita Acara (lihat catatan di firestore.ts). */
+  getStockAdjustmentsByDateRange: async (startDay: string, endDay: string): Promise<StockAdjustment[]> =>
+    ApiService.getStockAdjustmentsByDateRange(startDay, endDay),
+  getCashFlowForBeritaAcara: async (date: string): Promise<CashFlow[]> =>
+    ApiService.getCashFlowForBeritaAcara(date),
   getCashFlowByDateRange: async (startDay: string, endDay: string): Promise<CashFlow[]> => {
     return await ApiService.getCashFlowByDateRange(startDay, endDay);
   },

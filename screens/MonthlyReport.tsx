@@ -5,7 +5,7 @@ import { StorageService } from '../services/storage';
 import { syncBeritaAcaraExpensesToCashFlow } from '../services/beritaAcaraExpenseSync';
 import { resolveBeritaAcaraExpenseAmount, findSuspectedDuplicateOpex } from '../services/beritaAcaraExpensePlan';
 import type { BeritaAcaraExpenseRow } from '../services/beritaAcaraExpensePlan';
-import { formatIDR, formatDate, formatDateDateOnly, exportToCSV, exportToExcel, generateId, toMySQLDate } from '../utils';
+import { formatIDR, formatDate, formatDateDateOnly, exportToCSV, exportToExcel, generateId, toMySQLDate, dayWindow } from '../utils';
 import {
     Calculator, Calendar, Tag, TrendingDown, TrendingUp, PiggyBank, Printer,
     FileSpreadsheet, Download, ChevronLeft, ChevronRight, DollarSign,
@@ -105,9 +105,28 @@ const isDebtTransaction = (t: Transaction): boolean => {
 
 export const MonthlyReport: React.FC = () => {
     // Data Loading
+    /**
+     * `transactions` dan `cashFlows` SENGAJA dibaca penuh di layar ini.
+     *
+     * Bukan kelalaian — keduanya dipakai di luar periode terpilih:
+     *
+     *   - Piutang menghitung SELURUH utang yang masih berjalan, termasuk
+     *     dari tahun-tahun sebelumnya (lihat catatan di bagian piutang).
+     *   - Pelunasan ditelusuri lewat paymentHistory pada transaksi mana
+     *     pun; pelunasan bulan ini bisa menempel pada transaksi lama.
+     *   - Dropdown tahun diisi dari tahun yang benar-benar punya data,
+     *     jadi butuh rentang penuh.
+     *
+     * Membatasinya pada periode terpilih akan MENGECILKAN piutang dan
+     * pelunasan tanpa error apa pun — angkanya tetap terlihat wajar.
+     * Memperbaikinya butuh perubahan struktur (mis. pelunasan disimpan
+     * sebagai koleksi sendiri), bukan sekadar mengganti pemanggilan.
+     *
+     * `stockAdjustments` berbeda: nilainya hanya dipakai lewat
+     * filteredStockAdjustments, jadi aman dibatasi pada periode.
+     */
     const transactions = useData(() => StorageService.getTransactions(), [], 'transactions') || [];
     const cashFlows = useData(() => StorageService.getCashFlow(), [], 'cashflow') || [];
-    const stockAdjustments = useData(() => StorageService.getStockAdjustments(), [], 'stock_adjustments') || [];
     const categories = useData(() => StorageService.getCategories(), [], 'categories') || [];
     const banks = useData(() => StorageService.getBanks(), [], 'banks') || [];
     // Diperlukan untuk menilai penyesuaian stok: StockAdjustment hanya
@@ -297,6 +316,27 @@ export const MonthlyReport: React.FC = () => {
             };
         }
     }, [periodMode, selectedMonth, selectedYear]);
+
+    // Dibaca setelah periodRange siap, dengan bantalan sehari di kedua
+    // sisi: penyaring di bawah memakai hasil parse tanggal, yang bisa
+    // bergeser sehari untuk nilai berstempel UTC.
+    const jendelaPenyesuaian = useMemo(() => {
+        const ke = (ms: number) => {
+            const d = new Date(ms);
+            const p = (n: number) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+        };
+        return {
+            dari: dayWindow(ke(periodRange.startTime)).dari,
+            sampai: dayWindow(ke(periodRange.endTime)).sampai,
+        };
+    }, [periodRange.startTime, periodRange.endTime]);
+
+    const stockAdjustments = useData(
+        () => StorageService.getStockAdjustmentsByDateRange(jendelaPenyesuaian.dari, jendelaPenyesuaian.sampai),
+        [jendelaPenyesuaian.dari, jendelaPenyesuaian.sampai],
+        'stock_adjustments',
+    ) || [];
 
     // Filter Data by calculated period range
     const filteredTransactions = useMemo(() => {

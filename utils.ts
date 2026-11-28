@@ -204,6 +204,37 @@ export const toCanonicalDay = (date: Date = new Date()): string =>
  * Akibat batas lama itu, transaksi pada HARI TERAKHIR rentang bisa
  * hilang dari laporan tanpa error apa pun.
  */
+/**
+ * Rentang hari dengan bantalan di kedua sisi.
+ *
+ * Dipakai layar yang bekerja pada SATU hari tapi menyaring ulang
+ * hasilnya di kode, seperti Berita Acara.
+ *
+ * Kenapa perlu bantalan: pencocok tanggal di layar itu tidak hanya
+ * membandingkan awalan string, tapi juga mem-parse nilainya. Sebuah
+ * baris berstempel "2026-09-07T20:00:00Z" jatuh pada 8 September waktu
+ * Jayapura (+09), sehingga layar menganggapnya milik tanggal 8 —
+ * sementara kueri rentang yang membandingkan string mentah tidak akan
+ * mengembalikannya untuk tanggal 8, karena stringnya diawali "2026-09-07".
+ *
+ * Membatasi tepat satu hari karena itu bisa MENGHILANGKAN penjualan dari
+ * setoran, tanpa error apa pun. Mengambil sehari di kiri dan kanan
+ * menutup seluruh pergeseran zona waktu yang mungkin (maksimal ±14 jam),
+ * dan penyaringan presisinya tetap dilakukan di kode seperti sebelumnya.
+ *
+ * Tiga hari tetap jauh lebih murah daripada seluruh riwayat.
+ */
+export const dayWindow = (day: string, padDays = 1) => {
+  const inti = (day || '').slice(0, 10);
+  const geser = (arah: number) => {
+    const d = new Date(`${inti}T12:00:00Z`); // tengah hari: aman dari DST
+    if (Number.isNaN(d.getTime())) return inti;
+    d.setUTCDate(d.getUTCDate() + arah * padDays);
+    return d.toISOString().slice(0, 10);
+  };
+  return { dari: geser(-1), sampai: geser(1) };
+};
+
 export const dayRangeBounds = (startDay: string, endDay: string) => ({
   start: startDay.slice(0, 10),
   end: `${endDay.slice(0, 10)}T23:59:59.999Z`,

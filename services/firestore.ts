@@ -21,7 +21,7 @@ import {
   type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "../src/lib/firebase";
-import { dayRangeBounds } from "../utils";
+import { dayRangeBounds, dayWindow } from "../utils";
 import { queueWrite } from "./syncStatus";
 import {
   BankAccount,
@@ -691,6 +691,54 @@ export const FirestoreService = {
   addCashFlow: async (cf: CashFlow) => saveEntity<CashFlow>("cashflow", cf),
   deleteCashFlow: async (id: string) =>
     deleteDoc(doc(collectionRef("cashflow"), id)),
+
+  /**
+   * Arus kas yang dibutuhkan satu lembar Berita Acara.
+   *
+   * Dua kueri, digabung dan dibuang duplikatnya:
+   *
+   *   1. rentang tanggal ±1 hari — menutup pergeseran zona waktu pada
+   *      baris berstempel UTC (lihat dayWindow di utils.ts);
+   *   2. beritaAcaraDate == tanggal — menjaring cerminan Berita Acara
+   *      apa pun bentuk field `date`-nya.
+   *
+   * Yang kedua bukan kemewahan. Perencana sinkronisasi memakai daftar
+   * ini untuk mengenali dokumen kas yang SUDAH ada: kalau satu baris
+   * lama tidak ikut terbaca, baris itu akan dibuatkan dokumen baru dan
+   * nilainya terhitung DUA KALI di laporan. Lebih baik satu kueri
+   * tambahan daripada pengeluaran dobel.
+   */
+  getCashFlowForBeritaAcara: async (date: string): Promise<CashFlow[]> => {
+    const { dari, sampai } = dayWindow(date);
+    const { start, end } = dayRangeBounds(dari, sampai);
+
+    const [perTanggal, perBeritaAcara] = await Promise.all([
+      runQuery<CashFlow>("cashflow", [
+        where("date", ">=", start),
+        where("date", "<=", end),
+        orderBy("date", "desc"),
+      ]),
+      runQuery<CashFlow>("cashflow", [where("beritaAcaraDate", "==", date)]),
+    ]);
+
+    const gabungan = new Map<string, CashFlow>();
+    [...perTanggal, ...perBeritaAcara].forEach((cf) => {
+      if (cf?.id) gabungan.set(String(cf.id), cf);
+    });
+    return [...gabungan.values()];
+  },
+
+  getStockAdjustmentsByDateRange: async (
+    startDay: string,
+    endDay: string,
+  ): Promise<StockAdjustment[]> => {
+    const { start, end } = dayRangeBounds(startDay, endDay);
+    return runQuery<StockAdjustment>("stock_adjustments", [
+      where("date", ">=", start),
+      where("date", "<=", end),
+      orderBy("date", "desc"),
+    ]);
+  },
 
   getStockAdjustments: async (): Promise<StockAdjustment[]> =>
     getCollectionOrdered<StockAdjustment>("stock_adjustments", "date", "desc"),
