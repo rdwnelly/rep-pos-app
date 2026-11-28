@@ -4,7 +4,8 @@ import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Product, Category, UserRole } from '../types';
 import { formatIDR, formatNumber, exportToCSV, generateSKU, compressImage, exportToExcel } from '../utils';
-import { Edit2, Trash2, Plus, X, Download, Upload, Tag, Barcode, Image as ImageIcon, Search, Printer, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, FileSpreadsheet, Package, Sparkles, Check } from 'lucide-react';
+import { Edit2, Trash2, Plus, X, Download, Upload, Tag, Barcode, Image as ImageIcon, Search, Printer, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, FileSpreadsheet, Package, Sparkles, Check, AlertTriangle } from 'lucide-react';
+import { BentoGrid, StatTile } from '../components/Bento';
 import { HPPCalculatorModal } from '../components/HPPCalculatorModal';
 import { CategoryReportGroup, REPORT_GROUP_LABEL, VisitorServiceType, VISITOR_SERVICE_LABEL } from '../types';
 import { legacyGroupFromName, legacyVisitorServiceFromName } from '../utils/categoryMapping';
@@ -73,16 +74,16 @@ export const Products: React.FC = () => {
       return;
     }
 
-    // 3. Validasi Kategori Produk (Wajib dipilih kategori resmi)
+    // 3. Validasi Unit Usaha (Wajib dipilih unit usaha resmi)
     if (!formData.categoryId || !formData.categoryId.trim()) {
-      alert("Kategori produk wajib dipilih! Silakan pilih salah satu kategori yang tersedia pada pilihan kategori.");
+      alert("Unit usaha produk wajib dipilih! Silakan pilih salah satu unit usaha yang tersedia pada pilihan unit usaha.");
       return;
     }
 
     const availableCategories = categories.filter(c => c && c.name && c.name.trim().toLowerCase() !== 'umum');
     const selectedCat = availableCategories.find(c => c.id === formData.categoryId);
     if (!selectedCat || !selectedCat.name || selectedCat.name.trim().toLowerCase() === 'umum') {
-      alert("Kategori produk yang dipilih tidak valid. Silakan pilih kategori resmi yang tersedia.");
+      alert("Unit usaha produk yang dipilih tidak valid. Silakan pilih unit usaha resmi yang tersedia.");
       return;
     }
 
@@ -203,11 +204,11 @@ export const Products: React.FC = () => {
   const handleSaveCategory = async () => {
     const trimmed = categoryFormName.trim();
     if (!trimmed) {
-      alert('Nama kategori tidak boleh kosong!');
+      alert('Nama unit usaha tidak boleh kosong!');
       return;
     }
     if (trimmed.toLowerCase() === 'umum') {
-      alert('Nama kategori "Umum" tidak diperbolehkan. Silakan gunakan nama kategori spesifik.');
+      alert('Nama unit usaha "Umum" tidak diperbolehkan. Silakan gunakan nama unit usaha spesifik.');
       return;
     }
 
@@ -228,8 +229,8 @@ export const Products: React.FC = () => {
     setCategoryFeedback({
       type: 'success',
       message: isEdit 
-        ? `Kategori "${oldCat?.name}" berhasil diubah menjadi "${trimmed}" & disinkronkan ke Berita Acara!`
-        : `Kategori "${trimmed}" berhasil ditambahkan!`
+        ? `Unit Usaha "${oldCat?.name}" berhasil diubah menjadi "${trimmed}" & disinkronkan ke Berita Acara!`
+        : `Unit Usaha "${trimmed}" berhasil ditambahkan!`
     });
     setTimeout(() => setCategoryFeedback(null), 4000);
   };
@@ -238,16 +239,16 @@ export const Products: React.FC = () => {
     const cat = categories.find(c => c.id === id);
     const count = products.filter(p => p.categoryId === id).length;
     const confirmMsg = count > 0 
-      ? `Kategori "${cat?.name}" masih digunakan oleh ${count} produk.\n\nPenghapusan akan ditolak. Pindahkan produknya ke kategori lain terlebih dahulu.`
-      : `Yakin ingin menghapus kategori "${cat?.name}"?`;
+      ? `Unit Usaha "${cat?.name}" masih digunakan oleh ${count} produk.\n\nPenghapusan akan ditolak. Pindahkan produknya ke unit usaha lain terlebih dahulu.`
+      : `Yakin ingin menghapus unit usaha "${cat?.name}"?`;
 
     if (confirm(confirmMsg)) {
       try {
         await StorageService.deleteCategory(id);
       } catch (error: any) {
-        // Kategori yang masih dipakai produk ditolak oleh StorageService,
-        // agar produk tidak menggantung menunjuk kategori yang hilang.
-        setCategoryFeedback({ type: 'error', message: error?.message || 'Gagal menghapus kategori.' });
+        // Unit usaha yang masih dipakai produk ditolak oleh StorageService,
+        // agar produk tidak menggantung menunjuk unit usaha yang hilang.
+        setCategoryFeedback({ type: 'error', message: error?.message || 'Gagal menghapus unit usaha.' });
         setTimeout(() => setCategoryFeedback(null), 7000);
         return;
       }
@@ -259,7 +260,7 @@ export const Products: React.FC = () => {
       }
       setCategoryFeedback({
         type: 'success',
-        message: `Kategori "${cat?.name}" berhasil dihapus.`
+        message: `Unit Usaha "${cat?.name}" berhasil dihapus.`
       });
       setTimeout(() => setCategoryFeedback(null), 3000);
     }
@@ -288,7 +289,7 @@ export const Products: React.FC = () => {
     const currentUser = JSON.parse(localStorage.getItem('pos_current_user') || '{}');
     const showHPP = currentUser.role !== UserRole.CASHIER && currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.WAREHOUSE;
 
-    const headers = ['ID', 'Nama Produk', 'SKU', 'Kategori', 'Satuan', 'Stok'];
+    const headers = ['ID', 'Nama Produk', 'SKU', 'Unit Usaha', 'Satuan', 'Stok'];
     if (showHPP) headers.push('HPP');
     headers.push('Harga Jual');
 
@@ -311,7 +312,7 @@ export const Products: React.FC = () => {
         'ID': p.id,
         'Nama Produk': p.name,
         'SKU': p.sku,
-        'Kategori': p.categoryName,
+        'Unit Usaha': p.categoryName,
         'Satuan': p.unit || 'Pcs',
         'Stok': p.stock,
       };
@@ -327,7 +328,7 @@ export const Products: React.FC = () => {
       { wch: 15 }, // ID
       { wch: 30 }, // Nama
       { wch: 15 }, // SKU
-      { wch: 15 }, // Kategori
+      { wch: 15 }, // Unit Usaha
       { wch: 10 }, // Satuan
       { wch: 10 }, // Stok
     ];
@@ -379,13 +380,13 @@ export const Products: React.FC = () => {
         </head>
         <body>
           <h2>Daftar Produk</h2>
-          <p class="subtitle">Total: ${filteredProducts.length} produk${filterCategory !== 'ALL' ? ` - Kategori: ${categories.find(c => c.id === filterCategory)?.name || 'Semua'}` : ''}</p>
+          <p class="subtitle">Total: ${filteredProducts.length} produk${filterCategory !== 'ALL' ? ` - Unit Usaha: ${categories.find(c => c.id === filterCategory)?.name || 'Semua'}` : ''}</p>
           <table>
             <thead>
               <tr>
                 <th>Nama Produk</th>
                 <th>SKU</th>
-                <th>Kategori</th>
+                <th>Unit Usaha</th>
                 <th>Satuan</th>
                 <th>Stok</th>
                 ${showHPP ? '<th>HPP (Modal)</th>' : ''}
@@ -440,7 +441,7 @@ export const Products: React.FC = () => {
         id: headers.findIndex(h => h === 'id'),
         name: headers.findIndex(h => h.includes('nama') || h.includes('name')),
         sku: headers.findIndex(h => h.includes('sku') || h.includes('kode')),
-        category: headers.findIndex(h => h.includes('kategori') || h.includes('category')),
+        category: headers.findIndex(h => h.includes('unit usaha') || h.includes('category')),
         stock: headers.findIndex(h => h.includes('stok') || h.includes('stock')),
         hpp: headers.findIndex(h => h.includes('hpp') || h.includes('modal')),
         retail: headers.findIndex(h => h.includes('eceran') || h.includes('retail')),
@@ -592,11 +593,11 @@ export const Products: React.FC = () => {
   }, [loadMoreRef.current, filteredProducts]);
 
   return (
-    <div className="space-y-6 animate-fade-in p-2 md:p-0">
+    <div className="space-y-2.5 md:space-y-6 animate-fade-in">
       {/* Header Controls */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <h1 className="text-base md:text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Package className="text-amber-600" />
             Daftar Produk & Inventaris
           </h1>
@@ -605,7 +606,7 @@ export const Products: React.FC = () => {
 
         <div className="flex flex-wrap gap-2 w-full md:w-auto">
           <button onClick={() => setIsCategoryModalOpen(true)} className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 transition-all flex text-xs font-medium shadow-sm">
-            <Tag size={15} /> Kategori
+            <Tag size={15} /> Unit Usaha
           </button>
 
           {/* Hide Import CSV for Cashier and Warehouse */}
@@ -633,58 +634,39 @@ export const Products: React.FC = () => {
         </div>
       </div>
 
-      {/* Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Jenis Produk</p>
-            <h3 className="text-lg font-extrabold text-slate-900 mt-1">{products.length} <span className="text-xs font-normal text-slate-400">item</span></h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">{categories.length} Kategori Terdaftar</p>
-          </div>
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
-            <Package size={22} />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Stok Produk</p>
-            <h3 className="text-lg font-extrabold text-emerald-600 mt-1">
-              {formatNumber(products.reduce((acc, p) => acc + (p.stock || 0), 0))} <span className="text-xs font-normal text-slate-400">unit</span>
-            </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Semua Stok Fisik</p>
-          </div>
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
-            <Tag size={22} />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Aset Modal (HPP)</p>
-            <h3 className="text-lg font-extrabold text-amber-700 mt-1">
-              {formatIDR(products.reduce((acc, p) => acc + ((p.hpp || 0) * (p.stock || 0)), 0))}
-            </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Nilai Total Modal Stok</p>
-          </div>
-          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
-            <FileSpreadsheet size={22} />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Stok Menipis (&lt; 10)</p>
-            <h3 className="text-lg font-extrabold text-rose-600 mt-1">
-              {formatNumber(products.filter(p => (p.stock || 0) < 10).length)} <span className="text-xs font-normal text-slate-400">produk</span>
-            </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Perlu Restok Segera</p>
-          </div>
-          <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
-            <Trash2 size={22} />
-          </div>
-        </div>
-      </div>
+      {/* Ubin statistik Bento. Nilai HPP bisa mencapai delapan digit, dan
+          StatTile mengecilkan fontnya sendiri mengikuti panjang teks agar
+          tidak terpotong di lebar separuh layar HP. */}
+      <BentoGrid>
+        <StatTile
+          label="Total Jenis Produk"
+          value={`${products.length} item`}
+          icon={Package}
+          tone="primary"
+          hint={`${categories.length} Unit Usaha Terdaftar`}
+        />
+        <StatTile
+          label="Total Stok Produk"
+          value={`${formatNumber(products.reduce((acc, p) => acc + (p.stock || 0), 0))} unit`}
+          icon={Tag}
+          tone="greenSoft"
+          hint="Semua stok fisik"
+        />
+        <StatTile
+          label="Total Aset Modal (HPP)"
+          value={formatIDR(products.reduce((acc, p) => acc + ((p.hpp || 0) * (p.stock || 0)), 0))}
+          icon={FileSpreadsheet}
+          tone="accentSoft"
+          hint="Nilai total modal stok"
+        />
+        <StatTile
+          label="Stok Menipis (< 10)"
+          value={`${formatNumber(products.filter(p => (p.stock || 0) < 10).length)} produk`}
+          icon={AlertTriangle}
+          tone={products.filter(p => (p.stock || 0) < 10).length > 0 ? 'red' : 'default'}
+          hint="Perlu restok segera"
+        />
+      </BentoGrid>
 
       {/* Filter Category & Search Bar Container */}
       <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -744,7 +726,7 @@ export const Products: React.FC = () => {
             id="productSearchMain"
             name="productSearchMain"
             type="text"
-            placeholder="Cari nama produk, SKU, atau kategori..."
+            placeholder="Cari nama produk, SKU, atau unit usaha..."
             className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-800"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
@@ -872,11 +854,11 @@ export const Products: React.FC = () => {
       {isProductModalOpen && createPortal(
         <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-black/40 backdrop-blur-md z-[99999] flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
+            <div className="p-3 md:p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
               <h3 className="font-bold text-lg text-slate-800">{editingId ? 'Edit Produk' : 'Produk Baru'}</h3>
               <button onClick={() => setIsProductModalOpen(false)}><X size={24} className="text-slate-400 hover:text-slate-600" /></button>
             </div>
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="p-3 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
               {/* Image Uploader */}
               <div className="col-span-2 flex justify-center relative group-container">
                 <label className="relative w-full max-w-xs aspect-video bg-slate-100 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 group overflow-hidden">
@@ -926,7 +908,7 @@ export const Products: React.FC = () => {
               </div>
               <div className="col-span-2 md:col-span-1">
                 <label htmlFor="category" className="block text-sm font-medium text-slate-700 mb-1">
-                  Kategori Produk <span className="text-rose-500 font-bold">*</span>
+                  Unit Usaha <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <select
                   id="category"
@@ -935,7 +917,7 @@ export const Products: React.FC = () => {
                   value={formData.categoryId ?? ''}
                   onChange={e => setFormData({ ...formData, categoryId: e.target.value })}
                 >
-                  <option value="">-- Pilih Kategori (Wajib) --</option>
+                  <option value="">-- Pilih Unit Usaha (Wajib) --</option>
                   {categories
                     .filter(c => c && c.name && c.name.trim().toLowerCase() !== 'umum')
                     .map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -989,7 +971,7 @@ export const Products: React.FC = () => {
                 <span className="text-amber-700 font-bold">Catatan:</span> Semua kolom bertanda bintang merah (<span className="text-rose-600 font-bold">*</span>) wajib diisi lengkap sebelum produk disimpan.
               </div>
             </div>
-            <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+            <div className="p-3 md:p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
               <button onClick={() => setIsProductModalOpen(false)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-200 rounded-lg font-medium">Batal</button>
               <button onClick={handleSaveProduct} className="px-5 py-2.5 bg-primary text-white rounded-lg font-semibold hover:bg-primary-hover shadow-lg shadow-primary/20">Simpan Produk</button>
             </div>
@@ -1004,20 +986,20 @@ export const Products: React.FC = () => {
           <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
             
             {/* Modal Header */}
-            <div className="p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex justify-between items-center relative overflow-hidden">
+            <div className="p-3 md:p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex justify-between items-center relative overflow-hidden">
               <div className="flex items-center gap-3 z-10">
                 <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400">
                   <Tag size={20} />
                 </div>
                 <div>
                   <h3 className="font-bold text-lg text-white flex items-center gap-2">
-                    Kelola Kategori Master
+                    Kelola Unit Usaha
                     <span className="text-xs bg-amber-500/20 text-amber-300 font-semibold px-2.5 py-0.5 rounded-full border border-amber-400/30">
-                      {categories.length} Kategori
+                      {categories.length} Unit Usaha
                     </span>
                   </h3>
                   <p className="text-xs text-slate-300">
-                    Tambah, ubah nama, dan sinkronkan kategori ke seluruh sistem
+                    Tambah, ubah nama, dan sinkronkan unit usaha ke seluruh sistem
                   </p>
                 </div>
               </div>
@@ -1046,18 +1028,18 @@ export const Products: React.FC = () => {
             )}
 
             {/* Input Form Card */}
-            <div className="p-5 bg-slate-50 border-b border-slate-200/80">
+            <div className="p-3 md:p-5 bg-slate-50 border-b border-slate-200/80">
               <div className="flex items-center justify-between mb-2">
                 <label htmlFor="newCategoryName" className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
                   {editingId ? (
                     <>
                       <Edit2 size={13} className="text-amber-600" />
-                      <span>Ubah Nama Kategori</span>
+                      <span>Ubah Nama Unit Usaha</span>
                     </>
                   ) : (
                     <>
                       <Plus size={14} className="text-primary" />
-                      <span>Tambah Kategori Baru</span>
+                      <span>Tambah Unit Usaha Baru</span>
                     </>
                   )}
                 </label>
@@ -1085,17 +1067,17 @@ export const Products: React.FC = () => {
                   className="flex-1 border border-slate-300 bg-white p-2.5 px-3.5 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all shadow-2xs" 
                   value={categoryFormName} 
                   onChange={e => setCategoryFormName(e.target.value)} 
-                  placeholder={editingId ? "Ketik nama kategori baru..." : "Contoh: Tiket Masuk, Kafe & Resto, dsb..."} 
+                  placeholder={editingId ? "Ketik nama unit usaha baru..." : "Contoh: Tiket Masuk, Kafe & Resto, dsb..."} 
                   onKeyDown={e => e.key === 'Enter' && handleSaveCategory()} 
                 />
               </div>
 
-              {/* Penyetelan makna kategori. Dibiarkan kosong berarti sistem
+              {/* Penyetelan makna unit usaha. Dibiarkan kosong berarti sistem
                   menebak dari nama, persis seperti perilaku sebelumnya. */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2.5">
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                    Baris di Laporan
+                    Unit Usaha di SIK-REP
                   </label>
                   <select
                     value={categoryFormGroup}
@@ -1109,7 +1091,7 @@ export const Products: React.FC = () => {
                   </select>
                   <p className="text-[10px] text-slate-400 mt-1 leading-snug">
                     {categoryFormGroup
-                      ? 'Tetap masuk baris ini walau nama kategori diubah.'
+                      ? 'Kode ini yang dikirim ke SIK-REP, jadi tetap sama walau namanya diubah.'
                       : `Saat ini terbaca sebagai: ${
                           categoryFormName.trim()
                             ? REPORT_GROUP_LABEL[legacyGroupFromName(categoryFormName) ?? CategoryReportGroup.LAINNYA]
@@ -1134,7 +1116,7 @@ export const Products: React.FC = () => {
                   </select>
                   <p className="text-[10px] text-slate-400 mt-1 leading-snug">
                     {categoryFormService
-                      ? 'Penjualan kategori ini memunculkan pendataan pengunjung.'
+                      ? 'Penjualan unit usaha ini memunculkan pendataan pengunjung.'
                       : `Saat ini terbaca sebagai: ${
                           categoryFormName.trim() && legacyVisitorServiceFromName(categoryFormName)
                             ? VISITOR_SERVICE_LABEL[legacyVisitorServiceFromName(categoryFormName)!]
@@ -1181,7 +1163,7 @@ export const Products: React.FC = () => {
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input 
                   type="text"
-                  placeholder="Cari kategori..."
+                  placeholder="Cari unit usaha..."
                   value={categorySearchQuery}
                   onChange={e => setCategorySearchQuery(e.target.value)}
                   className="w-full pl-9 pr-8 py-1.5 bg-slate-100/70 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 placeholder-slate-400 outline-none focus:bg-white focus:ring-1 focus:ring-primary"
@@ -1198,7 +1180,7 @@ export const Products: React.FC = () => {
             </div>
 
             {/* Categories List */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-2 max-h-[340px]">
+            <div className="flex-1 overflow-y-auto p-3 md:p-5 space-y-2 max-h-[340px]">
               {categories
                 .filter(c => !categorySearchQuery.trim() || c.name.toLowerCase().includes(categorySearchQuery.toLowerCase().trim()))
                 .map((c, idx) => {
@@ -1241,7 +1223,7 @@ export const Products: React.FC = () => {
                               ? 'bg-amber-600 text-white'
                               : 'text-slate-600 hover:text-primary hover:bg-primary/10'
                           }`}
-                          title="Ubah Nama Kategori"
+                          title="Ubah Nama Unit Usaha"
                         >
                           <Edit2 size={14} />
                           <span className="hidden sm:inline">Ubah</span>
@@ -1249,7 +1231,7 @@ export const Products: React.FC = () => {
                         <button 
                           onClick={() => handleDeleteCategory(c.id)} 
                           className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
-                          title="Hapus Kategori"
+                          title="Hapus Unit Usaha"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -1261,7 +1243,7 @@ export const Products: React.FC = () => {
               {categories.length === 0 && (
                 <div className="text-center py-8 text-slate-400">
                   <Tag size={32} className="mx-auto mb-2 opacity-40" />
-                  <p className="text-sm font-medium">Belum ada kategori yang ditambahkan.</p>
+                  <p className="text-sm font-medium">Belum ada unit usaha yang ditambahkan.</p>
                 </div>
               )}
             </div>

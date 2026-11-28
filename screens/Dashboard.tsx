@@ -15,6 +15,7 @@ import { formatIDR, formatNumber, exportToExcel, exportToCSV, formatDate } from 
 import { generatePrintDashboard } from '../utils/printHelpers';
 import { Transaction, Product, CartItem, User, TransactionType, PaymentMethod, PaymentStatus, StoreSettings } from '../types';
 import { useData } from '../hooks/useData';
+import { BentoGrid, StatTile } from '../components/Bento';
 
 export const Dashboard: React.FC = () => {
   // Data Fetching
@@ -516,23 +517,23 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in p-2 md:p-0">
+    <div className="space-y-2.5 md:space-y-6 animate-fade-in">
       {/* Top Header & Toolbar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-4 print:hidden">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 md:gap-4 border-b border-slate-200 pb-2.5 md:pb-4 print:hidden">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-md shadow-emerald-600/20">
-              <LayoutDashboard size={22} />
+            <div className="p-1.5 md:p-2 bg-emerald-600 text-white rounded-xl shadow-md shadow-emerald-600/20 shrink-0">
+              <LayoutDashboard className="w-[18px] h-[18px] md:w-[22px] md:h-[22px]" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <h1 className="text-base md:text-2xl font-black text-slate-900 tracking-tight flex flex-wrap items-center gap-1.5 md:gap-2">
                 Dashboard Performa Bisnis
                 <span className="text-[11px] font-extrabold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full uppercase tracking-wider">
                   Live Analytics
                 </span>
               </h1>
-              <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
-                Pemantauan real-time omzet, laba kotor, piutang, tren penjualan, dan wawasan cerdas toko
+              <p className="text-slate-500 text-[11px] md:text-sm mt-0.5 leading-snug">
+                Pemantauan omzet, laba kotor, piutang, dan tren penjualan
               </p>
             </div>
           </div>
@@ -711,118 +712,58 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* 6 Executive KPI Metric Summary Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
-        {/* 1. Omzet Penjualan Bersih */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider">Omzet Bersih</span>
-              <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
-                <TrendingUp size={16} />
-              </div>
-            </div>
-            <h3 className="text-lg font-black text-slate-900 font-mono">{formatIDR(kpiMetrics.netRevenue)}</h3>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-2 font-mono">
-            {formatNumber(kpiMetrics.totalTransactions)} Trx • {formatNumber(kpiMetrics.totalItemsSold)} Unit
-          </p>
-        </div>
-
-        {/* 2. Estimasi Laba Kotor */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider">Laba Kotor</span>
-                <span className="bg-emerald-100 text-emerald-800 text-[9px] font-mono font-extrabold px-1 rounded">
-                  {kpiMetrics.grossProfitMargin.toFixed(0)}%
-                </span>
-              </div>
-              <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
-                <Percent size={16} />
-              </div>
-            </div>
-            <h3 className="text-lg font-black text-emerald-600 font-mono">{formatIDR(kpiMetrics.grossProfit)}</h3>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-2 font-mono">
-            HPP: {formatIDR(kpiMetrics.totalHppCost)}
-          </p>
-        </div>
-
-        {/* 3. Average Basket Size (AOV) */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider">Rata-rata Belanja</span>
-              <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg">
-                <ShoppingBag size={16} />
-              </div>
-            </div>
-            <h3 className="text-lg font-black text-purple-700 font-mono">{formatIDR(kpiMetrics.avgBasketSize)}</h3>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-2 font-mono">
-            Rata-rata per struk belanja
-          </p>
-        </div>
-
-        {/* 4. Total Volume Item Terjual */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider">Volume Terjual</span>
-              <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg">
-                <Package size={16} />
-              </div>
-            </div>
-            <h3 className="text-lg font-black text-amber-800 font-mono">
-              {formatNumber(kpiMetrics.totalItemsSold)} <span className="text-xs font-normal text-slate-500">pcs</span>
-            </h3>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-2 font-mono">
-            Total unit keluar
-          </p>
-        </div>
-
-        {/* 5. Total Piutang Berjalan */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider">Piutang Tertahan</span>
-              <div className="p-1.5 bg-rose-50 text-rose-600 rounded-lg">
-                <AlertCircle size={16} />
-              </div>
-            </div>
-            <h3 className="text-lg font-black text-rose-600 font-mono">{formatIDR(totalReceivables)}</h3>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-2 font-mono">
-            Belum diselesaikan
-          </p>
-        </div>
-
-        {/* 6. Stok Kritis / Menipis */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider">Stok Kritis</span>
-              <div className="p-1.5 bg-rose-50 text-rose-600 rounded-lg">
-                <AlertTriangle size={16} />
-              </div>
-            </div>
-            <h3 className="text-lg font-black text-rose-700 font-mono">
-              {formatNumber(lowStockProducts.length)} <span className="text-xs font-normal text-slate-500">produk</span>
-            </h3>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-2 font-mono">
-            Stok &lt; 10 unit
-          </p>
-        </div>
-      </div>
+      {/* Enam ubin KPI dalam Bento grid.
+          Sebelumnya grid-cols-1 di HP: enam kartu selebar layar, jadi
+          melihat piutang dan stok kritis perlu menggulir dua layar penuh.
+          Ubin "xs" memberi 2 per baris di HP, 4 di laptop, 6 di layar lebar. */}
+      <BentoGrid>
+        <StatTile
+          label="Omzet Bersih"
+          value={formatIDR(kpiMetrics.netRevenue)}
+          icon={TrendingUp}
+          tone="primary"
+          hint={`${formatNumber(kpiMetrics.totalTransactions)} Trx \u2022 ${formatNumber(kpiMetrics.totalItemsSold)} Unit`}
+        />
+        <StatTile
+          label={`Laba Kotor ${kpiMetrics.grossProfitMargin.toFixed(0)}%`}
+          value={formatIDR(kpiMetrics.grossProfit)}
+          icon={Percent}
+          tone="greenSoft"
+          hint={`HPP: ${formatIDR(kpiMetrics.totalHppCost)}`}
+        />
+        <StatTile
+          label="Rata-rata Belanja"
+          value={formatIDR(kpiMetrics.avgBasketSize)}
+          icon={ShoppingBag}
+          hint="Per struk belanja"
+        />
+        <StatTile
+          label="Volume Terjual"
+          value={`${formatNumber(kpiMetrics.totalItemsSold)} pcs`}
+          icon={Package}
+          tone="accentSoft"
+          hint="Total unit keluar"
+        />
+        <StatTile
+          label="Piutang Tertahan"
+          value={formatIDR(totalReceivables)}
+          icon={AlertCircle}
+          tone="redSoft"
+          hint="Belum diselesaikan"
+        />
+        <StatTile
+          label="Stok Kritis"
+          value={`${formatNumber(lowStockProducts.length)} produk`}
+          icon={AlertTriangle}
+          tone={lowStockProducts.length > 0 ? 'red' : 'default'}
+          hint="Stok di bawah 10 unit"
+        />
+      </BentoGrid>
 
       {/* Main Trends & Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-2.5 md:gap-4">
         {/* Left 2 Cols: Main Dual Trend Chart (Omzet vs Laba Kotor) */}
-        <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-xs border border-slate-200 flex flex-col h-[400px]">
+        <div className="col-span-2 lg:col-span-4 bg-white p-3 md:p-5 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 flex flex-col h-[280px] md:h-[400px]">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <div>
               <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
@@ -874,7 +815,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Right 1 Col: Payment Methods Donut Chart */}
-        <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 flex flex-col h-[400px]">
+        <div className="col-span-2 lg:col-span-2 bg-white p-3 md:p-5 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 flex flex-col h-[280px] md:h-[400px]">
           <div className="mb-2">
             <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
               <CreditCard size={16} className="text-purple-600" />
@@ -915,9 +856,9 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Hourly Peak Traffic Chart & Category Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-2.5 md:gap-4">
         {/* Hourly Traffic Chart (Peak Hours) */}
-        <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-xs border border-slate-200 h-[340px] flex flex-col">
+        <div className="col-span-2 lg:col-span-4 bg-white p-3 md:p-5 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 h-[260px] md:h-[340px] flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
@@ -944,11 +885,11 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Top Categories Ranking */}
-        <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 h-[340px] flex flex-col">
+        <div className="col-span-2 lg:col-span-2 bg-white p-3 md:p-5 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 h-[260px] md:h-[340px] flex flex-col">
           <div className="mb-3">
             <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
               <Layers size={16} className="text-indigo-600" />
-              Kontribusi Kategori Teratas
+              Pendapatan Unit Usaha Teratas
             </h3>
             <p className="text-[11px] text-slate-400 mt-0.5">Omzet per kelompok produk</p>
           </div>
@@ -977,7 +918,7 @@ export const Dashboard: React.FC = () => {
 
       {/* Yearly View Specific Monthly Boxes */}
       {timeFilter === 'yearly' && (
-        <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
+        <div className="col-span-2 lg:col-span-3 bg-white p-3 md:p-5 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200">
           <h3 className="font-extrabold text-sm text-slate-900 mb-3 flex items-center gap-2">
             <CalendarDays size={16} className="text-emerald-600" />
             Rekapitulasi Omzet Bulanan - Tahun {selectedYear}
@@ -997,9 +938,9 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* Bottom Operational Grid: Top 5 Best Sellers & Critical Low Stock Alert */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-2.5 md:gap-4">
         {/* 5 Produk Terlaris */}
-        <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
+        <div className="col-span-2 lg:col-span-3 bg-white p-3 md:p-5 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200">
           <div className="flex justify-between items-center mb-4">
             <div>
               <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
@@ -1015,7 +956,7 @@ export const Dashboard: React.FC = () => {
 
           <div className="divide-y divide-slate-100 text-xs">
             {topProductsData.length === 0 ? (
-              <div className="text-center text-slate-400 py-6">Belum ada data produk terjual</div>
+              <div className="text-center text-slate-400 py-3 md:py-6">Belum ada data produk terjual</div>
             ) : topProductsData.map((prod, idx) => (
               <div key={prod.name} className="py-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -1038,7 +979,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Peringatan Stok Menipis */}
-        <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
+        <div className="col-span-2 lg:col-span-3 bg-white p-3 md:p-5 rounded-2xl md:rounded-3xl shadow-sm border border-slate-200">
           <div className="flex justify-between items-center mb-4">
             <div>
               <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
@@ -1054,14 +995,14 @@ export const Dashboard: React.FC = () => {
 
           <div className="divide-y divide-slate-100 text-xs">
             {lowStockProducts.length === 0 ? (
-              <div className="text-center text-emerald-600 py-6 flex items-center justify-center gap-2 font-bold">
+              <div className="text-center text-emerald-600 py-3 md:py-6 flex items-center justify-center gap-2 font-bold">
                 <CheckCircle2 size={16} /> Seluruh stok produk dalam kondisi aman!
               </div>
             ) : lowStockProducts.slice(0, 5).map(prod => (
               <div key={prod.id} className="py-2.5 flex items-center justify-between">
                 <div>
                   <p className="font-bold text-slate-800">{prod.name}</p>
-                  <p className="text-[10px] text-slate-400">Kategori: {prod.categoryName || '-'} • HPP: {formatIDR(prod.hpp || 0)}</p>
+                  <p className="text-[10px] text-slate-400">Unit Usaha: {prod.categoryName || '-'} • HPP: {formatIDR(prod.hpp || 0)}</p>
                 </div>
                 <div className="text-right">
                   <span className={`font-mono font-black px-2 py-0.5 rounded-lg ${prod.stock <= 3 ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>

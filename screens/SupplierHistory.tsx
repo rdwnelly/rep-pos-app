@@ -282,11 +282,11 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
     };
 
     return (
-        <div className="space-y-6 animate-fade-in p-2 md:p-0">
+        <div className="space-y-3 md:space-y-6 animate-fade-in p-2 md:p-0">
             {/* Header Bar */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <h1 className="text-base md:text-2xl font-bold text-slate-800 flex items-center gap-2">
                         <TruckIcon className="text-amber-600" />
                         Riwayat Pembelian & Aktivitas Supplier
                     </h1>
@@ -307,14 +307,14 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
             </div>
 
             {/* Metric Summary Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
                 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Pembelian</p>
                         <h3 className="text-lg font-extrabold text-slate-900 mt-1">{formatIDR(totals.totalPurchases)}</h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">{filteredPurchases.length} Transaksi Pembelian</p>
                     </div>
-                    <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
                         <TruckIcon size={22} />
                     </div>
                 </div>
@@ -325,7 +325,7 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
                         <h3 className="text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(totals.totalPaid)}</h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">Sudah Dilunasi</p>
                     </div>
-                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
                         <TruckIcon size={22} />
                     </div>
                 </div>
@@ -336,7 +336,7 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
                         <h3 className="text-lg font-extrabold text-rose-600 mt-1">{formatIDR(totals.totalDebt)}</h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">Belum Lunas</p>
                     </div>
-                    <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
                         <TruckIcon size={22} />
                     </div>
                 </div>
@@ -349,7 +349,7 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
                         </h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">{suppliers.length} Supplier Master Data</p>
                     </div>
-                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
                         <TruckIcon size={22} />
                     </div>
                 </div>
@@ -538,7 +538,7 @@ export const SupplierHistory: React.FC<SupplierHistoryProps> = ({ currentUser })
                                 <X size={18} />
                             </button>
                         </div>
-                        <div className="p-5 max-h-[75vh] overflow-y-auto space-y-4 text-xs">
+                        <div className="p-3 md:p-5 max-h-[75vh] overflow-y-auto space-y-4 text-xs">
                             <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
                                 <div>
                                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Waktu Pembelian</span>

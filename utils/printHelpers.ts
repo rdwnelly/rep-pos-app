@@ -1189,7 +1189,7 @@ export const generatePrintDashboard = (
                         </div>
                     </div>
                      <div class="chart-box">
-                        <div class="chart-header">5 Kategori Terlaris</div>
+                        <div class="chart-header">5 Unit Usaha Terlaris</div>
                          <div class="horz-bars">
                             ${data.topCategories.map(c => `
                                 <div class="hb-item">
@@ -1207,7 +1207,7 @@ export const generatePrintDashboard = (
                 
                  <div class="charts-row">
                     <div class="chart-box" style="grid-column: span 2;">
-                        <div class="chart-header">Pendapatan per Kategori</div>
+                        <div class="chart-header">Pendapatan Unit Usaha</div>
                         <div class="pie-container">
                             <div class="pie-chart" style="${pieStyle}"></div>
                             <div class="pie-legend">

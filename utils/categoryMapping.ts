@@ -6,28 +6,34 @@ import {
 } from '../types';
 
 /**
- * Satu-satunya tempat kategori diterjemahkan menjadi baris laporan dan
+ * Satu-satunya tempat unit usaha diterjemahkan menjadi baris laporan dan
  * jenis layanan kunjungan.
  *
  * Sebelumnya logika ini ada dalam tiga salinan — Berita Acara, Laporan
  * Bulanan, dan POS — yang masing-masing mencocokkan potongan nama
- * kategori. Salinan di Berita Acara dan Laporan Bulanan sudah nyaris
+ * unit usaha. Salinan di Berita Acara dan Laporan Bulanan sudah nyaris
  * identik tetapi tidak persis, dan tidak ada yang menjamin ketiganya
  * tetap sejalan.
  *
  * Urutan penentuan:
- *   1. Pakai `reportGroup` / `visitorService` pada dokumen kategori.
+ *   1. Pakai `reportGroup` / `visitorService` pada dokumen unit usaha.
  *   2. Bila belum disetel, jatuh kembali ke pencocokan nama LAMA.
  *
  * Langkah kedua membuat seluruh data yang sudah ada berjalan persis
- * seperti sebelumnya, sehingga penyetelan kategori dapat dilakukan
+ * seperti sebelumnya, sehingga penyetelan unit usaha dapat dilakukan
  * bertahap tanpa mengubah satu pun angka laporan.
  */
 
 /** Pencocokan nama warisan. Dipertahankan apa adanya demi kesetaraan perilaku. */
 export const legacyGroupFromName = (catName: string): CategoryReportGroup | null => {
   const lower = (catName || '').toLowerCase().trim();
-  if (!lower || lower === 'umum' || lower === 'tanpa kategori') return CategoryReportGroup.TOKO_SOUVENIR;
+  // Teks lama "tanpa kategori" tetap dikenali di samping istilah barunya
+  // "tanpa unit usaha": data lama menyimpan teks itu pada categoryName, dan
+  // mengubah pencocoknya saja akan memindahkan pendapatannya ke baris lain
+  // tanpa peringatan.
+  if (!lower || lower === 'umum' || lower === 'tanpa kategori' || lower === 'tanpa unit usaha') {
+    return CategoryReportGroup.TOKO_SOUVENIR;
+  }
   if (lower.includes('sewa kostum keluar') || lower.includes('kostum keluar')) return CategoryReportGroup.SEWA_KOSTUM_KELUAR;
   if (lower.includes('taman etnik') || lower.includes('taman') || lower.includes('tiket') || lower.includes('sewa kostum') || lower.includes('kostum')) return CategoryReportGroup.TAMAN_ETNIK;
   if (lower.includes('toko') || lower.includes('souvenir') || lower.includes('sovenir')) return CategoryReportGroup.TOKO_SOUVENIR;
@@ -45,9 +51,9 @@ const findCategory = (catName: string, categories?: Category[]): Category | unde
 };
 
 /**
- * Nama baris laporan untuk sebuah kategori.
+ * Nama baris laporan untuk sebuah unit usaha.
  *
- * Kategori yang tidak dikenali tetap mengembalikan namanya sendiri,
+ * Unit usaha yang tidak dikenali tetap mengembalikan namanya sendiri,
  * sehingga muncul sebagai baris baru pada laporan — persis seperti
  * perilaku lama.
  */
@@ -71,7 +77,7 @@ export const resolveReportGroup = (catName: string, categories?: Category[]): Ca
 /** Pencocokan nama warisan untuk layanan kunjungan. */
 export const legacyVisitorServiceFromName = (catName: string): VisitorServiceType | null => {
   const cat = (catName || '').toLowerCase();
-  // Kostum didahulukan: kategorinya kadang memuat kata "taman", yang
+  // Kostum didahulukan: unit usahanya kadang memuat kata "taman", yang
   // kalau diperiksa belakangan akan terbaca sebagai tiket masuk.
   if (cat.includes('kostum')) return VisitorServiceType.SEWA_KOSTUM;
   if (cat.includes('homestay') || cat.includes('penginapan') || cat.includes('kamar')) return VisitorServiceType.HOMESTAY;
@@ -81,7 +87,7 @@ export const legacyVisitorServiceFromName = (catName: string): VisitorServiceTyp
 };
 
 /**
- * Jenis layanan kunjungan untuk sebuah kategori, atau null bila
+ * Jenis layanan kunjungan untuk sebuah unit usaha, atau null bila
  * penjualannya tidak menandakan ada tamu berkunjung.
  */
 export const resolveVisitorService = (
@@ -95,23 +101,23 @@ export const resolveVisitorService = (
   if (found && found.visitorService) {
     dariKategori = found.visitorService;
   } else if (found && 'visitorService' in found) {
-    // Kategori yang sudah disetel tetapi sengaja dikosongkan jenis
+    // Unit usaha yang sudah disetel tetapi sengaja dikosongkan jenis
     // layanannya tidak boleh jatuh ke tebakan nama.
     dariKategori = null;
   } else {
     dariKategori = legacyVisitorServiceFromName(catName);
   }
 
-  // Kategori yang bukan layanan kunjungan berhenti di sini. Nama produk
+  // Unit usaha yang bukan layanan kunjungan berhenti di sini. Nama produk
   // TIDAK boleh memunculkan layanan dari ketiadaan: menu "Paket Nasi
-  // Goreng" di kategori Kafe & Resto bukan paket wisata.
+  // Goreng" di unit usaha Kafe & Resto bukan paket wisata.
   if (!dariKategori) return null;
 
-  // Bila kategorinya memang layanan kunjungan, nama produk dipakai untuk
+  // Bila unit usahanya memang layanan kunjungan, nama produk dipakai untuk
   // MEMPERTAJAM jenisnya. Satu baris bernama "Sewa Kostum" adalah sewa
-  // kostum, di kategori mana pun ia diletakkan.
+  // kostum, di unit usaha mana pun ia diletakkan.
   //
-  // Tanpa ini, produk kostum yang dititipkan ke kategori "Taman Etnik"
+  // Tanpa ini, produk kostum yang dititipkan ke unit usaha "Taman Etnik"
   // terbaca sebagai tiket masuk — sehingga 3 tiket + 3 kostum dihitung
   // 6 pengunjung, padahal orangnya tiga.
   if (itemName) {

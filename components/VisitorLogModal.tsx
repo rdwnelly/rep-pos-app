@@ -186,7 +186,7 @@ export const VisitorLogModal: React.FC<Props> = ({
           </button>
         </div>
 
-        <div className="p-5 space-y-4 overflow-y-auto">
+        <div className="p-3 md:p-5 space-y-4 overflow-y-auto">
 
           {prefill?.soldSummary && (
             <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">

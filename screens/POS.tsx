@@ -51,8 +51,8 @@ const FlyingItem = ({ item, cartRect }: { item: any, cartRect?: DOMRect }) => {
  *
  * Keempat layanan berikut sama-sama menandakan ada tamu yang datang:
  * tiket masuk, paket tour/edukasi, sewa kostum, dan homestay. Semuanya
- * dijual sebagai produk biasa, jadi penandanya hanya nama kategori.
- * Pola pencocokan disamakan dengan pemetaan kategori pada Berita Acara.
+ * dijual sebagai produk biasa, jadi penandanya hanya nama unit usaha.
+ * Pola pencocokan disamakan dengan pemetaan unit usaha pada Berita Acara.
  */
 export const POS: React.FC = () => {
   const bluetooth = useBluetoothPrinter();
@@ -902,7 +902,7 @@ export const POS: React.FC = () => {
       {/* Product Catalog Grid Container */}
       <div className="flex-1 flex flex-col bg-slate-50 border-r border-slate-200 overflow-hidden">
         {/* Search Bar Header */}
-        <div className="p-2.5 sm:p-4 border-b border-slate-200 flex gap-2 sm:gap-3 bg-white shadow-sm z-10">
+        <div className="p-2 sm:p-4 border-b border-slate-200 flex gap-1.5 sm:gap-3 bg-white shadow-sm z-10">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 sm:w-4.5 sm:h-4.5" />
             <label htmlFor="posSearch" className="sr-only">Cari Produk POS</label>
@@ -985,15 +985,15 @@ export const POS: React.FC = () => {
         </div>
 
         {/* Product Cards Grid - Clear Legible Multi-Line Layout */}
-        <div className="flex-1 overflow-y-auto p-2 sm:p-3.5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3.5 content-start pb-28 lg:pb-3 touch-scroll">
+        <div className="flex-1 overflow-y-auto p-2 sm:p-3.5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5 sm:gap-3.5 content-start pb-28 lg:pb-3 touch-scroll">
           {visibleProducts.map(product => (
             <button
               key={product.id}
               onClick={(e) => addToCart(product, e)}
-              className="group flex flex-col justify-between items-start text-left bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-2 sm:p-2.5 hover:shadow-md hover:border-amber-500/60 transition-all active:scale-95 relative overflow-hidden cursor-pointer"
+              className="group flex flex-col justify-between items-start text-left bg-white border border-primary/10 rounded-2xl shadow-sm p-1.5 sm:p-2.5 hover:shadow-md hover:border-amber-500/60 transition-all active:scale-[0.98] relative overflow-hidden cursor-pointer"
               title={product.name}
             >
-              <div className="w-full aspect-square bg-slate-50 rounded-lg sm:rounded-xl mb-1.5 sm:mb-2 overflow-hidden relative border border-slate-100 flex items-center justify-center shrink-0">
+              <div className="w-full aspect-[4/3] sm:aspect-square bg-slate-50 rounded-lg sm:rounded-xl mb-1 sm:mb-2 overflow-hidden relative border border-slate-100 flex items-center justify-center shrink-0">
                 {product.image && !product.image.includes('picsum.photos') ? (
                   <img src={product.image} alt={product.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 ) : (
@@ -1009,7 +1009,7 @@ export const POS: React.FC = () => {
 
               <div className="w-full flex-1 flex flex-col justify-between">
                 <h4
-                  className="font-bold text-slate-800 text-xs sm:text-[13px] leading-snug line-clamp-2 min-h-[2rem] sm:min-h-[2.4rem] mb-1 group-hover:text-amber-700 transition-colors"
+                  className="font-bold text-slate-800 text-xs sm:text-[13px] leading-snug line-clamp-2 min-h-[1.7rem] sm:min-h-[2.4rem] mb-0.5 sm:mb-1 group-hover:text-amber-700 transition-colors"
                   title={product.name}
                 >
                   {product.name}
@@ -1035,7 +1035,7 @@ export const POS: React.FC = () => {
       </div>
 
       {/* Mobile Bottom Bar */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-2.5 sm:p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40 flex items-center justify-between gap-3 sm:gap-4">
+      <div className="lg:hidden fixed left-0 right-0 bilah-aksi-bawah bg-white border-t border-slate-200 p-2.5 sm:p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-[34] flex items-center justify-between gap-3 sm:gap-4">
         <div className="flex flex-col">
           <span className="text-[10px] sm:text-xs text-slate-500">{cart.reduce((acc, item) => acc + item.qty, 0)} Item di Keranjang</span>
           <span className="text-base sm:text-lg font-bold text-primary">{formatIDR(totalAmount)}</span>
@@ -1373,10 +1373,15 @@ export const POS: React.FC = () => {
             <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
 
               {/* Sisi Kiri: Receipt Preview */}
-              <div className="w-full md:w-5/12 bg-slate-50 border-r border-slate-200 p-6 flex flex-col relative overflow-hidden">
-                <div className="text-center mb-4 pb-4 border-b border-dashed border-slate-300 shrink-0">
-                  <h4 className="font-bold text-lg text-slate-800">{storeSettings?.name || 'Toko'}</h4>
-                  <p className="text-xs text-slate-500">Preview Struk Pembayaran</p>
+              <div className="w-full md:w-5/12 bg-slate-50 border-b md:border-b-0 md:border-r border-slate-200 p-3 md:p-6 flex flex-col relative overflow-hidden max-h-[40vh] md:max-h-none shrink-0 md:shrink">
+                {/* Di HP panel ini dibatasi 40vh dan daftar itemnya bergulir di
+                    dalam, supaya form pembayaran di bawahnya selalu terlihat.
+                    Sebelumnya panel ini tumbuh mengikuti jumlah item, jadi pada
+                    keranjang yang panjang kolom "Uang Dibayar" dan tombol
+                    simpan terdorong keluar layar. */}
+                <div className="text-center mb-2 md:mb-4 pb-2 md:pb-4 border-b border-dashed border-slate-300 shrink-0">
+                  <h4 className="font-bold text-sm md:text-lg text-slate-800">{storeSettings?.name || 'Toko'}</h4>
+                  <p className="text-[10px] md:text-xs text-slate-500">Preview Struk Pembayaran</p>
                 </div>
                 <div className="flex-1 overflow-y-auto pr-2 space-y-3 font-mono text-sm text-slate-700">
                   {cart.map((item, idx) => (
@@ -1422,7 +1427,7 @@ export const POS: React.FC = () => {
               {/* Sisi Kanan: Input Pembayaran & Numpad */}
               <div className="w-full md:w-7/12 flex flex-col bg-white overflow-hidden max-h-[90vh]">
                 {/* Header (Fixed) */}
-                <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 shrink-0">
+                <div className="flex justify-between items-center px-4 md:px-6 py-4 border-b border-slate-100 shrink-0">
                   <h3 className="text-xl font-bold text-slate-800">Detail Pembayaran</h3>
                   <button onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors cursor-pointer">
                     <X size={20} />
@@ -1430,7 +1435,7 @@ export const POS: React.FC = () => {
                 </div>
 
                 {/* Scrollable Form Body */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-4.5 touch-scroll">
+                <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-4.5 touch-scroll">
                   {/* Customer & Phone & Table */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
@@ -1541,7 +1546,7 @@ export const POS: React.FC = () => {
                           <input
                             type="text"
                             readOnly
-                            className="w-full pl-12 pr-4 py-3 text-2xl font-bold text-slate-900 bg-white border-2 border-slate-200 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                            className="w-full pl-12 pr-4 py-3 input-nominal-besar font-bold text-slate-900 bg-white border-2 border-slate-200 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                             value={formatNumber(parseFloat(amountPaid || '0'))}
                             placeholder="0"
                           />
@@ -1594,21 +1599,21 @@ export const POS: React.FC = () => {
                   {(paymentMethod === PaymentMethod.CASH) && parseFloat(amountPaid) >= totalAmount && (
                     <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex justify-between items-center animate-fade-in">
                       <span className="text-emerald-700 font-bold uppercase tracking-wider text-sm">Kembalian</span>
-                      <span className="text-2xl font-black text-emerald-600">{formatIDR(parseFloat(amountPaid) - totalAmount)}</span>
+                      <span className="text-xl md:text-2xl font-black text-emerald-600">{formatIDR(parseFloat(amountPaid) - totalAmount)}</span>
                     </div>
                   )}
 
                   {(paymentMethod === PaymentMethod.TEMPO || paymentMethod === PaymentMethod.BON || (paymentMethod === PaymentMethod.CASH && parseFloat(amountPaid) < totalAmount)) && (
                     <div className="p-4 bg-orange-50 rounded-xl border border-orange-200 flex justify-between items-center animate-fade-in">
                       <span className="text-orange-700 font-bold uppercase tracking-wider text-sm">Sisa Hutang BON</span>
-                      <span className="text-2xl font-black text-orange-600">{formatIDR(totalAmount - (parseFloat(amountPaid) || 0))}</span>
+                      <span className="text-xl md:text-2xl font-black text-orange-600">{formatIDR(totalAmount - (parseFloat(amountPaid) || 0))}</span>
                     </div>
                   )}
                 </div>
 
                 {/* Fixed Footer Action */}
                 <div className="p-4 sm:p-6 bg-white border-t border-slate-200 flex gap-3 shrink-0 shadow-lg z-20">
-                  <button onClick={() => setShowPaymentModal(false)} className="px-6 py-3.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition-colors cursor-pointer">Batal</button>
+                  <button onClick={() => setShowPaymentModal(false)} className="px-4 md:px-6 py-3.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition-colors cursor-pointer">Batal</button>
                   <button
                     onClick={() => {
                       if (paymentMethod === PaymentMethod.TRANSFER) {
@@ -1669,7 +1674,7 @@ export const POS: React.FC = () => {
 
               {/* Right Side: Details and Action */}
               <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
-                <h3 className="text-3xl font-black text-slate-800 mb-2">Selesaikan Pembayaran</h3>
+                <h3 className="text-lg md:text-3xl font-black text-slate-800 mb-2">Selesaikan Pembayaran</h3>
                 <p className="text-slate-500 mb-10 text-lg">Mohon tunjukkan layar ini kepada pelanggan untuk dipindai.</p>
 
                 <div className="mb-12">
@@ -1708,7 +1713,7 @@ export const POS: React.FC = () => {
             <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center">
               <CheckCircle size={48} className="text-emerald-500" />
             </div>
-            <h3 className="text-2xl font-bold text-slate-800">Transaksi Berhasil!</h3>
+            <h3 className="text-base md:text-2xl font-bold text-slate-800">Transaksi Berhasil!</h3>
             <p className="text-slate-500 text-center text-sm">Transaksi telah berhasil diproses dan disimpan.</p>
             <button
               onClick={() => setShowSuccessModal(false)}
@@ -1730,7 +1735,7 @@ export const POS: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-scale-in">
             {/* Header Modal */}
-            <div className="p-6 bg-gradient-to-r from-amber-600 to-amber-700 text-white flex justify-between items-center shrink-0">
+            <div className="p-3 md:p-6 bg-gradient-to-r from-amber-600 to-amber-700 text-white flex justify-between items-center shrink-0">
               <div>
                 <div className="flex items-center gap-2">
                   <Clock size={24} className="animate-spin-slow" />
@@ -1764,7 +1769,7 @@ export const POS: React.FC = () => {
             </div>
 
             {/* List Body */}
-            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+            <div className="p-3 md:p-6 overflow-y-auto flex-1 space-y-4">
               {openBills.filter(b =>
                 (b.tableNumber && b.tableNumber.toLowerCase().includes(openBillSearch.toLowerCase())) ||
                 b.customerName.toLowerCase().includes(openBillSearch.toLowerCase()) ||
@@ -1873,7 +1878,7 @@ export const POS: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col animate-scale-in">
             {/* Header Modal */}
-            <div className="p-6 bg-gradient-to-r from-amber-500 to-amber-600 text-white flex justify-between items-center shrink-0">
+            <div className="p-3 md:p-6 bg-gradient-to-r from-amber-500 to-amber-600 text-white flex justify-between items-center shrink-0">
               <div>
                 <div className="flex items-center gap-2">
                   <Receipt size={22} />
@@ -1893,7 +1898,7 @@ export const POS: React.FC = () => {
             </div>
 
             {/* Form Body */}
-            <div className="p-6 space-y-4 text-slate-800">
+            <div className="p-3 md:p-6 space-y-4 text-slate-800">
               {/* Quick Select Meja Pills */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Pilih Cepat Meja</label>

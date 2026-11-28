@@ -372,11 +372,11 @@ export const People: React.FC = () => {
     }, [loadMoreRef.current, filteredList]);
 
     return (
-        <div className="space-y-6 animate-fade-in p-2 md:p-0">
+        <div className="space-y-3 md:space-y-6 animate-fade-in p-2 md:p-0">
             {/* Header Controls */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <h1 className="text-base md:text-2xl font-bold text-slate-800 flex items-center gap-2">
                         <Users className="text-amber-600" />
                         Daftar Kontak (Pelanggan & Supplier)
                     </h1>
@@ -407,14 +407,14 @@ export const People: React.FC = () => {
             </div>
 
             {/* Metric Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
                 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Pelanggan</p>
                         <h3 className="text-lg font-extrabold text-slate-900 mt-1">{customers.length} <span className="text-xs font-normal text-slate-400">kontak</span></h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">Pelanggan Terdaftar</p>
                     </div>
-                    <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
                         <User size={22} />
                     </div>
                 </div>
@@ -425,7 +425,7 @@ export const People: React.FC = () => {
                         <h3 className="text-lg font-extrabold text-amber-600 mt-1">{suppliers.length} <span className="text-xs font-normal text-slate-400">supplier</span></h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">Mitra Pemasok</p>
                     </div>
-                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
                         <Truck size={22} />
                     </div>
                 </div>
@@ -438,18 +438,18 @@ export const People: React.FC = () => {
                         </h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">Akses Kontak Langsung</p>
                     </div>
-                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
                         <Phone size={22} />
                     </div>
                 </div>
 
                 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Kategori Terpilih</p>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Unit Usaha Terpilih</p>
                         <h3 className="text-lg font-extrabold text-purple-700 mt-1 capitalize">{activeTab === 'customers' ? 'Pelanggan' : 'Supplier'}</h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">{filteredList.length} Kontak Tampil</p>
                     </div>
-                    <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
                         <Users size={22} />
                     </div>
                 </div>
@@ -524,7 +524,7 @@ export const People: React.FC = () => {
             </div>
 
             {/* Card View */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2.5 md:gap-4">
                 {filteredList.length === 0 && (
                     <div className="col-span-full text-center py-12 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
                         Tidak ada data kontak ditemukan.
@@ -533,7 +533,7 @@ export const People: React.FC = () => {
                 {visibleList.map(item => {
                     const formattedWa = item.phone ? item.phone.replace(/^0/, '62').replace(/[^0-9]/g, '') : '';
                     return (
-                        <div key={item.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-amber-500/50 transition-colors group flex flex-col justify-between">
+                        <div key={item.id} className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-amber-500/50 transition-colors group flex flex-col justify-between">
                             <div>
                                 <div className="flex justify-between items-start mb-3">
                                     <div className="flex items-center gap-3">
@@ -618,7 +618,7 @@ export const People: React.FC = () => {
                                 <X size={18} />
                             </button>
                         </div>
-                        <div className="p-5 space-y-4 text-xs">
+                        <div className="p-3 md:p-5 space-y-4 text-xs">
                             <div className="flex justify-center mb-2 relative">
                                 <label className="relative w-20 h-20 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-amber-500 overflow-hidden group">
                                     {formData.image ? (

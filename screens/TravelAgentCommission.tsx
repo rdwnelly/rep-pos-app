@@ -31,14 +31,14 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
   const availablePackageCategories = useMemo(() => {
     const list: string[] = [];
 
-    // 1. Kategori dari Master Data Kategori
+    // 1. Unit usaha dari Master Data
     categories.forEach(c => {
       if (c && c.name && !list.includes(c.name)) {
         list.push(c.name);
       }
     });
 
-    // 2. Kategori Produk & Produk Paket Wisata
+    // 2. Unit Usaha & Produk Paket Wisata
     products.forEach(p => {
       if (p.categoryName && !list.includes(p.categoryName)) {
         list.push(p.categoryName);
@@ -676,7 +676,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
   };
 
   return (
-    <div className="space-y-6 animate-fade-in p-2 md:p-0">
+    <div className="space-y-2.5 md:space-y-6 animate-fade-in">
       {/* Header Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-4 print:hidden">
         <div>
@@ -685,7 +685,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
               <BadgePercent size={22} />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <h1 className="text-base md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
                 Manajemen Target & Komisi Driver / Guide
                 <span className="text-[11px] font-extrabold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full uppercase tracking-wider">
                   Partner System
@@ -761,14 +761,14 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
       </div>
 
       {/* Summary KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Total Komisi Berjalan</p>
             <h3 className="text-xl font-black text-emerald-600 font-mono mt-1">{formatIDR(overallTargetSummary.totalEarned)}</h3>
             <p className="text-[11px] text-slate-400 mt-0.5">Komisi pokok & bonus bulan {months[targetMonth]}</p>
           </div>
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+          <div className="max-md:hidden p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
             <Trophy size={24} />
           </div>
         </div>
@@ -779,7 +779,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
             <h3 className="text-xl font-black text-amber-600 font-mono mt-1">{formatIDR(overallTargetSummary.totalPending)}</h3>
             <p className="text-[11px] text-slate-400 mt-0.5">Menunggu pencairan kasir</p>
           </div>
-          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+          <div className="max-md:hidden p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
             <Clock size={24} />
           </div>
         </div>
@@ -790,7 +790,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
             <h3 className="text-xl font-black text-blue-600 font-mono mt-1">{formatIDR(overallTargetSummary.totalSales)}</h3>
             <p className="text-[11px] text-slate-400 mt-0.5">Dibawa oleh Driver & Guide</p>
           </div>
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+          <div className="max-md:hidden p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
             <DollarSign size={24} />
           </div>
         </div>
@@ -803,7 +803,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
             </h3>
             <p className="text-[11px] text-slate-400 mt-0.5">Mencapai target omzet bulanan</p>
           </div>
-          <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
+          <div className="max-md:hidden p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
             <Award size={24} />
           </div>
         </div>
@@ -813,11 +813,11 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
       {/* TAB 1: TARGET & ESTIMASI KOMISI PER DRIVER / GUIDE */}
       {/* ======================================================== */}
       {activeTab === 'targets' && (
-        <div className="space-y-6">
+        <div className="space-y-3 md:space-y-6">
           {/* Top Month Filter & Simulator Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6">
             {/* Left 2 Cols: Target Table Header & Filter */}
-            <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div className="lg:col-span-2 bg-white p-3 md:p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
                   <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
@@ -872,7 +872,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
             </div>
 
             {/* Right 1 Col: Live Commission Calculator Simulator */}
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-2xl shadow-md flex flex-col justify-between">
+            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-3 md:p-5 rounded-2xl shadow-md flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-black text-xs text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -1290,7 +1290,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
                 onChange={e => setAgentCategoryFilter(e.target.value)}
                 className="px-3.5 py-2 bg-white border border-slate-300 rounded-xl outline-none text-xs text-slate-700 font-medium"
               >
-                <option value="">Semua Kategori</option>
+                <option value="">Semua Unit Usaha</option>
                 <option value="Driver">Driver</option>
                 <option value="Tour Guide">Tour Guide</option>
                 <option value="Driver & Guide">Driver & Guide</option>
@@ -1317,9 +1317,9 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2.5 md:gap-4">
             {filteredAgents.map(agent => (
-              <div key={agent.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:border-amber-300 transition-all flex flex-col justify-between">
+              <div key={agent.id} className="bg-white p-3 md:p-5 rounded-2xl border border-slate-200 shadow-xs hover:border-amber-300 transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start gap-2">
                     <div>
@@ -1399,7 +1399,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
       {/* Modal: Tambah / Edit Driver & Guide */}
       {isAgentModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-scale-up">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-3 md:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-scale-up">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                 <Users size={18} className="text-amber-600" />
@@ -1578,7 +1578,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
       {/* Modal: Catat / Edit Komisi Booking */}
       {isCommissionModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-scale-up">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-3 md:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-scale-up">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                 <BadgePercent size={18} className="text-amber-600" />
@@ -1666,14 +1666,14 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
 
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block font-bold text-slate-700">Keterangan Belanja / Kategori Paket *</label>
+                  <label className="block font-bold text-slate-700">Keterangan Belanja / Unit Usaha *</label>
                   <span className="text-[10px] text-amber-800 font-bold bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
                     Produk & Inventaris
                   </span>
                 </div>
 
                 <div className="space-y-1.5">
-                  {/* Dropdown Kategori / Paket dari Master Data Produk & Inventaris */}
+                  {/* Dropdown Unit Usaha / Paket dari Master Data Produk & Inventaris */}
                   <select
                     value={availablePackageCategories.includes(commissionForm.tourPackage || '') ? commissionForm.tourPackage : '__CUSTOM__'}
                     onChange={(e) => {
@@ -1697,8 +1697,8 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
                     }}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none text-xs font-semibold bg-white text-slate-800 focus:border-amber-600 shadow-2xs cursor-pointer"
                   >
-                    <option value="">-- Pilih Kategori / Paket Terdaftar --</option>
-                    <optgroup label="📦 Kategori Master Produk & Inventaris">
+                    <option value="">-- Pilih Unit Usaha / Paket Terdaftar --</option>
+                    <optgroup label="📦 Unit Usaha Terdaftar">
                       {availablePackageCategories.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
@@ -1795,7 +1795,7 @@ export const TravelAgentCommission: React.FC<TravelAgentCommissionProps> = ({ cu
       {/* Modal: Cairkan / Bayar Komisi Driver */}
       {disbursingCommission && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-scale-up">
+          <div className="bg-white rounded-3xl max-w-md w-full p-3 md:p-6 shadow-2xl space-y-4 animate-scale-up">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                 <DollarSign size={18} className="text-emerald-600" />

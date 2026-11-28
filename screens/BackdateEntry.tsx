@@ -722,7 +722,7 @@ export const BackdateEntry: React.FC<BackdateEntryProps> = ({ currentUser }) => 
         </div>
 
         {/* Mobile Bottom Bar */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-2.5 sm:p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40 flex items-center justify-between gap-3 sm:gap-4">
+        <div className="lg:hidden fixed left-0 right-0 bilah-aksi-bawah bg-white border-t border-slate-200 p-2.5 sm:p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-[34] flex items-center justify-between gap-3 sm:gap-4">
           <div className="flex flex-col">
             <span className="text-[10px] sm:text-xs text-slate-500">{cart.reduce((acc, item) => acc + item.qty, 0)} Item di Keranjang</span>
             <span className="text-base sm:text-lg font-bold text-orange-600">{formatIDR(totalAmount)}</span>
@@ -1038,7 +1038,7 @@ export const BackdateEntry: React.FC<BackdateEntryProps> = ({ currentUser }) => 
           <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
 
             {/* Sisi Kiri: Receipt Preview */}
-            <div className="w-full md:w-5/12 bg-slate-50 border-r border-slate-200 p-6 flex flex-col relative overflow-hidden">
+            <div className="w-full md:w-5/12 bg-slate-50 border-r border-slate-200 p-3 md:p-6 flex flex-col relative overflow-hidden">
               <div className="text-center mb-4 pb-4 border-b border-dashed border-slate-300 shrink-0">
                 <h4 className="font-bold text-lg text-slate-800">{storeSettings?.name || 'Toko'}</h4>
                 <p className="text-xs text-orange-600 font-bold uppercase tracking-wider">Preview Struk Transaksi Susulan</p>
@@ -1083,7 +1083,7 @@ export const BackdateEntry: React.FC<BackdateEntryProps> = ({ currentUser }) => 
             {/* Sisi Kanan: Input Pembayaran & Numpad */}
             <div className="w-full md:w-7/12 flex flex-col bg-white overflow-hidden max-h-[90vh]">
               {/* Header (Fixed) */}
-              <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 shrink-0">
+              <div className="flex justify-between items-center px-4 md:px-6 py-4 border-b border-slate-100 shrink-0">
                 <h3 className="text-xl font-bold text-slate-800">Detail Pembayaran Susulan</h3>
                 <button onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors cursor-pointer">
                   <X size={20} />
@@ -1091,7 +1091,7 @@ export const BackdateEntry: React.FC<BackdateEntryProps> = ({ currentUser }) => 
               </div>
 
               {/* Scrollable Form Body */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4.5 touch-scroll">
+              <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-4.5 touch-scroll">
                 {/* Customer & Phone & Table */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
@@ -1202,7 +1202,7 @@ export const BackdateEntry: React.FC<BackdateEntryProps> = ({ currentUser }) => 
                         <input
                           type="text"
                           readOnly
-                          className="w-full pl-12 pr-4 py-3 text-2xl font-bold text-slate-900 bg-white border-2 border-slate-200 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all"
+                          className="w-full pl-12 pr-4 py-3 input-nominal-besar font-bold text-slate-900 bg-white border-2 border-slate-200 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all"
                           value={formatNumber(parseFloat(amountPaid || '0'))}
                           placeholder="0"
                         />
@@ -1255,21 +1255,21 @@ export const BackdateEntry: React.FC<BackdateEntryProps> = ({ currentUser }) => 
                 {(paymentMethod === PaymentMethod.CASH) && parseFloat(amountPaid) >= totalAmount && (
                   <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex justify-between items-center animate-fade-in">
                     <span className="text-emerald-700 font-bold uppercase tracking-wider text-sm">Kembalian</span>
-                    <span className="text-2xl font-black text-emerald-600">{formatIDR(parseFloat(amountPaid) - totalAmount)}</span>
+                    <span className="text-xl md:text-2xl font-black text-emerald-600">{formatIDR(parseFloat(amountPaid) - totalAmount)}</span>
                   </div>
                 )}
 
                 {(paymentMethod === PaymentMethod.TEMPO || paymentMethod === PaymentMethod.BON || (paymentMethod === PaymentMethod.CASH && parseFloat(amountPaid) < totalAmount)) && (
                   <div className="p-4 bg-orange-50 rounded-xl border border-orange-200 flex justify-between items-center animate-fade-in">
                     <span className="text-orange-700 font-bold uppercase tracking-wider text-sm">Sisa Hutang BON</span>
-                    <span className="text-2xl font-black text-orange-600">{formatIDR(totalAmount - (parseFloat(amountPaid) || 0))}</span>
+                    <span className="text-xl md:text-2xl font-black text-orange-600">{formatIDR(totalAmount - (parseFloat(amountPaid) || 0))}</span>
                   </div>
                 )}
               </div>
 
               {/* Fixed Footer Action */}
               <div className="p-4 sm:p-6 bg-white border-t border-slate-200 flex gap-3 shrink-0 shadow-lg z-20">
-                <button onClick={() => setShowPaymentModal(false)} className="px-6 py-3.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition-colors cursor-pointer">Batal</button>
+                <button onClick={() => setShowPaymentModal(false)} className="px-4 md:px-6 py-3.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition-colors cursor-pointer">Batal</button>
                 <button
                   disabled={isSubmitting}
                   onClick={() => {
@@ -1331,7 +1331,7 @@ export const BackdateEntry: React.FC<BackdateEntryProps> = ({ currentUser }) => 
 
             {/* Right Side: Details and Action */}
             <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
-              <h3 className="text-3xl font-black text-slate-800 mb-2">Selesaikan Pembayaran</h3>
+              <h3 className="text-lg md:text-3xl font-black text-slate-800 mb-2">Selesaikan Pembayaran</h3>
               <p className="text-slate-500 mb-10 text-lg">Mohon tunjukkan layar ini kepada pelanggan untuk dipindai.</p>
 
               <div className="mb-12">

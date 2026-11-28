@@ -149,11 +149,11 @@ export const BarcodeGenerator: React.FC = () => {
     }, [selectedProducts]);
 
     return (
-        <div className="space-y-6 animate-fade-in p-2 md:p-0">
+        <div className="space-y-3 md:space-y-6 animate-fade-in p-2 md:p-0">
             {/* Header Bar */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <h1 className="text-base md:text-2xl font-bold text-slate-800 flex items-center gap-2">
                         <Barcode className="text-amber-600" />
                         Cetak Label & Barcode Produk
                     </h1>
@@ -180,14 +180,14 @@ export const BarcodeGenerator: React.FC = () => {
             </div>
 
             {/* Metric Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
                 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Produk Katalog</p>
                         <h3 className="text-lg font-extrabold text-slate-900 mt-1">{products.length} <span className="text-xs font-normal text-slate-400">item</span></h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">{filteredProducts.length} Tampil Hasil Filter</p>
                     </div>
-                    <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
                         <Barcode size={22} />
                     </div>
                 </div>
@@ -198,7 +198,7 @@ export const BarcodeGenerator: React.FC = () => {
                         <h3 className="text-lg font-extrabold text-amber-600 mt-1">{selectedProducts.length} <span className="text-xs font-normal text-slate-400">jenis</span></h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">Produk Dipilih</p>
                     </div>
-                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
                         <Printer size={22} />
                     </div>
                 </div>
@@ -209,7 +209,7 @@ export const BarcodeGenerator: React.FC = () => {
                         <h3 className="text-lg font-extrabold text-emerald-600 mt-1">{totalLabelsCount} <span className="text-xs font-normal text-slate-400">lembar</span></h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">Siap Dicetak</p>
                     </div>
-                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
                         <Barcode size={22} />
                     </div>
                 </div>
@@ -220,16 +220,16 @@ export const BarcodeGenerator: React.FC = () => {
                         <h3 className="text-base font-extrabold text-purple-700 mt-1">A4 Sticker Grid</h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">CODE128 Auto Layout</p>
                     </div>
-                    <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
                         <Printer size={22} />
                     </div>
                 </div>
             </div>
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6">
                 {/* Product Catalog Picker */}
-                <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col h-[620px]">
+                <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-3 md:p-5 flex flex-col h-[620px]">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                         <div className="relative flex-1 w-full">
                             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -307,7 +307,7 @@ export const BarcodeGenerator: React.FC = () => {
                 </div>
 
                 {/* Print Queue Container */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col h-[620px]">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 md:p-5 flex flex-col h-[620px]">
                     <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
                         <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                             <Printer size={16} className="text-amber-600" /> Antrian Cetak Label

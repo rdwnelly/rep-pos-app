@@ -652,7 +652,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
 
         const catTitle = worksheetCategoryFilter
             ? (categories.find(c => c.id === worksheetCategoryFilter)?.name || worksheetCategoryFilter)
-            : 'Semua Kategori';
+            : 'Semua Unit Usaha';
 
         const dayName = getDayName(opnameDateTime);
         const fullDate = getFullDateDisplay(opnameDateTime);
@@ -703,7 +703,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                     <div class="meta-grid">
                         <div class="meta-item"><strong>Hari, Tanggal Opname:</strong> ${fullDate}</div>
                         <div class="meta-item"><strong>Waktu / Jam:</strong> ${timeStr} WIB</div>
-                        <div class="meta-item"><strong>Kategori Produk:</strong> ${catTitle} (${targetProducts.length} Produk)</div>
+                        <div class="meta-item"><strong>Unit Usaha:</strong> ${catTitle} (${targetProducts.length} Produk)</div>
                         <div class="meta-item"><strong>Petugas Pemeriksa:</strong> ${currentUser?.name || '...........................................'}</div>
                     </div>
 
@@ -713,7 +713,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                                 <th style="width: 25px; text-align: center;">No</th>
                                 <th style="width: 85px;">Barcode/SKU</th>
                                 <th>Nama Produk</th>
-                                <th style="width: 90px;">Kategori</th>
+                                <th style="width: 90px;">Unit Usaha</th>
                                 <th style="width: 45px; text-align: center;">Satuan</th>
                                 <th style="width: 65px; text-align: center;">Stok Buku</th>
                                 <th style="width: 85px; text-align: center; background: #e2e8f0;">Hasil Fisik Real</th>
@@ -915,7 +915,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                 'Jam / Waktu': getTimeDisplay(item.date),
                 'SKU / Barcode': product?.sku || '-',
                 'Nama Produk': item.productName,
-                'Kategori': product?.categoryName || '-',
+                'Unit Usaha': product?.categoryName || '-',
                 'HPP (Modal)': hpp,
                 'Tipe': item.type === 'INCREASE' ? 'Penambahan (+)' : 'Pengurangan (-)',
                 'Alasan': item.reason,
@@ -950,7 +950,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
 
     const handleExportCSV = () => {
         const headers = [
-            'ID', 'Hari', 'Tanggal', 'Jam', 'Barcode/SKU', 'Produk', 'Kategori',
+            'ID', 'Hari', 'Tanggal', 'Jam', 'Barcode/SKU', 'Produk', 'Unit Usaha',
             'HPP', 'Tipe', 'Alasan', 'Stok Awal', 'Selisih Qty', 'Nilai Selisih Rp', 'Stok Akhir', 'Petugas', 'Catatan'
         ];
 
@@ -983,11 +983,11 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
     };
 
     return (
-        <div className="space-y-6 animate-fade-in p-2 md:p-0">
+        <div className="space-y-3 md:space-y-6 animate-fade-in p-2 md:p-0">
             {/* Top Title & Quick Actions Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
                 <div>
-                    <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2.5 tracking-tight">
+                    <h1 className="text-base md:text-2xl font-black text-slate-900 flex items-center gap-2.5 tracking-tight">
                         <div className="p-2 bg-amber-500 text-white rounded-xl shadow-md shadow-amber-500/20">
                             <ClipboardCheck size={22} />
                         </div>
@@ -1028,7 +1028,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
             </div>
 
             {/* Historical Summary Metric Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
                 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
                     <div>
                         <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Total Hari Opname</p>
@@ -1038,7 +1038,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                         </h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">Riwayat audit fisik harian</p>
                     </div>
-                    <div className="p-3 bg-slate-100 text-slate-700 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-slate-100 text-slate-700 rounded-xl shrink-0">
                         <CalendarDays size={22} />
                     </div>
                 </div>
@@ -1053,7 +1053,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                             +{formatIDR(summaryStats.totalIncreaseValue)}
                         </p>
                     </div>
-                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
                         <TrendingUp size={22} />
                     </div>
                 </div>
@@ -1068,7 +1068,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                             -{formatIDR(summaryStats.totalDecreaseValue)}
                         </p>
                     </div>
-                    <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
                         <TrendingDown size={22} />
                     </div>
                 </div>
@@ -1161,13 +1161,13 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                 {/* TAB 1: WORKSHEET BATCH OPNAME */}
                 {/* ======================================================== */}
                 {activeTab === 'worksheet' && (
-                    <div className="p-5 space-y-4">
+                    <div className="p-3 md:p-5 space-y-4">
                         {/* Worksheet Filters & Quick Fill Actions */}
                         <div className="flex flex-wrap justify-between items-center gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
                             <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
                                 {/* Category Filter */}
                                 <div className="relative min-w-[180px]">
-                                    <label htmlFor="wsCategory" className="sr-only">Filter Kategori</label>
+                                    <label htmlFor="wsCategory" className="sr-only">Filter Unit Usaha</label>
                                     <select
                                         id="wsCategory"
                                         name="wsCategory"
@@ -1175,7 +1175,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                                         value={worksheetCategoryFilter}
                                         onChange={e => setWorksheetCategoryFilter(e.target.value)}
                                     >
-                                        <option value="">🏷️ Semua Kategori Produk</option>
+                                        <option value="">🏷️ Semua Unit Usaha</option>
                                         {categories.map(cat => (
                                             <option key={cat.id} value={cat.id}>{cat.name}</option>
                                         ))}
@@ -1257,7 +1257,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                                         <tr>
                                             <th className="p-3 text-center w-10">No</th>
                                             <th className="p-3 min-w-[200px]">Nama Produk</th>
-                                            <th className="p-3 min-w-[100px]">Kategori</th>
+                                            <th className="p-3 min-w-[100px]">Unit Usaha</th>
                                             <th className="p-3 text-right w-24">HPP (Modal)</th>
                                             <th className="p-3 text-center w-28 bg-amber-50/70 border-x border-amber-200">Stok Sistem</th>
                                             <th className="p-3 text-center w-36 bg-amber-100/70 border-r border-amber-300">Stok Fisik Real</th>
@@ -1313,7 +1313,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                                                     </td>
                                                     <td className="p-3 text-slate-600">
                                                         <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-semibold">
-                                                            {product.categoryName || 'Tanpa Kategori'}
+                                                            {product.categoryName || 'Tanpa Unit Usaha'}
                                                         </span>
                                                     </td>
                                                     <td className="p-3 text-right font-mono text-slate-600">
@@ -1446,7 +1446,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                                 type="button"
                                 onClick={handleBulkWorksheetSubmit}
                                 disabled={isBulkSubmitting || worksheetSummary.totalToAdjust === 0}
-                                className="w-full sm:w-auto px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-amber-600/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                className="w-full sm:w-auto px-4 md:px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-amber-600/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                             >
                                 {isBulkSubmitting ? (
                                     <>
@@ -1468,8 +1468,8 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                 {/* TAB 2: SINGLE ITEM QUICK SCAN / OPNAME */}
                 {/* ======================================================== */}
                 {activeTab === 'single' && (
-                    <div className="p-6">
-                        <form onSubmit={handleSingleSubmit} className="space-y-6">
+                    <div className="p-3 md:p-6">
+                        <form onSubmit={handleSingleSubmit} className="space-y-3 md:space-y-6">
                             {/* Searchable Product Selector */}
                             <div className="relative">
                                 <label htmlFor="productSearchInput" className="block text-xs font-extrabold text-slate-700 uppercase mb-2">
@@ -1535,7 +1535,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                                                     >
                                                         <div>
                                                             <span className="font-extrabold text-sm text-slate-800 group-hover:text-amber-700 transition-colors">{p.name}</span>
-                                                            <div className="text-xs text-slate-400 font-mono">{p.sku ? `SKU: ${p.sku} • ` : ''}{p.categoryName || 'Tanpa Kategori'} {p.unit ? `• ${p.unit}` : ''}</div>
+                                                            <div className="text-xs text-slate-400 font-mono">{p.sku ? `SKU: ${p.sku} • ` : ''}{p.categoryName || 'Tanpa Unit Usaha'} {p.unit ? `• ${p.unit}` : ''}</div>
                                                         </div>
                                                         <div className="bg-amber-50 text-amber-900 border border-amber-200 px-2.5 py-1 rounded-lg text-xs font-bold font-mono">
                                                             Stok Buku: {p.stock}
@@ -1556,7 +1556,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
 
                             {/* Selected Product Detail & Adjustment Form */}
                             {selectedProduct && (
-                                <div className="flex flex-col lg:flex-row gap-6 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                                <div className="flex flex-col lg:flex-row gap-3 md:gap-6 bg-slate-50 p-3 md:p-5 rounded-2xl border border-slate-200">
                                     {/* Product Box */}
                                     <div className="flex items-start gap-4 lg:w-1/3 border-b lg:border-b-0 lg:border-r border-slate-200 pb-4 lg:pb-0 lg:pr-5">
                                         <div className="w-20 h-20 bg-white rounded-xl border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
@@ -1568,7 +1568,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <h4 className="font-black text-slate-900 text-sm line-clamp-2">{selectedProduct.name}</h4>
-                                            <p className="text-xs text-slate-500 font-mono mt-0.5">{selectedProduct.sku ? `SKU: ${selectedProduct.sku} • ` : ''}{selectedProduct.categoryName || 'Tanpa Kategori'}</p>
+                                            <p className="text-xs text-slate-500 font-mono mt-0.5">{selectedProduct.sku ? `SKU: ${selectedProduct.sku} • ` : ''}{selectedProduct.categoryName || 'Tanpa Unit Usaha'}</p>
                                             <div className="mt-2 text-xs text-slate-600 font-mono">
                                                 HPP (Modal): <strong>{formatIDR(selectedProduct.hpp || 0)}</strong>
                                             </div>
@@ -1869,7 +1869,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                                 value={historyCategoryFilter}
                                 onChange={e => setHistoryCategoryFilter(e.target.value)}
                             >
-                                <option value="">🏷️ Semua Kategori</option>
+                                <option value="">🏷️ Semua Unit Usaha</option>
                                 {categories.map(c => (
                                     <option key={c.id} value={c.id}>{c.name}</option>
                                 ))}
@@ -2035,7 +2035,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                                                     <div className="font-extrabold text-slate-900">{item.productName}</div>
                                                     <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1.5">
                                                         {product?.sku && <span>SKU: {product.sku}</span>}
-                                                        <span>• {product?.categoryName || 'Tanpa Kategori'}</span>
+                                                        <span>• {product?.categoryName || 'Tanpa Unit Usaha'}</span>
                                                     </div>
                                                 </td>
                                                 <td className="p-3 text-center whitespace-nowrap">
@@ -2107,7 +2107,7 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
                                         <td className="p-3.5">
                                             <div className="font-extrabold text-slate-900">{item.productName}</div>
                                             <div className="text-[10px] text-slate-400 font-mono">
-                                                {product?.categoryName || 'Tanpa Kategori'}
+                                                {product?.categoryName || 'Tanpa Unit Usaha'}
                                             </div>
                                         </td>
                                         <td className="p-3.5 text-center whitespace-nowrap">

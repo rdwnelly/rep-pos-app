@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { LayoutDashboard, ShoppingCart, Package, Receipt, Wallet, Settings, LogOut, Users, Menu, ChevronLeft, Barcode, ShoppingBag, UserCheck, Truck, ArrowRightLeft, Undo2, ClipboardCheck, X, Info, FileText, Wifi, WifiOff, CloudUpload, CloudOff, UsersRound, Building2, BadgePercent, FileClock } from 'lucide-react';
+import { LogOut, Menu, X, Wifi, WifiOff, CloudUpload, CloudOff } from 'lucide-react';
 import { UserRole } from '../types';
+import { navItemsFor } from './navItems';
+import { BottomNav } from './BottomNav';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useSyncState } from '../hooks/useSyncState';
 import { clearSyncFailures } from '../services/syncStatus';
@@ -91,59 +93,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
     setIsSidebarOpen(prev => !prev);
   }, []);
 
-  // Memoize nav items untuk mencegah re-creation setiap render
-  const navItems = useMemo(() => {
-    let items = [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'pos', label: 'Kasir (POS)', icon: ShoppingCart },
+  // Daftar menu dibaca dari navItems.ts agar sidebar dan bilah bawah
+  // tidak punya dua salinan yang bisa melenceng.
+  const navItems = useMemo(() => navItemsFor(userRole), [userRole]);
 
-      { id: 'berita-acara', label: 'Berita Acara', icon: FileText },
-      { id: 'products', label: 'Produk', icon: Package },
-      { id: 'transactions', label: 'Riwayat & Utang', icon: Receipt },
-      { id: 'people', label: 'Kontak', icon: Users },
-      { id: 'monthly_report', label: 'Laporan Bulanan', icon: Building2 },
-      { id: 'travel_commission', label: 'Komisi Agen', icon: BadgePercent },
-      { id: 'visitor_data', label: 'Data Pengunjung', icon: UsersRound },
-      { id: 'customer_history', label: 'Riwayat Pelanggan', icon: UserCheck },
-      { id: 'supplier_history', label: 'Riwayat Supplier', icon: Truck },
-      { id: 'real_stock_check', label: 'Pengecekan Stok', icon: ClipboardCheck },
-      { id: 'sold_items', label: 'Barang Terjual', icon: ShoppingBag },
-    ];
-
-    // Kasir (POS) dan Data Pengunjung terbuka untuk SEMUA peran, termasuk
-    // Superadmin dan Gudang. Keduanya dipakai bergantian oleh siapa pun
-    // yang sedang berjaga di depan, jadi tidak lagi dibatasi per peran.
-    // Aturan Firestore tetap yang menentukan apa yang boleh disimpan
-    // (lihat firestore.rules: transactions & visitor_logs).
-    const ALL_ROLE_PAGES = ['pos', 'visitor_data'];
-
-    // Selain dua halaman di atas, role GUDANG hanya bisa akses Produk
-    // dan Pengecekan Stok.
-    if (userRole === UserRole.WAREHOUSE) {
-      items = items.filter(
-        item =>
-          ALL_ROLE_PAGES.includes(item.id) ||
-          item.id === 'products' ||
-          item.id === 'real_stock_check',
-      );
-    }
-
-    if (userRole === UserRole.OWNER || userRole === UserRole.SUPERADMIN || userRole === UserRole.ADMIN) {
-      items.push({ id: 'transfer_history', label: 'Riwayat Transfer', icon: ArrowRightLeft });
-      items.push({ id: 'return_history', label: 'Riwayat Retur', icon: Undo2 });
-      items.push({ id: 'barcode', label: 'Cetak Barcode', icon: Barcode });
-    }
-
-    // Transaksi Susulan: Kasir (POS) juga bisa akses, bukan hanya Admin
-    if (userRole !== UserRole.WAREHOUSE && userRole !== UserRole.SUPERADMIN) {
-      items.push({ id: 'backdate_entry', label: 'Transaksi Susulan', icon: FileClock });
-    }
-
-    items.push({ id: 'settings', label: 'Pengaturan', icon: Settings });
-    items.push({ id: 'about', label: 'Tentang Aplikasi', icon: Info });
-
-    return items;
-  }, [userRole]);
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
@@ -281,24 +234,41 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto bg-slate-100 flex flex-col relative w-full min-w-0">
-        {/* Mobile Header */}
-        <div className="md:hidden bg-white px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between shadow-sm sticky top-0 z-30 print:hidden">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => setMobileMenuOpen(true)}
-              className="p-1.5 -ml-1 text-slate-600 hover:bg-slate-100 rounded-lg active:bg-slate-200 transition-colors"
-              aria-label="Buka menu navigasi"
+        {/* Header HP: dipadatkan dan tombol hamburger dilepas, karena menu
+            lengkap sekarang dibuka dari tombol "Menu" di bilah bawah.
+            Status jaringan ikut ke sini supaya terlihat tanpa buka menu. */}
+        <div className="md:hidden bg-white px-3 h-11 flex items-center justify-between shadow-sm sticky top-0 z-30 print:hidden">
+          <span className="font-bold text-slate-800 text-sm tracking-tight truncate">KASIR RELY</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {(pendingSync > 0 || restoredPending) && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">
+                <CloudUpload size={11} className="animate-pulse" />
+                {pendingSync > 0 ? pendingSync : '!'}
+              </span>
+            )}
+            <span
+              className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${isOnline ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
+              title={isOnline ? 'Online (Sinkron)' : 'Offline (Mode Lokal)'}
             >
-              <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
-            </button>
-            <span className="font-bold text-slate-800 text-base sm:text-lg tracking-tight">KASIR RELY</span>
+              {isOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
+            </span>
           </div>
         </div>
 
-        <div className={`flex-1 w-full mx-auto flex flex-col min-w-0 ${activePage === 'pos' ? 'p-0 max-w-full' : 'p-3 sm:p-4 md:p-8 max-w-7xl'}`}>
+        {/* pb di HP memberi ruang setinggi bilah bawah + safe area iOS,
+            supaya baris terakhir tabel dan tombol simpan tidak tertutup. */}
+        <div className={`flex-1 w-full mx-auto flex flex-col min-w-0 ruang-bilah-bawah ${activePage === 'pos' ? 'p-0 max-w-full' : 'p-2.5 sm:p-4 md:p-8 max-w-7xl'}`}>
           {children}
         </div>
       </main>
+
+      <BottomNav
+        activePage={activePage}
+        onNavigate={onNavigate}
+        onOpenMenu={() => setMobileMenuOpen(true)}
+        userRole={userRole}
+        perluPerhatian={!isOnline || pendingSync > 0 || restoredPending || syncFailures.length > 0}
+      />
     </div>
   );
 };

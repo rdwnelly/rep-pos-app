@@ -4,10 +4,10 @@ import { SiGithub, SiWhatsapp } from '@icons-pack/react-simple-icons';
 
 export const About: React.FC = () => {
     return (
-        <div className="space-y-6 animate-fade-in pb-10">
+        <div className="space-y-3 md:space-y-6 animate-fade-in pb-10">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-2">
+                    <h1 className="text-lg md:text-3xl font-bold text-slate-800 flex items-center gap-2">
                         <Info className="text-primary" />
                         Tentang Aplikasi
                     </h1>
@@ -17,21 +17,21 @@ export const About: React.FC = () => {
 
             {/* Tentang Yayasan */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-primary/10 px-8 py-6 border-b border-primary/20">
-                    <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+                <div className="bg-primary/10 px-8 py-3 md:py-6 border-b border-primary/20">
+                    <h2 className="text-base md:text-2xl font-bold text-slate-800 flex items-center gap-3">
                         <Building className="text-primary" size={28} />
                         Yayasan Rumah Etnik Papua (REP)
                     </h2>
                 </div>
                 <div className="p-8">
-                    <div className="flex items-start gap-3 mb-6 text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div className="flex items-start gap-3 mb-3 md:mb-6 text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100">
                         <MapPin className="text-accent flex-shrink-0 mt-0.5" size={20} />
                         <p className="font-medium text-sm">
                             Jalan Baru Aimas - Klamono Km. 21, Kabupaten Sorong, Provinsi Papua Barat Daya.
                         </p>
                     </div>
                     
-                    <p className="text-slate-700 leading-relaxed mb-6 text-justify">
+                    <p className="text-slate-700 leading-relaxed mb-3 md:mb-6 text-justify">
                         Kami didirikan dengan visi luhur untuk menjadi pusat wisata budaya dan edukasi Papua yang berkelanjutan, serta menjadi motor penggerak pelestarian budaya dan pemberdayaan masyarakat asli Papua.
                     </p>
                     
@@ -42,13 +42,13 @@ export const About: React.FC = () => {
             </div>
 
             {/* Misi Digitalisasi */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 h-full">
                     <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                         <Globe className="text-blue-500" />
                         Misi Digitalisasi Kami
                     </h3>
-                    <p className="text-slate-600 mb-6 text-sm leading-relaxed text-justify">
+                    <p className="text-slate-600 mb-3 md:mb-6 text-sm leading-relaxed text-justify">
                         Sistem ini merupakan bagian dari langkah transformasi digital Yayasan Rumah Etnik Papua untuk menghadirkan tata kelola administrasi yang efisien, transparan, dan profesional. Ekosistem digital REP mencakup:
                     </p>
                     
@@ -85,9 +85,9 @@ export const About: React.FC = () => {
                 </div>
 
                 {/* Pengurus & Developer */}
-                <div className="space-y-6">
+                <div className="space-y-3 md:space-y-6">
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-                        <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                        <h3 className="text-xl font-bold text-slate-800 mb-3 md:mb-6 flex items-center gap-2">
                             <Users className="text-purple-500" />
                             Susunan Pengurus Yayasan
                         </h3>
@@ -113,11 +113,11 @@ export const About: React.FC = () => {
 
                     <div className="bg-slate-800 rounded-2xl shadow-sm border border-slate-700 p-8 text-white relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-accent/20 rounded-full blur-3xl -mr-10 -mt-10"></div>
-                        <h3 className="text-xl font-bold mb-6 flex items-center gap-2 relative z-10">
+                        <h3 className="text-xl font-bold mb-3 md:mb-6 flex items-center gap-2 relative z-10">
                             <Code className="text-accent" />
                             Informasi Pengembang
                         </h3>
-                        <p className="text-slate-300 text-sm mb-6 relative z-10 leading-relaxed text-justify">
+                        <p className="text-slate-300 text-sm mb-3 md:mb-6 relative z-10 leading-relaxed text-justify">
                             Arsitektur dan ekosistem perangkat lunak ini dirancang, dibangun, dan dikembangkan secara dedikatif oleh:
                         </p>
                         

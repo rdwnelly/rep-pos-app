@@ -120,3 +120,149 @@ aside {
     -webkit-overflow-scrolling: touch;
     margin-bottom: 0.5rem;
 }
+/* ==========================================================================
+   KEPADATAN MOBILE
+   ==========================================================================
+   Aplikasi ini punya 18 layar dengan belasan ribu baris penanda kelas.
+   Memperkecil font per layar berarti menyentuh ribuan kelas Tailwind satu
+   per satu — mahal, dan pasti ada yang terlewat.
+
+   Tailwind memakai satuan rem untuk ukuran font, padding, margin, gap,
+   dan lebar. Jadi memperkecil font dasar dokumen di layar HP akan
+   mengecilkan semuanya secara sebanding: teks tidak terpotong, dan
+   komponen otomatis lebih padat. Satu setelan, semua halaman ikut.
+
+   Yang TIDAK ikut mengecil: apa pun yang ditulis dalam px (tebal garis,
+   ikon lucide, tinggi minimum sasaran sentuh, lembar cetak A4) — memang
+   disengaja, supaya sasaran sentuh tetap nyaman dan hasil cetak tetap
+   berukuran benar.
+   ========================================================================== */
+
+/* HP: 14px (−12,5%). Tablet kecil: 15px. Laptop ke atas: tetap 16px. */
+@media screen and (max-width: 639px) {
+    html {
+        font-size: 87.5%;
+    }
+}
+
+@media screen and (min-width: 640px) and (max-width: 767px) {
+    html {
+        font-size: 93.75%;
+    }
+}
+
+/* Hasil cetak selalu 16px: struk dan lembar A4 tidak boleh ikut menyusut
+   hanya karena dicetak dari HP. */
+@media print {
+
+    html,
+    body {
+        font-size: 16px;
+    }
+}
+
+/* Ruang untuk bilah navigasi bawah, hanya di layar HP. Dipasang sebagai
+   kelas (bukan inline style) supaya di laptop tidak menyisakan 56px
+   ruang kosong di bawah halaman. */
+@media screen and (max-width: 767px) {
+    .ruang-bilah-bawah {
+        padding-bottom: calc(56px + env(safe-area-inset-bottom) + 0.5rem) !important;
+    }
+}
+
+/* Dipakai PageHeader kit Bento untuk baris aksi yang digeser horizontal. */
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
+/* Pola latar tipis untuk ubin Bento bernada gelap, memakai watermark
+   lembaga yang sudah ada di aplikasi. */
+.bento-pattern {
+    background-image: url("/sidebar-watermark.jpg");
+    background-size: 150px;
+    background-repeat: repeat;
+    opacity: 0.06;
+}
+
+/* Tabel data padat di HP.
+   Padding bawaan tiap sel membuat baris jadi tinggi, sehingga satu layar
+   HP hanya memuat tiga-empat baris data. Aturan ini sebelumnya digantung
+   pada .table-responsive-container, kelas yang ternyata tidak dipakai di
+   satu berkas pun — jadi tidak pernah berefek.
+
+   Dikecualikan: .report-table dan .ba-table, yakni tabel di dalam
+   pratinjau dokumen A4 Berita Acara dan Laporan Bulanan. Ukurannya
+   mengikuti lembar cetak, bukan layar. */
+@media screen and (max-width: 767px) {
+
+    table:not(.report-table):not(.ba-table) th,
+    table:not(.report-table):not(.ba-table) td {
+        padding-top: 0.375rem !important;
+        padding-bottom: 0.375rem !important;
+    }
+}
+
+/* Kolom input di HP dipaksa 16px.
+   iOS Safari memperbesar halaman sendiri setiap kali pengguna menyentuh
+   kolom yang fontnya di bawah 16px, dan halaman tidak kembali ke ukuran
+   semula — itu justru penyebab tampilan "terpotong" yang paling sering
+   dikeluhkan. Karena font dasar di HP sudah diturunkan ke 14px, kelas
+   seperti `text-base` kini bernilai 14px dan akan memicu zoom itu, jadi
+   kolom input harus dikecualikan dari penyusutan.
+
+   `!important` dipakai dengan sadar: pemilih elemen (0,0,1) kalah dari
+   kelas Tailwind (0,1,0) yang terpasang di hampir semua input di
+   aplikasi ini, sehingga tanpa itu aturannya tidak berpengaruh sama
+   sekali. Teksnya tidak terpotong — kolomnya yang ikut menyesuaikan,
+   dan 16px justru lebih enak untuk diketik dengan jempol. */
+@media screen and (max-width: 767px) {
+
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(.input-nominal-besar),
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* Bilah aksi bawah milik layar (bilah keranjang POS & Transaksi Susulan).
+   Keduanya tadinya `fixed bottom-0 z-40` — posisi dan lapisan yang sama
+   dengan bilah navigasi bawah, jadi di HP keduanya saling menutupi dan
+   tombol Bayar bisa tidak tersentuh. Di sini bilah aksi didudukkan tepat
+   di atas bilah navigasi, dengan z-index satu tingkat di bawahnya.
+   Dari 768px ke atas bilah navigasi tidak ada, jadi bilah aksi kembali
+   menempel ke dasar layar. */
+.bilah-aksi-bawah {
+    bottom: 0;
+}
+
+@media screen and (max-width: 767px) {
+    .bilah-aksi-bawah {
+        bottom: calc(56px + env(safe-area-inset-bottom));
+    }
+}
+
+/* Kolom nominal pembayaran di POS dan Transaksi Susulan.
+   Aturan input di atas memaksa semua kolom jadi 16px dengan !important
+   (demi mencegah zoom iOS), sehingga kelas Tailwind pada kolom ini tidak
+   berpengaruh. Padahal justru kolom inilah yang paling sering salah baca:
+   kasir mengetik nominal uang pelanggan sambil memegang uangnya. Jadi
+   dikecualikan langsung di dalam selektor aturan input di atas, lewat
+   :not(.input-nominal-besar). Menimpanya dari sini tidak akan berhasil:
+   `input:not([type=..]) x3` bernilai (0,3,1), sedangkan sebuah kelas hanya
+   (0,1,0) — jadi aturan globalnya yang menang, bahkan dengan !important di
+   kedua sisi. Nilainya tetap di atas 16px, jadi iOS juga tidak memperbesar
+   halaman. */
+.input-nominal-besar {
+    font-size: 20px;
+}
+
+@media screen and (min-width: 768px) {
+    .input-nominal-besar {
+        font-size: 1.5rem;
+    }
+}

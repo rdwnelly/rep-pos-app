@@ -395,7 +395,7 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
                                 <th style="width:30px">No</th>
                                 <th>Tanggal</th>
                                 <th>ID</th>
-                                <th>Tipe Kategori</th>
+                                <th>Tipe Unit Usaha</th>
                                 <th>Deskripsi Transaksi</th>
                                 <th>Bank / E-Wallet</th>
                                 <th>Alur Kas</th>
@@ -418,11 +418,11 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
     if (loading) return <Loading />;
 
     return (
-        <div className="space-y-6 animate-fade-in p-2 md:p-0">
+        <div className="space-y-3 md:space-y-6 animate-fade-in p-2 md:p-0">
             {/* Header Controls */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <h1 className="text-base md:text-2xl font-bold text-slate-800 flex items-center gap-2">
                         <ArrowRightLeft className="text-amber-600" />
                         Riwayat Transfer (Bank & E-Wallet)
                     </h1>
@@ -443,14 +443,14 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
             </div>
 
             {/* Dashboard Summary Metric Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
                 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Transfer Masuk (IN)</p>
                         <h3 className="text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(summaryStats.totalIn)}</h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">{summaryStats.countIn} Transaksi Uang Masuk</p>
                     </div>
-                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
                         <ArrowDownLeft size={22} />
                     </div>
                 </div>
@@ -461,7 +461,7 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
                         <h3 className="text-lg font-extrabold text-rose-600 mt-1">{formatIDR(summaryStats.totalOut)}</h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">{summaryStats.countOut} Transaksi Uang Keluar</p>
                     </div>
-                    <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
                         <ArrowUpRight size={22} />
                     </div>
                 </div>
@@ -485,7 +485,7 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
                         <h3 className="text-lg font-extrabold text-slate-900 mt-1">{summaryStats.totalItems} <span className="text-xs font-normal text-slate-400">transaksi</span></h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">{bankOptions.length} Bank / E-Wallet Terkait</p>
                     </div>
-                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
                         <CreditCard size={22} />
                     </div>
                 </div>
@@ -614,7 +614,7 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
                         <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
                             <tr>
                                 <th className="p-3.5">Tanggal & Ref</th>
-                                <th className="p-3.5">Kategori / Tipe</th>
+                                <th className="p-3.5">Unit Usaha / Tipe</th>
                                 <th className="p-3.5">Deskripsi Mutasi</th>
                                 <th className="p-3.5">Bank / E-Wallet</th>
                                 <th className="p-3.5 text-right">Jumlah Total</th>
@@ -707,7 +707,7 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
                         </div>
 
                         {/* Modal Body */}
-                        <div className="p-5 space-y-4 text-xs max-h-[75vh] overflow-y-auto">
+                        <div className="p-3 md:p-5 space-y-4 text-xs max-h-[75vh] overflow-y-auto">
                             {/* Toko Info & Badge Status */}
                             <div className="text-center pb-3 border-b border-slate-200">
                                 <h2 className="text-base font-extrabold text-slate-800 uppercase tracking-wide">
@@ -734,7 +734,7 @@ export const TransferHistory: React.FC<TransferHistoryProps> = ({ currentUser })
                                     <span className="font-bold text-slate-800">{selectedReceipt.item.bankName}</span>
                                 </div>
                                 <div>
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Kategori</span>
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Unit Usaha</span>
                                     <span className="font-bold text-amber-700">{selectedReceipt.item.subType}</span>
                                 </div>
                             </div>

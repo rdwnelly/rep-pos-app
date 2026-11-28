@@ -17,12 +17,12 @@ export interface User {
 }
 
 /**
- * Kelompok baris laporan tempat sebuah kategori dijumlahkan.
+ * Kode unit usaha SIK-REP tempat sebuah unit usaha dijumlahkan.
  *
  * Nilai inilah yang dipakai Berita Acara dan Laporan Bulanan, BUKAN
- * nama kategorinya. Sebelumnya pengelompokan ditebak dengan mencocokkan
+ * nama unit usahanya. Sebelumnya pengelompokan ditebak dengan mencocokkan
  * potongan nama ("tiket", "taman", "kostum"), sehingga mengganti nama
- * kategori diam-diam memindahkan pendapatannya ke baris lain.
+ * unit usaha diam-diam memindahkan pendapatannya ke baris lain.
  */
 export enum CategoryReportGroup {
   TAMAN_ETNIK = 'TAMAN_ETNIK',
@@ -53,18 +53,18 @@ export interface Category {
 
   /**
    * Baris laporan tujuan. Bila kosong, sistem jatuh kembali ke
-   * pencocokan nama seperti perilaku lama, sehingga kategori yang
+   * pencocokan nama seperti perilaku lama, sehingga unit usaha yang
    * belum disetel tetap berjalan sebagaimana adanya.
    */
   reportGroup?: CategoryReportGroup;
 
   /**
-   * Menandai bahwa penjualan kategori ini berarti ada tamu berkunjung.
+   * Menandai bahwa penjualan unit usaha ini berarti ada tamu berkunjung.
    * Dipakai POS untuk memunculkan pendataan pengunjung.
    */
   visitorService?: VisitorServiceType;
 
-  /** Kategori non-aktif disembunyikan dari POS tetapi riwayatnya utuh. */
+  /** Unit usaha non-aktif disembunyikan dari POS tetapi riwayatnya utuh. */
   isActive?: boolean;
   /** Urutan tampil; makin kecil makin atas. */
   sortOrder?: number;

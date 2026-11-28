@@ -208,11 +208,11 @@ export const ReturnHistory: React.FC<ReturnHistoryProps> = ({ currentUser }) => 
     if (loading) return <Loading />;
 
     return (
-        <div className="space-y-6 animate-fade-in p-2 md:p-0">
+        <div className="space-y-3 md:space-y-6 animate-fade-in p-2 md:p-0">
             {/* Header Controls */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <h1 className="text-base md:text-2xl font-bold text-slate-800 flex items-center gap-2">
                         <Undo2 className="text-amber-600" />
                         Riwayat Retur Transaksi
                     </h1>
@@ -233,14 +233,14 @@ export const ReturnHistory: React.FC<ReturnHistoryProps> = ({ currentUser }) => 
             </div>
 
             {/* Metric Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
                 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Retur Penjualan</p>
                         <h3 className="text-lg font-extrabold text-rose-600 mt-1">{formatIDR(summaryStats.totalSalesAmount)}</h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">{summaryStats.salesCount} Transaksi ({summaryStats.totalSalesQty} unit)</p>
                     </div>
-                    <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
                         <ShoppingCart size={22} />
                     </div>
                 </div>
@@ -251,7 +251,7 @@ export const ReturnHistory: React.FC<ReturnHistoryProps> = ({ currentUser }) => 
                         <h3 className="text-lg font-extrabold text-amber-600 mt-1">{formatIDR(summaryStats.totalPurchaseAmount)}</h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">{summaryStats.purchaseCount} Pembelian ({summaryStats.totalPurchaseQty} unit)</p>
                     </div>
-                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
                         <Package size={22} />
                     </div>
                 </div>
@@ -262,7 +262,7 @@ export const ReturnHistory: React.FC<ReturnHistoryProps> = ({ currentUser }) => 
                         <h3 className="text-lg font-extrabold text-slate-900 mt-1">{summaryStats.totalSalesQty + summaryStats.totalPurchaseQty} <span className="text-xs font-normal text-slate-400">unit</span></h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">Penjualan + Pembelian</p>
                     </div>
-                    <div className="p-3 bg-slate-100 text-slate-700 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-slate-100 text-slate-700 rounded-xl shrink-0">
                         <Tag size={22} />
                     </div>
                 </div>
@@ -273,7 +273,7 @@ export const ReturnHistory: React.FC<ReturnHistoryProps> = ({ currentUser }) => 
                         <h3 className="text-lg font-extrabold text-rose-700 mt-1">{formatIDR(summaryStats.totalSalesAmount + summaryStats.totalPurchaseAmount)}</h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">Akumulasi Seluruh Retur</p>
                     </div>
-                    <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
                         <DollarSign size={22} />
                     </div>
                 </div>
@@ -490,7 +490,7 @@ export const ReturnHistory: React.FC<ReturnHistoryProps> = ({ currentUser }) => 
                             </button>
                         </div>
 
-                        <div className="p-5 space-y-4 text-xs">
+                        <div className="p-3 md:p-5 space-y-4 text-xs">
                             <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                                 <div>
                                     <span className="text-[10px] text-slate-400 font-bold uppercase block">ID Retur</span>

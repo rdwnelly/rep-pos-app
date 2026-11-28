@@ -108,7 +108,7 @@ const DeleteConfirmationModal: React.FC<DeleteModalProps> = ({
                         <X size={20} />
                     </button>
                 </div>
-                <div className="p-6 space-y-4">
+                <div className="p-3 md:p-6 space-y-4">
                     <div className="text-sm text-slate-700 font-medium whitespace-pre-wrap">{description}</div>
                     
                     {requireDateFilter && (
@@ -574,7 +574,7 @@ export const Settings: React.FC = () => {
         setDeleteModalConfig({
             isOpen: true,
             title: 'Reset Master Data',
-            description: '⚠️ BAHAYA: Ini akan me-reset SEMUA Master Data (Produk, Kategori, Pelanggan, Supplier) ke default awal!\nData yang Anda input akan HILANG PERMANEN!',
+            description: '⚠️ BAHAYA: Ini akan me-reset SEMUA Master Data (Produk, Unit Usaha, Pelanggan, Supplier) ke default awal!\nData yang Anda input akan HILANG PERMANEN!',
             confirmationText: 'RESET MASTER DATA',
             requireDateFilter: false,
             onConfirm: async () => {
@@ -600,7 +600,7 @@ export const Settings: React.FC = () => {
         setDeleteModalConfig({
             isOpen: true,
             title: 'HAPUS SEMUA DATA',
-            description: '🚨 PERINGATAN EKSTRIM 🚨\n\nIni akan menghapus SELURUH DATA dari database:\n• Transaksi Penjualan\n• Pembelian\n• Arus Kas\n• Penyesuaian Stok\n• Produk\n• Kategori\n• Pelanggan\n• Supplier\n\nSEMUA DATA AKAN HILANG PERMANEN!',
+            description: '🚨 PERINGATAN EKSTRIM 🚨\n\nIni akan menghapus SELURUH DATA dari database:\n• Transaksi Penjualan\n• Pembelian\n• Arus Kas\n• Penyesuaian Stok\n• Produk\n• Unit Usaha\n• Pelanggan\n• Supplier\n\nSEMUA DATA AKAN HILANG PERMANEN!',
             confirmationText: 'HAPUS SEMUA DATA',
             requireDateFilter: false,
             onConfirm: async () => {
@@ -616,16 +616,16 @@ export const Settings: React.FC = () => {
 
 
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-3 md:space-y-6 animate-fade-in">
             <div className="mb-8">
-                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                <h2 className="text-base md:text-2xl font-bold text-slate-900 flex items-center gap-2">
                     <SettingsIcon className="text-primary" />
                     Pengaturan
                 </h2>
                 <p className="text-slate-500 text-sm mt-1">Kelola profil toko, metode pembayaran, dan akses pengguna.</p>
             </div>
 
-            <div className="flex gap-4 mb-6 border-b border-slate-200 overflow-x-auto">
+            <div className="flex gap-4 mb-3 md:mb-6 border-b border-slate-200 overflow-x-auto">
                 {canManageStore && (
                     <button
                         onClick={() => setActiveTab('store')}
@@ -677,12 +677,12 @@ export const Settings: React.FC = () => {
             </div>
 
             {activeTab === 'store' && (
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in">
-                    <div className="flex items-start gap-6 flex-col md:flex-row">
+                <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in">
+                    <div className="flex items-start gap-3 md:gap-6 flex-col md:flex-row">
                         <div className="bg-primary/10 p-4 rounded-full">
                             <Store size={48} className="text-primary" />
                         </div>
-                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 w-full">
                             <div className="col-span-2">
                                 <label htmlFor="storeName" className="block text-sm font-medium text-slate-700 mb-1">Nama Toko</label>
                                 <input id="storeName" name="storeName" type="text" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={storeSettings.name} onChange={e => setStoreSettings({ ...storeSettings, name: e.target.value })} placeholder="Contoh: Toko Maju Jaya" />
@@ -731,8 +731,8 @@ export const Settings: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="mt-6 flex justify-end">
-                        <button onClick={handleSaveStore} className="bg-primary text-white px-6 py-2.5 rounded-lg font-bold hover:bg-primary/90 flex items-center gap-2">
+                    <div className="mt-3 md:mt-6 flex justify-end">
+                        <button onClick={handleSaveStore} className="bg-primary text-white px-4 md:px-6 py-2.5 rounded-lg font-bold hover:bg-primary/90 flex items-center gap-2">
                             <Save size={18} /> Simpan Pengaturan
                         </button>
                     </div>
@@ -740,8 +740,8 @@ export const Settings: React.FC = () => {
             )}
 
             {activeTab === 'print' && (
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in">
-                    <div className="flex items-start gap-6 flex-col md:flex-row">
+                <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in">
+                    <div className="flex items-start gap-3 md:gap-6 flex-col md:flex-row">
                         <div className="bg-primary/10 p-4 rounded-full">
                             <Printer size={48} className="text-primary" />
                         </div>
@@ -773,7 +773,7 @@ export const Settings: React.FC = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex flex-wrap gap-6 mt-2">
+                                <div className="flex flex-wrap gap-3 md:gap-6 mt-2">
                                     <label htmlFor="showLogo" className="flex items-center gap-2 cursor-pointer">
                                         <input id="showLogo" name="showLogo" type="checkbox" checked={storeSettings.showLogo !== false} onChange={e => setStoreSettings({ ...storeSettings, showLogo: e.target.checked })} className="w-4 h-4 text-primary rounded" />
                                         <span className="text-sm text-slate-700">Tampilkan Logo</span>
@@ -904,8 +904,8 @@ export const Settings: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="mt-6 flex justify-end">
-                        <button onClick={handleSaveStore} className="bg-primary text-white px-6 py-2.5 rounded-lg font-bold hover:bg-primary/90 flex items-center gap-2">
+                    <div className="mt-3 md:mt-6 flex justify-end">
+                        <button onClick={handleSaveStore} className="bg-primary text-white px-4 md:px-6 py-2.5 rounded-lg font-bold hover:bg-primary/90 flex items-center gap-2">
                             <Save size={18} /> Simpan Pengaturan
                         </button>
                     </div>
@@ -931,9 +931,9 @@ export const Settings: React.FC = () => {
                             <Download size={16} /> CSV
                         </button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2.5 md:gap-4">
                         {banks.map(bank => (
-                            <div key={bank.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-blue-300 transition-colors group">
+                            <div key={bank.id} className="bg-white p-3 md:p-5 rounded-xl border border-slate-200 shadow-sm hover:border-blue-300 transition-colors group">
                                 <div className="flex justify-between items-start">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 bg-primary/10 text-primary rounded-full flex items-center justify-center">
@@ -969,7 +969,7 @@ export const Settings: React.FC = () => {
                                     <h3 className="font-bold text-slate-800">{editingBankId ? 'Edit Rekening' : 'Tambah Rekening'}</h3>
                                     <button onClick={() => setIsBankModalOpen(false)}><X size={20} className="text-slate-400" /></button>
                                 </div>
-                                <div className="p-6 space-y-4">
+                                <div className="p-3 md:p-6 space-y-4">
                                     <div>
                                         <label htmlFor="bankName" className="block text-sm font-medium text-slate-700 mb-1">Nama Bank / E-Wallet</label>
                                         <input id="bankName" name="bankName" type="text" placeholder="Contoh: BCA, GoPay, Dana" className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={bankForm.bankName} onChange={e => setBankForm({ ...bankForm, bankName: e.target.value })} />
@@ -1022,7 +1022,7 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
 
                         <div className="grid gap-4">
                             {users.map(u => (
-                                <div key={u.id} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                <div key={u.id} className="bg-white p-3 md:p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                                     <div className="flex items-center gap-4">
                                         <div className="w-14 h-14 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
                                             {u.image ? (
@@ -1063,8 +1063,8 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
             }
 
             {activeTab === 'appearance' && (
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in">
-                    <div className="flex items-start gap-6 flex-col md:flex-row">
+                <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in">
+                    <div className="flex items-start gap-3 md:gap-6 flex-col md:flex-row">
                         <div className="bg-primary/10 p-4 rounded-full">
                             <Palette size={48} className="text-primary" />
                         </div>
@@ -1075,7 +1075,7 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div className="space-y-6">
+                                <div className="space-y-3 md:space-y-6">
                                     <div>
                                         <div className="flex justify-between mb-2">
                                             <label htmlFor="themeHue" className="text-sm font-medium text-slate-700">Warna (Hue)</label>
@@ -1121,7 +1121,7 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
                                     </div>
                                 </div>
 
-                                <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+                                <div className="bg-slate-50 p-3 md:p-6 rounded-xl border border-slate-200">
                                     <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 tracking-wider">Preview Tampilan</h4>
 
                                     <div className="space-y-4">
@@ -1161,9 +1161,9 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
             {/* Data Management Tab (SUPERADMIN ONLY) */}
             {
                 activeTab === 'data' && isSuperAdmin && (
-                    <div className="animate-fade-in space-y-6">
+                    <div className="animate-fade-in space-y-3 md:space-y-6">
                         {/* Warning Banner */}
-                        <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg">
+                        <div className="bg-red-50 border-l-4 border-red-500 p-3 md:p-6 rounded-lg">
                             <div className="flex items-start gap-3">
                                 <AlertTriangle size={24} className="text-red-600 flex-shrink-0 mt-0.5" />
                                 <div>
@@ -1177,9 +1177,9 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
                         </div>
 
                         {/* Reset Actions */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 md:gap-4">
                             {/* Reset Products */}
-                            <div className="bg-white p-6 rounded-xl border-2 border-green-200 hover:border-green-400 transition-colors">
+                            <div className="bg-white p-3 md:p-6 rounded-xl border-2 border-green-200 hover:border-green-400 transition-colors">
                                 <div className="flex items-start gap-3 mb-4">
                                     <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                                         <Trash2 size={24} className="text-green-600" />
@@ -1199,7 +1199,7 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
                             </div>
 
                             {/* Reset Stock Adjustments - Moved here as requested */}
-                            <div className="bg-white p-6 rounded-xl border-2 border-orange-200 hover:border-orange-400 transition-colors">
+                            <div className="bg-white p-3 md:p-6 rounded-xl border-2 border-orange-200 hover:border-orange-400 transition-colors">
                                 <div className="flex items-start gap-3 mb-4">
                                     <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
                                         <HistoryIcon size={24} className="text-orange-600" />
@@ -1219,7 +1219,7 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
                             </div>
 
                             {/* Reset Transactions */}
-                            <div className="bg-white p-6 rounded-xl border-2 border-orange-200 hover:border-orange-400 transition-colors">
+                            <div className="bg-white p-3 md:p-6 rounded-xl border-2 border-orange-200 hover:border-orange-400 transition-colors">
                                 <div className="flex items-start gap-3 mb-4">
                                     <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
                                         <Trash2 size={24} className="text-orange-600" />
@@ -1239,7 +1239,7 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
                             </div>
 
                             {/* Reset Purchases */}
-                            <div className="bg-white p-6 rounded-xl border-2 border-orange-200 hover:border-orange-400 transition-colors">
+                            <div className="bg-white p-3 md:p-6 rounded-xl border-2 border-orange-200 hover:border-orange-400 transition-colors">
                                 <div className="flex items-start gap-3 mb-4">
                                     <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
                                         <Trash2 size={24} className="text-orange-600" />
@@ -1259,7 +1259,7 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
                             </div>
 
                             {/* Reset Cash Flow */}
-                            <div className="bg-white p-6 rounded-xl border-2 border-orange-200 hover:border-orange-400 transition-colors">
+                            <div className="bg-white p-3 md:p-6 rounded-xl border-2 border-orange-200 hover:border-orange-400 transition-colors">
                                 <div className="flex items-start gap-3 mb-4">
                                     <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
                                         <Trash2 size={24} className="text-orange-600" />
@@ -1281,7 +1281,7 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
 
 
                             {/* Reset ALL Financial Data */}
-                            <div className="bg-white p-6 rounded-xl border-2 border-red-300 hover:border-red-500 transition-colors">
+                            <div className="bg-white p-3 md:p-6 rounded-xl border-2 border-red-300 hover:border-red-500 transition-colors">
                                 <div className="flex items-start gap-3 mb-4">
                                     <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
                                         <AlertTriangle size={24} className="text-red-600" />
@@ -1301,14 +1301,14 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
                             </div>
 
                             {/* Reset Master Data */}
-                            <div className="bg-white p-6 rounded-xl border-2 border-blue-300 hover:border-blue-500 transition-colors">
+                            <div className="bg-white p-3 md:p-6 rounded-xl border-2 border-blue-300 hover:border-blue-500 transition-colors">
                                 <div className="flex items-start gap-3 mb-4">
                                     <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                                         <Trash2 size={24} className="text-blue-600" />
                                     </div>
                                     <div className="flex-1">
                                         <h4 className="font-bold text-blue-800 text-lg">♻️ Reset Master Data</h4>
-                                        <p className="text-sm text-blue-600 mt-1 font-medium">Reset Produk, Kategori, Pelanggan & Supplier ke Default (Awal).</p>
+                                        <p className="text-sm text-blue-600 mt-1 font-medium">Reset Produk, Unit Usaha, Pelanggan & Supplier ke Default (Awal).</p>
                                     </div>
                                 </div>
                                 <button
@@ -1321,7 +1321,7 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
                             </div>
 
                             {/* NUCLEAR OPTION: Reset ALL Data */}
-                            <div className="bg-gradient-to-br from-red-50 to-pink-50 p-6 rounded-xl border-4 border-red-500 hover:border-red-600 transition-all shadow-lg col-span-full">
+                            <div className="bg-gradient-to-br from-red-50 to-pink-50 p-3 md:p-6 rounded-xl border-4 border-red-500 hover:border-red-600 transition-all shadow-lg col-span-full">
                                 <div className="flex items-start gap-3 mb-4">
                                     <div className="w-14 h-14 bg-gradient-to-br from-red-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0 animate-pulse">
                                         <AlertTriangle size={28} className="text-white" />
@@ -1339,7 +1339,7 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
                                                 <li>Transaksi Penjualan</li>
                                                 <li>Produk</li>
                                                 <li>Pembelian</li>
-                                                <li>Kategori</li>
+                                                <li>Unit Usaha</li>
                                                 <li>Arus Kas</li>
                                                 <li>Pelanggan</li>
                                                 <li>Penyesuaian Stok</li>
@@ -1388,7 +1388,7 @@ Dapatkan dari aplikasi bank atau struk QRIS merchant."
                                 <h3 className="font-bold text-slate-800">{editingId ? 'Edit Pengguna' : 'Tambah Pengguna'}</h3>
                                 <button onClick={() => setIsModalOpen(false)}><X size={20} className="text-slate-400" /></button>
                             </div>
-                            <div className="p-6 space-y-4">
+                            <div className="p-3 md:p-6 space-y-4">
                                 <div className="flex justify-center mb-4 relative">
                                     <label htmlFor="userImage" className="relative w-24 h-24 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-blue-500 overflow-hidden group">
                                         {userForm.image ? (

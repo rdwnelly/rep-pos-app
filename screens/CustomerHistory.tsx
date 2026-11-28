@@ -105,7 +105,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                 t.items?.some(item => {
                     const catName = (item.categoryName && item.categoryName.trim())
                         ? item.categoryName.trim()
-                        : (categories.find(c => c.id === item.categoryId)?.name || 'Tanpa Kategori');
+                        : (categories.find(c => c.id === item.categoryId)?.name || 'Tanpa Unit Usaha');
                     return catName.toLowerCase() === selectedCategory.toLowerCase() || item.categoryId === selectedCategory;
                 })
             );
@@ -172,14 +172,14 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             t.items?.forEach(item => {
                 const cat = (item.categoryName && item.categoryName.trim())
                     ? item.categoryName.trim()
-                    : (categories.find(c => c.id === item.categoryId)?.name || 'Tanpa Kategori');
+                    : (categories.find(c => c.id === item.categoryId)?.name || 'Tanpa Unit Usaha');
                 if (!catMapInTx[cat]) catMapInTx[cat] = [];
                 catMapInTx[cat].push(item);
             });
 
-            // If transaction has no items, treat as Tanpa Kategori
+            // If transaction has no items, treat as Tanpa Unit Usaha
             if (!t.items || t.items.length === 0) {
-                const cat = 'Tanpa Kategori';
+                const cat = 'Tanpa Unit Usaha';
                 if (!catMapInTx[cat]) catMapInTx[cat] = [];
             }
 
@@ -264,12 +264,12 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
     };
 
     const handleExport = () => {
-        const headers = ['ID Transaksi', 'No Faktur', 'Tanggal', 'Waktu / Jam', 'Pelanggan', 'Kategori Item', 'Rincian Item', 'Total', 'Dibayar', 'Piutang', 'Kembalian', 'Status', 'Metode', 'Kasir'];
+        const headers = ['ID Transaksi', 'No Faktur', 'Tanggal', 'Waktu / Jam', 'Pelanggan', 'Unit Usaha', 'Rincian Item', 'Total', 'Dibayar', 'Piutang', 'Kembalian', 'Status', 'Metode', 'Kasir'];
         const rows = filteredTransactions.map(t => {
             const remaining = t.totalAmount - t.amountPaid;
             const piutang = remaining > 0 ? remaining : 0;
             const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
-            const catList = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Kategori') || [])).join(', ');
+            const catList = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Unit Usaha') || [])).join(', ');
             const itemsList = t.items?.map(i => `${i.name} (${i.qty}x)`).join('; ') || '-';
             return [
                 t.id,
@@ -296,7 +296,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             const remaining = t.totalAmount - t.amountPaid;
             const piutang = remaining > 0 ? remaining : 0;
             const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
-            const catList = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Kategori') || [])).join(', ');
+            const catList = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Unit Usaha') || [])).join(', ');
             const itemsList = t.items?.map(i => `${i.name} (${i.qty}x)`).join('; ') || '-';
             return {
                 'ID Transaksi': t.id,
@@ -304,7 +304,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                 'Tanggal': formatDateDateOnly(t.date),
                 'Waktu / Jam': formatTimeOnly(t.date),
                 'Pelanggan': t.customerName,
-                'Kategori Item': catList || '-',
+                'Unit Usaha': catList || '-',
                 'Rincian Item': itemsList,
                 'Total': t.totalAmount,
                 'Dibayar': t.amountPaid,
@@ -322,7 +322,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             { wch: 15 }, // Tanggal
             { wch: 15 }, // Waktu Jam
             { wch: 20 }, // Pelanggan
-            { wch: 20 }, // Kategori
+            { wch: 20 }, // Unit Usaha
             { wch: 30 }, // Item
             { wch: 15 }, // Total
             { wch: 15 }, // Dibayar
@@ -344,7 +344,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             const remaining = t.totalAmount - t.amountPaid;
             const piutang = remaining > 0 ? remaining : 0;
             const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
-            const catList = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Kategori') || [])).join(', ');
+            const catList = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Unit Usaha') || [])).join(', ');
             return `
             <tr>
                 <td>${idx + 1}</td>
@@ -488,11 +488,11 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
     };
 
     return (
-        <div className="space-y-6 animate-fade-in p-2 md:p-0">
+        <div className="space-y-3 md:space-y-6 animate-fade-in p-2 md:p-0">
             {/* Header Controls */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <h1 className="text-base md:text-2xl font-bold text-slate-800 flex items-center gap-2">
                         <UserCheck className="text-amber-600" />
                         Riwayat Transaksi Pelanggan
                     </h1>
@@ -513,14 +513,14 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
             </div>
 
             {/* Metric Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
                 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Penjualan</p>
                         <h3 className="text-lg font-extrabold text-slate-900 mt-1">{formatIDR(totals.totalSales)}</h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">{filteredTransactions.length} Transaksi</p>
                     </div>
-                    <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
                         <FileText size={22} />
                     </div>
                 </div>
@@ -531,7 +531,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                         <h3 className="text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(totals.totalPaid)}</h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">Sudah Diterima</p>
                     </div>
-                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
                         <UserCheck size={22} />
                     </div>
                 </div>
@@ -544,7 +544,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                             {filteredTransactions.filter(t => t.paymentStatus !== PaymentStatus.PAID).length} Transaksi Belum Lunas
                         </p>
                     </div>
-                    <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
                         <X size={22} />
                     </div>
                 </div>
@@ -557,7 +557,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                         </h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">{customers.length} Pelanggan Terdaftar</p>
                     </div>
-                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
                         <UserCheck size={22} />
                     </div>
                 </div>
@@ -595,7 +595,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                         value={selectedCategory}
                         onChange={e => setSelectedCategory(e.target.value)}
                     >
-                        <option value="">🏷️ Semua Kategori</option>
+                        <option value="">🏷️ Semua Unit Usaha</option>
                         {availableCategories.map(cat => (
                             <option key={cat} value={cat}>{cat}</option>
                         ))}
@@ -687,9 +687,9 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                         type="button"
                         onClick={() => setGroupMode('category')}
                         className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${groupMode === 'category' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                        title="Kelompokkan Berdasarkan Kategori Produk"
+                        title="Kelompokkan Berdasarkan Unit Usaha"
                     >
-                        <Tag size={13} /> Per Kategori
+                        <Tag size={13} /> Per Unit Usaha
                     </button>
                     <button
                         type="button"
@@ -710,7 +710,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                         {groupMode === 'method' && <CreditCard size={16} className="text-amber-600" />}
                         {groupMode === 'none' && <Layers size={16} className="text-amber-600" />}
                         Daftar Transaksi Pelanggan ({filteredTransactions.length})
-                        {groupMode === 'category' && <span className="bg-amber-100 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-bold">Dikelompokkan per Kategori Produk</span>}
+                        {groupMode === 'category' && <span className="bg-amber-100 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-bold">Dikelompokkan per Unit Usaha</span>}
                         {groupMode === 'method' && <span className="bg-amber-100 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-bold">Dikelompokkan per Metode Pembayaran</span>}
                     </span>
                     <span className="text-rose-700 font-bold">Total Piutang: {formatIDR(totals.totalDebt)}</span>
@@ -730,8 +730,8 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                                 </th>
                                 <th className="p-3.5">No Faktur & Ref</th>
                                 <th className="p-3.5">Pelanggan</th>
-                                {groupMode === 'category' && <th className="p-3.5">Item Kategori Ini</th>}
-                                <th className="p-3.5">{groupMode === 'category' ? 'Subtotal Kategori / Nota' : 'Total Belanja'}</th>
+                                {groupMode === 'category' && <th className="p-3.5">Item Unit Usaha Ini</th>}
+                                <th className="p-3.5">{groupMode === 'category' ? 'Subtotal Unit Usaha / Nota' : 'Total Belanja'}</th>
                                 <th className="p-3.5">Dibayar</th>
                                 <th className="p-3.5">Sisa Piutang</th>
                                 <th className="p-3.5">Kembalian</th>
@@ -1082,8 +1082,8 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                             </h3>
                             <button onClick={() => setDetailTransaction(null)}><X size={20} className="text-slate-400" /></button>
                         </div>
-                        <div className="p-6 max-h-[70vh] overflow-y-auto">
-                            <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+                        <div className="p-3 md:p-6 max-h-[70vh] overflow-y-auto">
+                            <div className="grid grid-cols-2 gap-4 mb-3 md:mb-6 text-sm">
                                 <div>
                                     <span className="text-slate-500 block text-xs">Waktu Transaksi</span>
                                     <span className="font-medium text-slate-900">
@@ -1121,7 +1121,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                             </div>
 
                             <h4 className="font-bold text-sm text-slate-800 mb-2">Barang</h4>
-                            <div className="border border-slate-200 rounded-lg mb-6 divide-y divide-slate-100">
+                            <div className="border border-slate-200 rounded-lg mb-3 md:mb-6 divide-y divide-slate-100">
                                 {detailTransaction.items.map((item, idx) => (
                                     <div key={idx} className="p-3 flex justify-between">
                                         <div>
@@ -1145,7 +1145,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
 
                             {/* Return History (If this is a Sale) */}
                             {transactions.filter(t => t.type === TransactionType.RETURN && t.originalTransactionId === detailTransaction.id).length > 0 && (
-                                <div className="mt-6">
+                                <div className="mt-3 md:mt-6">
                                     <h4 className="font-bold text-sm text-slate-800 mb-2">Riwayat Retur</h4>
                                     <div className="bg-orange-50 rounded-lg p-3 space-y-2 text-sm border border-orange-100">
                                         {transactions
@@ -1178,7 +1178,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
 
                             {/* Original Transaction Info (If this is a Return) */}
                             {detailTransaction.type === TransactionType.RETURN && detailTransaction.originalTransactionId && (
-                                <div className="mt-6">
+                                <div className="mt-3 md:mt-6">
                                     <h4 className="font-bold text-sm text-slate-800 mb-2">Info Transaksi Induk</h4>
                                     <div className="bg-primary/5 rounded-lg p-3 text-sm border border-primary/10">
                                         {(() => {
@@ -1208,7 +1208,7 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
                             )}
 
                             {/* Payment History */}
-                            <h4 className="font-bold text-sm text-slate-800 mb-2 mt-6">Riwayat Pembayaran</h4>
+                            <h4 className="font-bold text-sm text-slate-800 mb-2 mt-3 md:mt-6">Riwayat Pembayaran</h4>
                             <div className="bg-slate-50 rounded-lg p-3 space-y-2 text-sm">
                                 {detailTransaction.paymentHistory?.map((ph, i) => (
                                     <div key={i} className="flex justify-between border-b border-slate-200 last:border-0 pb-1">

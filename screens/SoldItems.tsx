@@ -116,7 +116,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
     const availableCategories = useMemo(() => {
         const set = new Set<string>();
         soldItems.forEach(item => {
-            const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Kategori';
+            const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Unit Usaha';
             set.add(cat);
         });
         return Array.from(set).sort();
@@ -126,7 +126,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
     const categorySummaries = useMemo(() => {
         const summaries: { [cat: string]: { totalQty: number; totalRevenue: number; count: number } } = {};
         soldItems.forEach(item => {
-            const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Kategori';
+            const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Unit Usaha';
             if (!summaries[cat]) {
                 summaries[cat] = { totalQty: 0, totalRevenue: 0, count: 0 };
             }
@@ -144,14 +144,14 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
         let filtered = soldItems;
         if (selectedCategory !== 'ALL') {
             filtered = filtered.filter(item => {
-                const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Kategori';
+                const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Unit Usaha';
                 return cat === selectedCategory;
             });
         }
 
         const groups: { [catName: string]: typeof soldItems } = {};
         filtered.forEach(item => {
-            const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Kategori';
+            const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Unit Usaha';
             if (!groups[cat]) {
                 groups[cat] = [];
             }
@@ -180,7 +180,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
         if (!activeCategoryModal) return [];
 
         const itemsForCat = soldItems.filter(item => {
-            const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Kategori';
+            const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Unit Usaha';
             return cat === activeCategoryModal;
         });
 
@@ -194,7 +194,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                     name: item.name,
                     sku: item.sku || '-',
                     unit: item.unit || 'Pcs',
-                    categoryName: item.categoryName || 'Tanpa Kategori',
+                    categoryName: item.categoryName || 'Tanpa Unit Usaha',
                     totalQty: 0,
                     avgPrice: item.finalPrice,
                     totalRevenue: 0,
@@ -251,7 +251,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
         let filtered = soldItems;
         if (selectedCategory !== 'ALL') {
             filtered = filtered.filter(item => {
-                const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Kategori';
+                const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Unit Usaha';
                 return cat === selectedCategory;
             });
         }
@@ -260,7 +260,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
 
         filtered.forEach(item => {
             const key = item.id || item.name;
-            const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Kategori';
+            const cat = item.categoryName && item.categoryName.trim() ? item.categoryName.trim() : 'Tanpa Unit Usaha';
             if (!productMap[key]) {
                 productMap[key] = {
                     id: item.id,
@@ -318,7 +318,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
         printWindow.document.write(`
             <html>
                 <head>
-                    <title>Sub-Laporan Barang Terjual - Kategori ${catName}</title>
+                    <title>Sub-Laporan Barang Terjual - Unit Usaha ${catName}</title>
                     <style>
                         body { font-family: 'Inter', sans-serif; font-size: 11px; padding: 20px; color: #1e293b; }
                         .header { border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 15px; }
@@ -339,7 +339,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                     <div class="header">
                         <img src="${REPORT_LOGO_SRC}" alt="Rumah Etnik Papua" style="height:48px;width:auto;object-fit:contain;display:block;margin:0 auto 6px;" />
                         <h1 class="title">Sub-Laporan Barang Terjual (Per Produk)</h1>
-                        <div class="subtitle">Kategori: <strong>${catName}</strong> | Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                        <div class="subtitle">Unit Usaha: <strong>${catName}</strong> | Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
                     </div>
 
                     <div class="metrics">
@@ -398,7 +398,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
     ) => {
         const showHPP = currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.OWNER;
 
-        const headers = ['No', 'Nama Produk', 'SKU', 'Kategori', 'Satuan', 'Qty Terjual', 'Harga Jual', 'Total Omset'];
+        const headers = ['No', 'Nama Produk', 'SKU', 'Unit Usaha', 'Satuan', 'Qty Terjual', 'Harga Jual', 'Total Omset'];
         if (showHPP) {
             headers.push('Total HPP', 'Laba Bersih');
         }
@@ -421,7 +421,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
         });
 
         const safeName = catName.toLowerCase().replace(/[^a-z0-9]/g, '-');
-        exportToCSV(`laporan-sub-barang-kategori-${safeName}.csv`, headers, rows);
+        exportToCSV(`laporan-sub-barang-unit-usaha-${safeName}.csv`, headers, rows);
     };
 
     const visibleSoldItems = useMemo(() => soldItems.slice(0, visibleCount), [soldItems, visibleCount]);
@@ -494,7 +494,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                 return `
                     <div style="margin-bottom: 20px;">
                         <h3 style="background-color: #f8fafc; padding: 8px 12px; margin: 10px 0 5px 0; border: 1px solid #cbd5e1; font-size: 13px; color: #1e293b;">
-                            📁 Kategori: <strong>${catName}</strong> (${items.length} transaksi item)
+                            📁 Unit Usaha: <strong>${catName}</strong> (${items.length} transaksi item)
                         </h3>
                         <table>
                             <thead>
@@ -558,7 +558,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                             <th>Qty</th>
                             ${showHPP ? '<th>HPP</th>' : ''}
                             <th>Harga Jual</th>
-                            <th>Kategori Produk</th>
+                            <th>Unit Usaha</th>
                             <th>Pembeli</th>
                             <th>Kasir</th>
                             <th>Status</th>
@@ -574,7 +574,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
         const html = `
             <html>
                 <head>
-                    <title>Laporan Barang Terjual Per Kategori</title>
+                    <title>Laporan Barang Terjual Per Unit Usaha</title>
                     <style>
                         body { font-family: Arial, sans-serif; padding: 20px; font-size: 12px; color: #333; }
                         h2 { text-align: center; margin-bottom: 5px; }
@@ -586,7 +586,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                     </style>
                 </head>
                 <body>
-                    ${buildReportLetterhead('Laporan Barang Terjual Per Kategori')}
+                    ${buildReportLetterhead('Laporan Barang Terjual Per Unit Usaha')}
                     <p class="subtitle">Periode: ${startDate ? new Date(startDate).toLocaleDateString('id-ID') : 'Semua'} - ${endDate ? new Date(endDate).toLocaleDateString('id-ID') : 'Semua'}</p>
                     ${contentHtml}
                     ${REPORT_PRINT_SCRIPT}
@@ -600,7 +600,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
 
     const handleExport = () => {
         const showHPP = currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN;
-        let headers = ['Kategori Produk', 'ID Transaksi', 'No Faktur', 'Tanggal', 'Waktu', 'Item', 'Satuan', 'Qty', 'Harga Jual', 'Pembeli', 'Kasir', 'Status'];
+        let headers = ['Unit Usaha', 'ID Transaksi', 'No Faktur', 'Tanggal', 'Waktu', 'Item', 'Satuan', 'Qty', 'Harga Jual', 'Pembeli', 'Kasir', 'Status'];
         if (showHPP) {
             headers.splice(8, 0, 'HPP');
         }
@@ -608,7 +608,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
         const rows = soldItems.map(i => {
             const d = new Date(i.date);
             const row = [
-                i.categoryName || 'Tanpa Kategori',
+                i.categoryName || 'Tanpa Unit Usaha',
                 i.transactionId,
                 i.transactionInvoiceNumber || '-',
                 d.toLocaleDateString('id-ID'),
@@ -634,7 +634,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
         const data = soldItems.map(i => {
             const d = new Date(i.date);
             const item: any = {
-                'Kategori Produk': i.categoryName || 'Tanpa Kategori',
+                'Unit Usaha': i.categoryName || 'Tanpa Unit Usaha',
                 'ID Transaksi': i.transactionId,
                 'No Faktur': i.transactionInvoiceNumber || '-',
                 'Tanggal': d.toLocaleDateString('id-ID'),
@@ -654,7 +654,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
         });
 
         const cols = [
-            { wch: 20 }, // Kategori
+            { wch: 20 }, // Unit Usaha
             { wch: 15 }, // ID
             { wch: 20 }, // Faktur
             { wch: 12 }, // Tanggal
@@ -669,23 +669,23 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
             { wch: 15 }  // Status
         ];
 
-        exportToExcel(data, "Laporan_Barang_Terjual_Per_Kategori", "Barang Terjual", cols);
+        exportToExcel(data, "Laporan_Barang_Terjual_Per_Unit_Usaha", "Barang Terjual", cols);
     };
 
     const totalGlobalQty = soldItems.reduce((s, i) => s + (i.transactionType === TransactionType.RETURN ? -i.qty : i.qty), 0);
     const totalGlobalRevenue = soldItems.reduce((s, i) => s + (i.transactionType === TransactionType.RETURN ? -(i.finalPrice * i.qty) : (i.finalPrice * i.qty)), 0);
 
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-3 md:space-y-6 animate-fade-in">
             {/* Page Header */}
             <div className="flex flex-col gap-4 border-b border-slate-200 pb-4">
                 <div className="flex flex-wrap justify-between items-center gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <h1 className="text-base md:text-2xl font-bold text-slate-800 flex items-center gap-2">
                             <ShoppingBag className="text-primary" />
-                            Laporan Barang Terjual Per Kategori
+                            Laporan Barang Terjual Per Unit Usaha
                         </h1>
-                        <p className="text-slate-500 text-sm mt-1">Laporan detail penjualan barang yang dikelompokkan berdasarkan kategori produk</p>
+                        <p className="text-slate-500 text-sm mt-1">Laporan detail penjualan barang yang dikelompokkan berdasarkan unit usaha</p>
                     </div>
                     <div className="flex gap-2">
                         <button onClick={handlePrint} className="text-sm flex items-center gap-2 bg-white border border-slate-300 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 shadow-sm transition-colors">
@@ -705,13 +705,13 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                     {/* Category Filter */}
                     <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                         <Folder size={16} className="text-amber-600" />
-                        <span className="text-sm font-medium text-slate-600">Kategori:</span>
+                        <span className="text-sm font-medium text-slate-600">Unit Usaha:</span>
                         <select
                             value={selectedCategory}
                             onChange={(e) => setSelectedCategory(e.target.value)}
                             className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-700 font-medium outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer"
                         >
-                            <option value="ALL">Semua Kategori ({availableCategories.length})</option>
+                            <option value="ALL">Semua Unit Usaha ({availableCategories.length})</option>
                             {availableCategories.map(cat => (
                                 <option key={cat} value={cat}>{cat}</option>
                             ))}
@@ -724,7 +724,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                         className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border ${groupByCategory ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-sm' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}
                     >
                         <Layers size={14} />
-                        {groupByCategory ? 'Tampilan Per Kategori' : 'Tampilan Flat'}
+                        {groupByCategory ? 'Tampilan Per Unit Usaha' : 'Tampilan Flat'}
                     </button>
 
                     {/* Date Filters */}
@@ -822,7 +822,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                 <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 flex flex-wrap justify-between items-center gap-2 text-sm">
                     <div className="flex items-center gap-2">
                         <Folder size={18} className="text-amber-600" />
-                        <span>Daftar Barang Terjual ({groupByCategory ? `${Object.keys(groupedSoldItems).length} Kategori` : `${soldItems.length} Item`})</span>
+                        <span>Daftar Barang Terjual ({groupByCategory ? `${Object.keys(groupedSoldItems).length} Unit Usaha` : `${soldItems.length} Item`})</span>
                     </div>
                     <div className="flex items-center gap-4 text-xs font-bold text-slate-600">
                         <span>Total Qty Terjual: <strong className="text-slate-900 text-sm">{totalGlobalQty}</strong></span>
@@ -856,7 +856,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                     <div className="flex items-center justify-end">Harga Jual <SortIcon column="finalPrice" /></div>
                                 </th>
                                 <th className="p-3 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('categoryName')}>
-                                    <div className="flex items-center">Kategori <SortIcon column="categoryName" /></div>
+                                    <div className="flex items-center">Unit Usaha <SortIcon column="categoryName" /></div>
                                 </th>
                                 <th className="p-3 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('customerName')}>
                                     <div className="flex items-center">Pembeli <SortIcon column="customerName" /></div>
@@ -887,7 +887,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                                     <div className="flex justify-between items-center text-xs">
                                                         <span className="flex items-center gap-2 text-amber-900 font-bold text-sm">
                                                             <Folder size={16} className="text-amber-600" />
-                                                            Kategori: <span className="underline decoration-amber-500 uppercase tracking-wide">{catName}</span>
+                                                            Unit Usaha: <span className="underline decoration-amber-500 uppercase tracking-wide">{catName}</span>
                                                             <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-mono">{items.length} item</span>
                                                         </span>
                                                         <div className="flex items-center gap-4 text-xs font-semibold">
@@ -936,7 +936,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                             {/* Subtotal Row per Category */}
                                             <tr className="bg-slate-100/70 font-semibold border-b-2 border-slate-200">
                                                 <td colSpan={4} className="p-2.5 text-right text-slate-600 text-xs italic">
-                                                    Subtotal Kategori {catName}:
+                                                    Subtotal Unit Usaha {catName}:
                                                 </td>
                                                 <td className="p-2.5 text-center font-bold text-slate-900 text-xs">{subTotalQty}</td>
                                                 {currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.OWNER && (
@@ -1033,7 +1033,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                 <div className="text-lg font-black text-slate-800 mt-0.5">{modalCategoryTotals.totalQty} <span className="text-xs font-semibold text-slate-400">Unit</span></div>
                             </div>
                             <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
-                                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Total Omset Kategori</div>
+                                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Total Omset Unit Usaha</div>
                                 <div className="text-lg font-black text-emerald-600 mt-0.5">{formatIDR(modalCategoryTotals.totalRevenue)}</div>
                             </div>
                             {currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.OWNER && (
@@ -1050,7 +1050,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input
                                     type="text"
-                                    placeholder="Cari barang / SKU dalam kategori..."
+                                    placeholder="Cari barang / SKU dalam unit usaha..."
                                     className="w-full pl-9 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-amber-500"
                                     value={modalSearch}
                                     onChange={e => setModalSearch(e.target.value)}
@@ -1080,7 +1080,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                         </div>
 
                         {/* Modal Table Body */}
-                        <div className="overflow-y-auto flex-1 p-4">
+                        <div className="overflow-y-auto overflow-x-auto flex-1 p-3 md:p-4">
                             <table className="w-full text-left text-xs border-collapse">
                                 <thead className="bg-slate-100 border-b border-slate-200 text-slate-600 uppercase font-bold sticky top-0 z-10">
                                     <tr>
@@ -1103,7 +1103,7 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                     {modalCategoryProducts.length === 0 ? (
                                         <tr>
                                             <td colSpan={10} className="p-8 text-center text-slate-400 font-medium">
-                                                Tidak ada produk ditemukan dalam kategori "{activeCategoryModal}".
+                                                Tidak ada produk ditemukan dalam unit usaha "{activeCategoryModal}".
                                             </td>
                                         </tr>
                                     ) : (
@@ -1149,13 +1149,13 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                                     onClick={() => handlePrintCategorySubReport(activeCategoryModal, modalCategoryProducts, modalCategoryTotals)}
                                     className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
                                 >
-                                    <Printer size={14} /> Cetak Sub-Laporan Kategori
+                                    <Printer size={14} /> Cetak Sub-Laporan Unit Usaha
                                 </button>
                                 <button
                                     onClick={() => handleExportCategorySubReport(activeCategoryModal, modalCategoryProducts)}
                                     className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
                                 >
-                                    <FileSpreadsheet size={14} /> Export CSV Sub-Kategori
+                                    <FileSpreadsheet size={14} /> Export CSV Unit Usaha
                                 </button>
                             </div>
                             <button

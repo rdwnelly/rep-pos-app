@@ -103,7 +103,7 @@ export const StorageService = {
 
   // Categories
   /**
-   * Kategori "umum" peninggalan versi lama disembunyikan dari tampilan,
+   * Unit usaha "umum" peninggalan versi lama disembunyikan dari tampilan,
    * TAPI tidak lagi dihapus di sini.
    *
    * Sebelumnya setiap pemanggilan getCategories() menghapus dokumennya
@@ -119,7 +119,7 @@ export const StorageService = {
         || (a.name || '').localeCompare(b.name || ''));
   },
 
-  /** Termasuk kategori non-aktif — untuk layar pengelolaan kategori. */
+  /** Termasuk unit usaha non-aktif — untuk layar pengelolaan unit usaha. */
   getAllCategories: async (): Promise<Category[]> => {
     const cats = await ApiService.getCategories();
     return cats
@@ -239,11 +239,11 @@ export const StorageService = {
     notifyListeners('categories');
   },
   /**
-   * Menolak penghapusan kategori yang masih dipakai produk.
+   * Menolak penghapusan unit usaha yang masih dipakai produk.
    *
-   * Sebelumnya dokumen kategori langsung dihapus sementara produk tetap
+   * Sebelumnya dokumen unit usaha langsung dihapus sementara produk tetap
    * menyimpan categoryId yang sudah tidak ada — padahal pesan
-   * konfirmasi di layar menjanjikan produknya dipindahkan. Kategori
+   * konfirmasi di layar menjanjikan produknya dipindahkan. Unit usaha
    * yang tidak dipakai lagi sebaiknya dinonaktifkan, bukan dihapus,
    * agar laporan periode lama tetap terbaca.
    */
@@ -252,9 +252,9 @@ export const StorageService = {
     const dipakai = products.filter(p => p.categoryId === id);
     if (dipakai.length > 0) {
       throw new Error(
-        `Kategori ini masih dipakai ${dipakai.length} produk. ` +
-        `Pindahkan produknya ke kategori lain terlebih dahulu, ` +
-        `atau nonaktifkan kategori ini agar tetap tersimpan di laporan lama.`
+        `Unit usaha ini masih dipakai ${dipakai.length} produk. ` +
+        `Pindahkan produknya ke unit usaha lain terlebih dahulu, ` +
+        `atau nonaktifkan unit usaha ini agar tetap tersimpan di laporan lama.`
       );
     }
     await ApiService.deleteCategory(id);
@@ -266,7 +266,7 @@ export const StorageService = {
 
   // Products
   /**
-   * Kategori "umum" dikosongkan pada hasil baca saja. Penulisan balik
+   * Unit usaha "umum" dikosongkan pada hasil baca saja. Penulisan balik
    * ke basis data sengaja dihapus: membaca daftar produk tidak boleh
    * mengubah data produk.
    */

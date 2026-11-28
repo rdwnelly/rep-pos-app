@@ -55,7 +55,7 @@ export const HPPCalculatorModal: React.FC<HPPCalculatorModalProps> = ({ isOpen, 
       <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
         <div className="p-6 md:p-8 bg-slate-50 overflow-y-auto">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex justify-between items-center mb-3 md:mb-6">
             <h3 className="font-bold text-xl text-slate-800 flex items-center gap-2">
               <Calculator className="text-primary" /> Kalkulator HPP
             </h3>
@@ -68,7 +68,7 @@ export const HPPCalculatorModal: React.FC<HPPCalculatorModalProps> = ({ isOpen, 
           </div>
 
           {/* Bahan Baku */}
-          <div className="mb-6">
+          <div className="mb-3 md:mb-6">
             <h4 className="font-bold text-sm text-slate-700 mb-3 flex justify-between items-center">
               <span>Bahan Baku / Komponen</span>
               <button onClick={handleAddIngredient} className="text-xs text-primary font-bold hover:underline flex items-center gap-1">
@@ -92,7 +92,7 @@ export const HPPCalculatorModal: React.FC<HPPCalculatorModalProps> = ({ isOpen, 
           </div>
 
           {/* Overhead */}
-          <div className="mb-6">
+          <div className="mb-3 md:mb-6">
             <h4 className="font-bold text-sm text-slate-700 mb-3">Biaya Overhead (Opsional)</h4>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -113,7 +113,7 @@ export const HPPCalculatorModal: React.FC<HPPCalculatorModalProps> = ({ isOpen, 
           </div>
 
           {/* Pembagian Porsi */}
-          <div className="mb-6 p-4 bg-white border border-slate-200 rounded-xl flex items-center justify-between">
+          <div className="mb-3 md:mb-6 p-4 bg-white border border-slate-200 rounded-xl flex items-center justify-between">
             <div>
               <h4 className="font-bold text-sm text-slate-800">Menghasilkan berapa porsi?</h4>
               <p className="text-xs text-slate-500">Resep/modal di atas untuk berapa barang</p>
@@ -122,16 +122,16 @@ export const HPPCalculatorModal: React.FC<HPPCalculatorModalProps> = ({ isOpen, 
           </div>
 
           {/* HPP Final */}
-          <div className="p-5 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl flex items-center justify-between shadow-sm">
+          <div className="p-3 md:p-5 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl flex items-center justify-between shadow-sm">
             <div>
               <p className="text-amber-800 text-sm font-bold">Total HPP per Porsi</p>
               <p className="text-xs text-amber-600/80">Modal murni per satu item</p>
             </div>
-            <p className="text-2xl font-black text-amber-600">{formatIDR(hppPerPortion)}</p>
+            <p className="text-xl md:text-2xl font-black text-amber-600">{formatIDR(hppPerPortion)}</p>
           </div>
         </div>
 
-        <div className="p-5 bg-white border-t border-slate-200 flex flex-col gap-2">
+        <div className="p-3 md:p-5 bg-white border-t border-slate-200 flex flex-col gap-2">
           <button
             onClick={() => onApply(hppPerPortion)}
             disabled={hppPerPortion <= 0}

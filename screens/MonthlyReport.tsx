@@ -1876,7 +1876,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                         <h3 className="text-lg font-black text-slate-900 mt-1 font-mono">{formatIDR(salesMetrics.grossSales)}</h3>
                         <p className="text-[10px] text-slate-400 mt-0.5">Tunai: {formatIDR(salesMetrics.cashSales)}</p>
                     </div>
-                    <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-2.5 bg-blue-50 text-blue-600 rounded-xl shrink-0">
                         <TrendingUp size={20} />
                     </div>
                 </div>
@@ -1892,7 +1892,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                         <h3 className="text-lg font-black text-emerald-600 mt-1 font-mono">{formatIDR(grossProfit)}</h3>
                         <p className="text-[10px] text-slate-400 mt-0.5">HPP: {formatIDR(totalCOGS)}</p>
                     </div>
-                    <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-2.5 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
                         <Percent size={20} />
                     </div>
                 </div>
@@ -1911,7 +1911,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                         <h3 className="text-lg font-black text-rose-600 mt-1 font-mono">{formatIDR(expenseBreakdown.totalOperatingExpenses)}</h3>
                         <p className="text-[10px] text-slate-400 mt-0.5">Rasio: {((expenseBreakdown.totalOperatingExpenses / (salesMetrics.netSales || 1)) * 100).toFixed(1)}%</p>
                     </div>
-                    <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-2.5 bg-rose-50 text-rose-600 rounded-xl shrink-0">
                         <TrendingDown size={20} />
                     </div>
                 </div>
@@ -1927,7 +1927,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                         <h3 className="text-lg font-black text-amber-700 mt-1 font-mono">{formatIDR(receivablesData.totalAllActiveDebtRemaining)}</h3>
                         <p className="text-[10px] text-slate-400 mt-0.5">Lunas Diterima: {formatIDR(receivablesData.totalRepaymentsReceived)}</p>
                     </div>
-                    <div className="p-2.5 bg-amber-50 text-amber-700 rounded-xl shrink-0">
+                    <div className="max-md:hidden p-2.5 bg-amber-50 text-amber-700 rounded-xl shrink-0">
                         <CreditCard size={20} />
                     </div>
                 </div>
@@ -1981,7 +1981,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'}`}
                         >
                             <Tag size={14} />
-                            3. Kinerja per Kategori
+                            3. Pendapatan Unit Usaha
                         </button>
                         <button
                             type="button"
@@ -2512,21 +2512,21 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                                     <div>
                                         <p className="font-bold text-slate-900">Dibuat Oleh,</p>
                                         <p className="text-[9px] print:text-[5.8pt] text-slate-500 mb-8 print:mb-6">Kasir / Staf Administrasi</p>
-                                        <p className="font-bold border-t border-black inline-block px-6 pt-0.5 text-slate-900 uppercase">
+                                        <p className="font-bold border-t border-black inline-block px-4 md:px-6 pt-0.5 text-slate-900 uppercase">
                                             ( {cashierDisplayName} )
                                         </p>
                                     </div>
                                     <div>
                                         <p className="font-bold text-slate-900">Diperiksa Oleh,</p>
                                         <p className="text-[9px] print:text-[5.8pt] text-slate-500 mb-8 print:mb-6">Supervisor / Bendahara</p>
-                                        <p className="font-bold border-t border-black inline-block px-6 pt-0.5 text-slate-900">
+                                        <p className="font-bold border-t border-black inline-block px-4 md:px-6 pt-0.5 text-slate-900">
                                             ( ........................................... )
                                         </p>
                                     </div>
                                     <div>
                                         <p className="font-bold text-slate-900">Mengetahui & Menyetujui,</p>
                                         <p className="text-[9px] print:text-[5.8pt] text-slate-500 mb-8 print:mb-6">Pemilik / Direktur</p>
-                                        <p className="font-bold border-t border-black inline-block px-6 pt-0.5 text-slate-900">
+                                        <p className="font-bold border-t border-black inline-block px-4 md:px-6 pt-0.5 text-slate-900">
                                             ( ........................................... )
                                         </p>
                                     </div>
@@ -2540,7 +2540,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                 {/* TAB 2: STANDAR LAPORAN LABA RUGI (INCOME STATEMENT) */}
                 {/* ======================================================== */}
                 {activeTab === 'income_statement' && (
-                    <div className="p-4 sm:p-6 space-y-6">
+                    <div className="p-4 sm:p-6 space-y-3 md:space-y-6">
                         <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
                             <table className="w-full text-left text-xs border-collapse">
                                 <thead className="bg-slate-100 text-slate-700 uppercase font-black tracking-wider border-b border-slate-200">
@@ -2694,7 +2694,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                 {activeTab === 'category_breakdown' && (
                     <div className="p-4 sm:p-6 space-y-4">
                         <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
-                            <span className="text-xs font-bold text-slate-700">Total Kategori: {categoryRows.length} Kategori</span>
+                            <span className="text-xs font-bold text-slate-700">Total Unit Usaha: {categoryRows.length} Unit Usaha</span>
                             <span className="text-xs font-mono font-bold text-emerald-700">Total Omzet Bruto: {formatIDR(salesMetrics.grossSales)}</span>
                         </div>
 
@@ -2704,7 +2704,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                                     <thead className="bg-slate-100 text-slate-600 font-extrabold uppercase tracking-wider border-b border-slate-200">
                                         <tr>
                                             <th className="p-3 text-center w-12">No</th>
-                                            <th className="p-3 min-w-[180px]">Nama Kategori</th>
+                                            <th className="p-3 min-w-[180px]">Nama Unit Usaha</th>
                                             <th className="p-3 text-center w-20">Unit</th>
                                             <th className="p-3 text-right w-28">Omzet Tunai</th>
                                             <th className="p-3 text-right w-28">Omzet Non-Tunai</th>
@@ -2760,9 +2760,9 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                 {/* TAB 4: REKAPITULASI PIUTANG & PELANGGAN (BON) */}
                 {/* ======================================================== */}
                 {activeTab === 'receivables' && (
-                    <div className="p-4 sm:p-6 space-y-6">
+                    <div className="p-4 sm:p-6 space-y-3 md:space-y-6">
                         {/* KPI Cards */}
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
                             <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-2xl border border-amber-200 flex items-center gap-3 shadow-2xs">
                                 <div className="p-3 bg-amber-200/80 text-amber-900 rounded-xl">
                                     <CreditCard size={22} />
@@ -2987,7 +2987,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
 
                         {/* MODE 4: CUSTOMER LEDGER (BUKU BESAR PELANGGAN) */}
                         {receivablesViewMode === 'ledger' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2.5 md:gap-4">
                                 {receivablesData.customerLedger
                                     .filter(c => !receivablesSearch || c.customerName.toLowerCase().includes(receivablesSearch.toLowerCase()))
                                     .map(cust => (
@@ -3045,7 +3045,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                 {/* TAB 5: RINCIAN ARUS KAS & BIAYA (CASH FLOW STATEMENT) */}
                 {/* ======================================================== */}
                 {activeTab === 'cash_flow' && (
-                    <div className="p-4 sm:p-6 space-y-6">
+                    <div className="p-4 sm:p-6 space-y-3 md:space-y-6">
                         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                             <div>
                                 <h3 className="text-sm font-black text-slate-900">Rincian Arus Kas & Pos Beban Operasional</h3>
@@ -3099,13 +3099,13 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 md:gap-4">
                             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center gap-3">
-                                <div className="p-3 bg-emerald-100 text-emerald-700 rounded-xl">
+                                <div className="max-md:hidden p-3 bg-emerald-100 text-emerald-700 rounded-xl">
                                     <Wallet size={20} />
                                 </div>
                                 <div>
-                                    <p className="text-[11px] font-bold text-slate-500 uppercase">Total Arus Kas Masuk</p>
+                                    <p className="text-[11px] font-bold text-slate-500 uppercase">Total Uang Masuk</p>
                                     <h4 className="text-lg font-black text-emerald-700 font-mono mt-0.5">
                                         {formatIDR(salesMetrics.netSales + nonOperatingMetrics.otherIncome)}
                                     </h4>
@@ -3113,11 +3113,11 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                             </div>
 
                             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center gap-3">
-                                <div className="p-3 bg-rose-100 text-rose-700 rounded-xl">
+                                <div className="max-md:hidden p-3 bg-rose-100 text-rose-700 rounded-xl">
                                     <TrendingDown size={20} />
                                 </div>
                                 <div>
-                                    <p className="text-[11px] font-bold text-slate-500 uppercase">Total Arus Kas Keluar (Beban)</p>
+                                    <p className="text-[11px] font-bold text-slate-500 uppercase">Total Uang Keluar (Beban)</p>
                                     <h4 className="text-lg font-black text-rose-700 font-mono mt-0.5">
                                         {formatIDR(expenseBreakdown.totalOperatingExpenses + nonOperatingMetrics.otherExpense)}
                                     </h4>
@@ -3125,7 +3125,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                             </div>
 
                             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center gap-3">
-                                <div className="p-3 bg-blue-100 text-blue-700 rounded-xl">
+                                <div className="max-md:hidden p-3 bg-blue-100 text-blue-700 rounded-xl">
                                     <DollarSign size={20} />
                                 </div>
                                 <div>
@@ -3166,7 +3166,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                                         <tr>
                                             <th className="p-3 text-center w-12">No</th>
                                             <th className="p-3 w-32">Tanggal</th>
-                                            <th className="p-3 w-48">Pos Kategori Beban</th>
+                                            <th className="p-3 w-48">Pos Akun Biaya</th>
                                             <th className="p-3 min-w-[220px]">Keterangan / Rincian Pengeluaran</th>
                                             <th className="p-3 text-center w-28">Metode</th>
                                             <th className="p-3 text-right w-36 text-rose-700 font-bold">Nominal (Rp)</th>
@@ -3342,11 +3342,11 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                         </div>
 
                         {/* Form Body */}
-                        <form onSubmit={handleSaveExpense} className="p-5 space-y-4 overflow-y-auto flex-1">
-                            {/* Pos Kategori Pengeluaran */}
+                        <form onSubmit={handleSaveExpense} className="p-3 md:p-5 space-y-4 overflow-y-auto flex-1">
+                            {/* Pos Akun Biaya */}
                             <div>
                                 <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5">
-                                    Pos Beban / Kategori Biaya <span className="text-rose-600">*</span>
+                                    Pos Beban / Akun Biaya <span className="text-rose-600">*</span>
                                 </label>
                                 <select
                                     value={expenseForm.category}
@@ -3356,7 +3356,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                                     {OPEX_CATEGORIES.map(cat => (
                                         <option key={cat} value={cat}>{cat}</option>
                                     ))}
-                                    <option value="LAINNYA">+ Kategori Lainnya (Ketik Manual)...</option>
+                                    <option value="LAINNYA">+ Akun Biaya Lainnya (Ketik Manual)...</option>
                                 </select>
                             </div>
 
@@ -3364,7 +3364,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                             {expenseForm.category === 'LAINNYA' && (
                                 <div>
                                     <label className="block text-xs font-bold text-slate-600 mb-1">
-                                        Nama Kategori Kustom
+                                        Nama Akun Biaya Kustom
                                     </label>
                                     <input
                                         type="text"
@@ -3553,7 +3553,7 @@ _Demikian laporan rekapitulasi ini kami sampaikan, terima kasih._`;
                                 <X size={18} />
                             </button>
                         </div>
-                        <div className="p-4 overflow-y-auto flex-1">
+                        <div className="p-3 md:p-4 overflow-y-auto overflow-x-auto flex-1">
                             <table className="w-full text-left text-xs border-collapse">
                                 <thead className="bg-slate-100 text-slate-700 font-extrabold uppercase tracking-wider border-b border-slate-200">
                                     <tr>

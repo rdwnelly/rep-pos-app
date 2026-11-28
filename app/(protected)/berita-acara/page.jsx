@@ -7,6 +7,7 @@ import { syncBeritaAcaraExpensesToCashFlow } from "../../../services/beritaAcara
 import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
 import { formatIDR, formatNumber } from "../../../utils";
 import { resolveReportRowName } from "../../../utils/categoryMapping";
+import { StatTile } from "../../../components/Bento";
 import {
     Plus, PlusCircle, Trash2, Info, Save, Archive, FileText, X, Printer, Eye,
     FolderPlus, Download, Loader2, CheckCircle2, RefreshCw, AlertCircle, Sparkles, Check,
@@ -21,8 +22,8 @@ const WhatsAppIcon = ({ size = 16 }) => (
     </svg>
 );
 
-// Kategori penjualan dasar yang selalu muncul (urutan tampilan default)
-// Tiket Masuk dan Sewa Kostum digabungkan ke kategori "Taman Etnik"
+// Unit Usaha penjualan dasar yang selalu muncul (urutan tampilan default)
+// Tiket Masuk dan Sewa Kostum digabungkan ke unit usaha "Taman Etnik"
 const BASE_SALES_CATEGORIES = [
     "Taman Etnik",
     "TOKO SOUVENIR",
@@ -342,7 +343,7 @@ export default function BeritaAcaraPage() {
     const [isSyncingArchive, setIsSyncingArchive] = useState(false);
     const [archiveSyncFeedback, setArchiveSyncFeedback] = useState(null);
 
-    // Kategori penjualan murni mengikuti kategori yang terdaftar pada Kelola Kategori Master (POS)
+    // Unit Usaha penjualan murni mengikuti unit usaha yang terdaftar pada Kelola Unit Usaha (POS)
     const allSalesCategories = useMemo(() => {
         if (!categories || categories.length === 0) {
             return BASE_SALES_CATEGORIES;
@@ -394,14 +395,14 @@ export default function BeritaAcaraPage() {
         return defaultList;
     });
 
-    // Otomatis sinkronkan kategori master ke salesRows (hanya tampilkan kategori yang terdaftar di Kelola Kategori Master)
+    // Otomatis sinkronkan unit usaha master ke salesRows (hanya tampilkan unit usaha yang terdaftar di Kelola Unit Usaha)
     const salesCategoriesKey = useMemo(() => allSalesCategories.join(','), [allSalesCategories]);
 
     useEffect(() => {
         setSalesRows(prevRows => {
             const prevMap = new Map(prevRows.map(r => [r.name.toLowerCase().trim(), r]));
 
-            // Bangun baris penjualan murni berdasarkan kategori master saat ini
+            // Bangun baris penjualan murni berdasarkan unit usaha master saat ini
             const updatedRows = allSalesCategories.map(catName => {
                 const lower = catName.toLowerCase().trim();
                 if (prevMap.has(lower)) {
@@ -417,7 +418,7 @@ export default function BeritaAcaraPage() {
         });
     }, [salesCategoriesKey]);
 
-    // Otomatis sinkronkan kategori master baru ke categoryOptions dropdown
+    // Otomatis sinkronkan unit usaha master baru ke categoryOptions dropdown
     useEffect(() => {
         setCategoryOptions(prevOptions => {
             const currentClean = new Set(prevOptions.map(opt => opt.replace(/^\d+\)\s*/, '').toLowerCase().trim()));
@@ -440,7 +441,7 @@ export default function BeritaAcaraPage() {
         { id: Date.now(), category: '1) Tiket Masuk', keterangan: '', qty: '', harga: '', total: '' }
     ]);
 
-    // Live listener untuk perubahan/rename nama kategori dari Master Data POS
+    // Live listener untuk perubahan/rename nama unit usaha dari Master Data POS
     useEffect(() => {
         const handleCategoryRenamed = (e) => {
             const { oldName, newName } = e.detail || {};
@@ -1456,7 +1457,7 @@ export default function BeritaAcaraPage() {
 
             const tanggalFormatted = currentPeriode || currentTanggal;
 
-            // Rincian per kategori penjualan aktif (> 0)
+            // Rincian per unit usaha penjualan aktif (> 0)
             const activeSalesLines = currentSalesRows
                 .filter(row => (Number(row.tunai) || 0) > 0 || (Number(row.qr) || 0) > 0)
                 .map(row => {
@@ -1631,7 +1632,7 @@ export default function BeritaAcaraPage() {
         : salesRows;
 
     const addSalesRow = () => {
-        const name = prompt("Masukkan nama kategori penjualan baru:");
+        const name = prompt("Masukkan nama unit usaha baru:");
         if (name && name.trim()) {
             const trimmedName = name.trim();
             setSalesRows(prev => {
@@ -1642,7 +1643,7 @@ export default function BeritaAcaraPage() {
     };
 
     const deleteSalesRow = (index) => {
-        if (confirm("Hapus baris kategori penjualan ini?")) {
+        if (confirm("Hapus baris unit usaha penjualan ini?")) {
             setSalesRows(prev => prev.filter((_, i) => i !== index));
         }
     };
@@ -1768,7 +1769,7 @@ export default function BeritaAcaraPage() {
     };
 
     const handleDeleteCategory = (catName) => {
-        if (confirm(`Apakah Anda yakin ingin menghapus kategori "${catName}"?`)) {
+        if (confirm(`Apakah Anda yakin ingin menghapus akun biaya "${catName}"?`)) {
             setCategoryOptions(prev => {
                 const updated = prev.filter(c => c !== catName);
                 try {
@@ -1782,7 +1783,7 @@ export default function BeritaAcaraPage() {
     };
 
     const handleResetCategories = () => {
-        if (confirm("Kembalikan daftar kategori pengeluaran ke kategori bawaan?")) {
+        if (confirm("Kembalikan daftar akun biaya ke akun bawaan?")) {
             const defaultList = buildDefaultCategoryOptions(allSalesCategories);
             setCategoryOptions(defaultList);
             try {
@@ -1796,7 +1797,7 @@ export default function BeritaAcaraPage() {
     const handleCategorySelect = (expId, selectedVal) => {
         lastLocalEditTimeRef.current = Date.now();
         if (selectedVal === '__ADD_NEW__') {
-            const input = prompt("Masukkan nama kategori pengeluaran baru:");
+            const input = prompt("Masukkan nama akun biaya baru:");
             if (input && input.trim()) {
                 handleAddCategory(input.trim(), expId);
             }
@@ -2310,7 +2311,7 @@ export default function BeritaAcaraPage() {
                                 <thead>
                                     <tr>
                                         <th style={{ width: '8%' }}>No</th>
-                                        <th style={{ width: '58%' }}>KATEGORI PENGELUARAN</th>
+                                        <th style={{ width: '58%' }}>AKUN BIAYA</th>
                                         <th style={{ width: '28%' }}>Jumlah (Rp)</th>
                                         {!isReadOnly && <th style={{ width: '6%' }} className="print:hidden">Aksi</th>}
                                     </tr>
@@ -2337,7 +2338,7 @@ export default function BeritaAcaraPage() {
                                                         className={`editable-cell ${isReadOnly ? 'cursor-default' : ''}`}
                                                         value={row.name}
                                                         onChange={!isReadOnly ? (e) => handleExpenseRowChange(idx, 'name', e.target.value) : undefined}
-                                                        placeholder={isReadOnly ? '-' : 'Tulis kategori pengeluaran...'}
+                                                        placeholder={isReadOnly ? '-' : 'Tulis akun biaya...'}
                                                         readOnly={isReadOnly}
                                                     />
                                                 </td>
@@ -2518,7 +2519,7 @@ export default function BeritaAcaraPage() {
                                 </div>
 
                                 {/* Page 2 Validation Signatures */}
-                                <div className="flex justify-between text-xs mt-6 px-8 font-medium">
+                                <div className="flex justify-between text-xs mt-3 md:mt-6 px-8 font-medium">
                                     <div className="text-center">
                                         <p className="mb-8">Dibuat oleh,<br />Kasir / Administrasi</p>
                                         <p className="font-bold">(&nbsp;&nbsp;{currentKasir || '........................................'}&nbsp;&nbsp;)</p>
@@ -2539,9 +2540,9 @@ export default function BeritaAcaraPage() {
     return (
         <div className="min-h-screen print:min-h-0 print:h-auto print:overflow-visible bg-slate-100 p-2 md:p-6 lg:p-8 print:bg-white print:p-0">
             {/* Header Title & Navigation Bar (Hidden on Print) */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4 mb-6 print:hidden">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4 mb-3 md:mb-6 print:hidden">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <h1 className="text-base md:text-2xl font-bold text-slate-800 flex items-center gap-2">
                         <FileText className="text-amber-600" />
                         Berita Acara & Laporan Setoran Sesi
                     </h1>
@@ -2591,67 +2592,57 @@ export default function BeritaAcaraPage() {
             {/* VIEW 1: FORM BERITA ACARA (LIVE DATE ENTRY) */}
             {/* ======================================================== */}
             {activeTab === 'input' && !viewingArchive && (
-                <div className="space-y-6">
-                    {/* Metric Summary Cards Banner (Live Form) */}
-                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 lg:gap-3.5 print:hidden">
-                        <div className="bg-white p-2.5 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
-                            <div>
-                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Total Penjualan Tunai</p>
-                                <h3 className="text-[13px] sm:text-base lg:text-lg font-extrabold text-slate-900 mt-1">{formatIDR(totalSalesTunai)}</h3>
-                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Penerimaan Tunai Kasir</p>
-                            </div>
-                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
-                                <FileText size={22} />
-                            </div>
-                        </div>
+                <div className="space-y-3 md:space-y-6">
+                    {/* Ubin Bento, sewarna dengan Dashboard dan Produk.
 
-                        <div className="bg-white p-2.5 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
-                            <div>
-                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Total Non-Tunai / QR</p>
-                                <h3 className="text-[13px] sm:text-base lg:text-lg font-extrabold text-purple-700 mt-1">{formatIDR(totalSalesQR)}</h3>
-                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Transfer & QRIS Bank</p>
-                            </div>
-                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
-                                <Info size={22} />
-                            </div>
-                        </div>
+                        Setoran Bersih mendapat ubin selebar dua kolom dan
+                        diletakkan paling atas di HP: itu satu angka yang
+                        dicocokkan karyawan dengan uang fisik di tangan.
 
-                        <div className="bg-white p-2.5 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
-                            <div>
-                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Total Pendapatan Kotor</p>
-                                <h3 className="text-[13px] sm:text-base lg:text-lg font-extrabold text-emerald-600 mt-1">{formatIDR(totalAllSales)}</h3>
-                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Tunai + Non-Tunai</p>
-                            </div>
-                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
-                                <CheckCircle2 size={22} />
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-2.5 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-2">
-                            <div>
-                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Pengeluaran Sesi</p>
-                                <h3 className="text-[13px] sm:text-base lg:text-lg font-extrabold text-rose-600 mt-1">{formatIDR(totalPengeluaran)}</h3>
-                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Operasional Kasir</p>
-                            </div>
-                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
-                                <Trash2 size={22} />
-                            </div>
-                        </div>
-
-                        <div className="col-span-2 order-first lg:order-none lg:col-span-1 bg-gradient-to-br from-amber-50 to-white p-3 sm:p-3.5 lg:p-4 rounded-xl sm:rounded-2xl border-2 border-amber-300 shadow-sm flex items-center justify-between gap-2">
-                            <div>
-                                <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight">Setoran Bersih (Netto)</p>
-                                <h3 className="text-lg sm:text-xl lg:text-lg font-black text-amber-700 mt-0.5">{formatIDR(netto)}</h3>
-                                <p className="hidden sm:block text-[10px] lg:text-[11px] text-slate-400 mt-0.5">Tunai Dikurangi Pengeluaran</p>
-                            </div>
-                            <div className="hidden sm:flex p-2.5 lg:p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
-                                <Save size={22} />
-                            </div>
-                        </div>
+                        Kisinya 5 kolom di laptop, bukan BentoGrid yang 4 kolom,
+                        supaya kelima ubin tetap sejajar satu baris seperti
+                        sebelum dirombak. */}
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 md:gap-4 print:hidden">
+                        <StatTile
+                            tone="accent"
+                            className="max-lg:col-span-2 order-first lg:order-none"
+                            label="Setoran Bersih (Netto)"
+                            value={formatIDR(netto)}
+                            icon={Save}
+                            hint="Tunai dikurangi pengeluaran"
+                        />
+                        <StatTile
+                            label="Total Penjualan Tunai"
+                            value={formatIDR(totalSalesTunai)}
+                            icon={FileText}
+                            tone="primary"
+                            hint="Penerimaan tunai kasir"
+                        />
+                        <StatTile
+                            label="Total Non-Tunai / QR"
+                            value={formatIDR(totalSalesQR)}
+                            icon={Info}
+                            tone="soft"
+                            hint="Transfer & QRIS bank"
+                        />
+                        <StatTile
+                            label="Total Pendapatan Kotor"
+                            value={formatIDR(totalAllSales)}
+                            icon={CheckCircle2}
+                            tone="greenSoft"
+                            hint="Tunai + non-tunai"
+                        />
+                        <StatTile
+                            label="Pengeluaran Sesi"
+                            value={formatIDR(totalPengeluaran)}
+                            icon={Trash2}
+                            tone="redSoft"
+                            hint="Operasional kasir"
+                        />
                     </div>
 
                     {/* Control Panel (Live Form) */}
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 print:hidden flex flex-wrap gap-4 items-end text-xs">
+                    <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-slate-200 print:hidden flex flex-wrap gap-4 items-end text-xs">
                         <div>
                             <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Tanggal Laporan</label>
                             <input
@@ -2822,7 +2813,7 @@ export default function BeritaAcaraPage() {
                                     onClick={() => setShowCategoryModal(true)}
                                     className="flex items-center gap-1.5 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-3.5 py-2 rounded-xl transition-colors shadow-sm shrink-0"
                                 >
-                                    <FolderPlus size={15} className="text-amber-700" /> Kelola Kategori Pengeluaran
+                                    <FolderPlus size={15} className="text-amber-700" /> Kelola Akun Biaya
                                 </button>
                             </div>
                         </div>
@@ -2856,7 +2847,7 @@ export default function BeritaAcaraPage() {
                             harus digeser-geser dengan kolom input berdesakan. */}
                         <div className="md:hidden space-y-2.5">
                             {customExpenses.length === 0 && (
-                                <p className="text-center text-xs text-slate-400 py-6 border border-dashed border-slate-200 rounded-xl">
+                                <p className="text-center text-xs text-slate-400 py-3 md:py-6 border border-dashed border-slate-200 rounded-xl">
                                     Belum ada rincian pengeluaran.
                                 </p>
                             )}
@@ -2877,13 +2868,13 @@ export default function BeritaAcaraPage() {
 
                                     <div className="p-3 space-y-2.5">
                                         <div>
-                                            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Kategori</label>
+                                            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Akun Biaya</label>
                                             <select
                                                 className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-amber-500 text-sm font-medium text-gray-700"
                                                 value={exp.category}
                                                 onChange={(e) => handleCategorySelect(exp.id, e.target.value)}
                                             >
-                                                <optgroup label="Pilih Kategori">
+                                                <optgroup label="Pilih Akun Biaya">
                                                     {categoryOptions.map(cat => (
                                                         <option key={cat} value={cat}>{cat}</option>
                                                     ))}
@@ -2892,7 +2883,7 @@ export default function BeritaAcaraPage() {
                                                     )}
                                                 </optgroup>
                                                 <optgroup label="Opsi Tambahan">
-                                                    <option value="__ADD_NEW__">➕ + Tambah Kategori Baru...</option>
+                                                    <option value="__ADD_NEW__">➕ + Tambah Akun Biaya Baru...</option>
                                                 </optgroup>
                                             </select>
                                         </div>
@@ -2958,7 +2949,7 @@ export default function BeritaAcaraPage() {
                             <table className="w-full text-sm text-left text-gray-600">
                                 <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                                     <tr>
-                                        <th className="px-4 py-3 w-56">Kategori</th>
+                                        <th className="px-4 py-3 w-56">Akun Biaya</th>
                                         <th className="px-4 py-3">Keterangan</th>
                                         <th className="px-4 py-3 w-24">QTY</th>
                                         <th className="px-4 py-3 w-32">Harga</th>
@@ -2975,7 +2966,7 @@ export default function BeritaAcaraPage() {
                                                     value={exp.category}
                                                     onChange={(e) => handleCategorySelect(exp.id, e.target.value)}
                                                 >
-                                                    <optgroup label="Pilih Kategori">
+                                                    <optgroup label="Pilih Akun Biaya">
                                                         {categoryOptions.map(cat => (
                                                             <option key={cat} value={cat}>{cat}</option>
                                                         ))}
@@ -2984,7 +2975,7 @@ export default function BeritaAcaraPage() {
                                                         )}
                                                     </optgroup>
                                                     <optgroup label="Opsi Tambahan">
-                                                        <option value="__ADD_NEW__">➕ + Tambah Kategori Baru...</option>
+                                                        <option value="__ADD_NEW__">➕ + Tambah Akun Biaya Baru...</option>
                                                     </optgroup>
                                                 </select>
                                             </td>
@@ -3064,7 +3055,7 @@ export default function BeritaAcaraPage() {
                             </div>
                             <div className="flex items-center gap-2 text-xs text-gray-600 bg-blue-50 px-3.5 py-2 rounded-xl border border-blue-100">
                                 <Info size={15} className="text-blue-500 flex-shrink-0" />
-                                <span>Kategori yang sama akan dikelompokkan otomatis di halaman cetak.</span>
+                                <span>Akun biaya yang sama akan dikelompokkan otomatis di halaman cetak.</span>
                             </div>
                         </div>
                     </div>
@@ -3075,7 +3066,7 @@ export default function BeritaAcaraPage() {
                     <div className="lg:hidden print:hidden space-y-2.5">
                         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                             <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">Penjualan per Kategori</span>
+                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">Pendapatan Unit Usaha</span>
                                 <span className="text-[11px] font-bold text-slate-500">{formatIDR(totalAllSales)}</span>
                             </div>
                             <div className="divide-y divide-slate-100">
@@ -3160,7 +3151,7 @@ export default function BeritaAcaraPage() {
             {/* VIEW 2: DAFTAR ARSIP REKAPAN */}
             {/* ======================================================== */}
             {activeTab === 'archives' && !viewingArchive && (
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 print:hidden">
+                <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-slate-200 print:hidden">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4 mb-4">
                         <div>
                             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -3281,9 +3272,9 @@ export default function BeritaAcaraPage() {
             {/* VIEW 3: DEDICATED ARCHIVE VIEWER (HALAMAN MELIHAT ARSIP) */}
             {/* ======================================================== */}
             {(activeTab === 'view_archive' || viewingArchive) && viewingArchive && (
-                <div className="space-y-6 animate-fadeIn">
+                <div className="space-y-3 md:space-y-6 animate-fadeIn">
                     {/* Dedicated Archive Header & Action Bar */}
-                    <div className="bg-white border border-amber-200/90 p-5 rounded-2xl shadow-sm print:hidden">
+                    <div className="bg-white border border-amber-200/90 p-3 md:p-5 rounded-2xl shadow-sm print:hidden">
                         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                             <div>
                                 <div className="flex items-center gap-2 mb-2">
@@ -3503,10 +3494,10 @@ export default function BeritaAcaraPage() {
             {/* Category Management Modal */}
             {showCategoryModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:hidden">
-                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 animate-fadeIn">
+                    <div className="bg-white rounded-2xl max-w-md w-full p-3 md:p-6 shadow-2xl border border-gray-100 animate-fadeIn">
                         <div className="flex justify-between items-center pb-4 border-b">
                             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                                <FolderPlus className="text-amber-600" size={20} /> Kelola Kategori Pengeluaran
+                                <FolderPlus className="text-amber-600" size={20} /> Kelola Akun Biaya
                             </h3>
                             <button
                                 onClick={() => setShowCategoryModal(false)}
@@ -3517,7 +3508,7 @@ export default function BeritaAcaraPage() {
                         </div>
 
                         <div className="my-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Tambah Kategori Baru</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Tambah Akun Biaya Baru</label>
                             <div className="flex gap-2">
                                 <input
                                     type="text"
@@ -3547,7 +3538,7 @@ export default function BeritaAcaraPage() {
                         <div className="mt-4">
                             <div className="flex justify-between items-center mb-2">
                                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                    Daftar Kategori Saat Ini ({categoryOptions.length})
+                                    Daftar Akun Biaya Saat Ini ({categoryOptions.length})
                                 </h4>
                                 <button
                                     onClick={handleResetCategories}
@@ -3557,8 +3548,8 @@ export default function BeritaAcaraPage() {
                                 </button>
                             </div>
                             {categoryOptions.length === 0 ? (
-                                <p className="text-center text-xs text-gray-400 py-6 italic border border-dashed rounded-lg">
-                                    Belum ada kategori pengeluaran. Silakan tambah kategori baru di atas.
+                                <p className="text-center text-xs text-gray-400 py-3 md:py-6 italic border border-dashed rounded-lg">
+                                    Belum ada akun biaya. Silakan tambah akun biaya baru di atas.
                                 </p>
                             ) : (
                                 <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
@@ -3571,7 +3562,7 @@ export default function BeritaAcaraPage() {
                                             <button
                                                 onClick={() => handleDeleteCategory(cat)}
                                                 className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
-                                                title="Hapus Kategori"
+                                                title="Hapus Akun Biaya"
                                             >
                                                 <Trash2 size={14} /> Hapus
                                             </button>
@@ -3581,7 +3572,7 @@ export default function BeritaAcaraPage() {
                             )}
                         </div>
 
-                        <div className="mt-6 pt-4 border-t flex justify-end">
+                        <div className="mt-3 md:mt-6 pt-4 border-t flex justify-end">
                             <button
                                 onClick={() => setShowCategoryModal(false)}
                                 className="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2 rounded-lg font-medium text-sm transition-colors"

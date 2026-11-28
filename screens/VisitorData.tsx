@@ -4,7 +4,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import {
   Users, Globe, MapPin, CalendarDays, Download, FileSpreadsheet,
   Trash2, Search, TrendingUp, School, Plus, Ticket,
-  Sparkles, Loader2, CheckCircle2, FileText,
+  Sparkles, Loader2, CheckCircle2, FileText, type LucideIcon,
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
@@ -21,6 +21,7 @@ import { VisitorLogModal } from '../components/VisitorLogModal';
 import { VisitorReportDocument } from '../components/VisitorReportDocument';
 import { exportElementToPdf } from '../utils/pdfExport';
 import { BaganTrenHarian, BaganPeringkat } from '../components/VisitorCharts';
+import { StatTile, type TileTone } from '../components/Bento';
 
 const SEGMENT_LABEL: Record<string, string> = {
   UMUM: 'Umum / Perorangan',
@@ -124,11 +125,11 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
   );
 
   /**
-   * Kategori apa saja yang benar-benar terjual pada periode ini.
+   * Unit Usaha apa saja yang benar-benar terjual pada periode ini.
    *
    * Dipakai saat estimasi kosong: tanpa ini, "tidak ada penjualan
    * tiket" tidak bisa dibedakan dari "tiketnya ada tapi nama
-   * kategorinya belum dikenali", dan layarnya hanya terlihat kosong
+   * unit usahanya belum dikenali", dan layarnya hanya terlihat kosong
    * tanpa petunjuk apa pun.
    */
   const kategoriTerjual = useMemo(() => {
@@ -136,7 +137,7 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
     transaksi.forEach(tx => {
       if (!Array.isArray(tx.items)) return;
       tx.items.forEach((item: any) => {
-        const nama = (item?.categoryName || '').trim() || '(tanpa kategori)';
+        const nama = (item?.categoryName || '').trim() || '(tanpa unit usaha)';
         map.set(nama, (map.get(nama) || 0) + (Number(item?.qty) || 0));
       });
     });
@@ -439,15 +440,15 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
    * mana yang penting. Total pengunjung adalah angka yang dicari orang
    * saat membuka layar ini, jadi ia tampil paling besar.
    */
-  const tile = [
-    { label: 'Nusantara', nilai: formatNumber(ringkasan.wisnus), sub: 'Wisatawan domestik', icon: <MapPin size={15} />, warna: 'text-[#eb6834] bg-[#eb6834]/10' },
-    { label: 'Mancanegara', nilai: formatNumber(ringkasan.wisman), sub: 'Wisatawan asing', icon: <Globe size={15} />, warna: 'text-[#2a78d6] bg-[#2a78d6]/10' },
-    { label: 'Dewasa / Anak', nilai: `${formatNumber(ringkasan.dewasa)} / ${formatNumber(ringkasan.anak)}`, sub: 'Komposisi usia', icon: <Users size={15} />, warna: 'text-slate-600 bg-slate-100' },
-    { label: 'Pendapatan Tiket', nilai: formatIDR(ringkasan.pendapatan), sub: 'Tercatat pada periode ini', icon: <TrendingUp size={15} />, warna: 'text-emerald-600 bg-emerald-50' },
+  const tile: { label: string; nilai: string; sub: string; icon: LucideIcon; nada: TileTone }[] = [
+    { label: 'Nusantara', nilai: formatNumber(ringkasan.wisnus), sub: 'Wisatawan domestik', icon: MapPin, nada: 'accentSoft' },
+    { label: 'Mancanegara', nilai: formatNumber(ringkasan.wisman), sub: 'Wisatawan asing', icon: Globe, nada: 'soft' },
+    { label: 'Dewasa / Anak', nilai: `${formatNumber(ringkasan.dewasa)} / ${formatNumber(ringkasan.anak)}`, sub: 'Komposisi usia', icon: Users, nada: 'default' },
+    { label: 'Pendapatan Tiket', nilai: formatIDR(ringkasan.pendapatan), sub: 'Tercatat pada periode ini', icon: TrendingUp, nada: 'greenSoft' },
   ];
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
+    <div className="space-y-2.5 md:space-y-5">
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -481,7 +482,7 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
       </div>
 
       {/* Penyaring */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 grid grid-cols-2 lg:grid-cols-6 gap-3">
         <div>
           <label className="text-[11px] font-bold text-slate-600 block mb-1">Dari Tanggal</label>
           <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
@@ -531,7 +532,7 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
 
       {/* Ringkasan: satu angka utama, empat tile pendamping */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <div className="bg-gradient-to-br from-[#3b1604] to-[#6b2f0d] text-white p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+        <div className="bg-gradient-to-br from-[#3b1604] to-[#6b2f0d] text-white p-3 md:p-5 rounded-2xl shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-white/70">
               Total Pengunjung
@@ -560,16 +561,16 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
           </div>
         </div>
 
-        <div className="lg:col-span-2 grid grid-cols-2 gap-3">
+        <div className="lg:col-span-2 grid grid-cols-2 gap-2.5 md:gap-3">
           {tile.map(k => (
-            <div key={k.label} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-              <div className="flex items-center justify-between text-slate-500 mb-1">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider">{k.label}</span>
-                <div className={`p-1.5 rounded-lg ${k.warna}`}>{k.icon}</div>
-              </div>
-              <p className="text-xl font-black text-slate-800 tabular-nums">{k.nilai}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">{k.sub}</p>
-            </div>
+            <StatTile
+              key={k.label}
+              label={k.label}
+              value={k.nilai}
+              icon={k.icon}
+              tone={k.nada}
+              hint={k.sub}
+            />
           ))}
         </div>
       </div>
@@ -589,7 +590,7 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
           </span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-slate-100">
-          {perLayanan.length === 0 && <p className="col-span-full p-6 text-center text-slate-400 text-xs">Belum ada data.</p>}
+          {perLayanan.length === 0 && <p className="col-span-full p-3 md:p-6 text-center text-slate-400 text-xs">Belum ada data.</p>}
           {perLayanan.map(([jenis, d]) => (
             <div key={jenis} className="p-4">
               <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1">
@@ -607,8 +608,8 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
         <div className="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-700 text-sm">
           Kunjungan per Kanal Pemesanan
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-          {perKanal.length === 0 && <p className="col-span-full p-6 text-center text-slate-400 text-xs">Belum ada data.</p>}
+        <div className="grid grid-cols-2 sm:grid-cols-3 divide-x divide-y sm:divide-y-0 divide-slate-100">
+          {perKanal.length === 0 && <p className="col-span-full p-3 md:p-6 text-center text-slate-400 text-xs">Belum ada data.</p>}
           {perKanal.map(([kanal, d]) => (
             <div key={kanal} className="p-4">
               <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1">
@@ -650,7 +651,7 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
             <MapPin size={15} /> Daerah / Negara Asal
           </div>
           <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
-            {perDaerah.length === 0 && <p className="p-6 text-center text-slate-400 text-xs">Belum ada data.</p>}
+            {perDaerah.length === 0 && <p className="p-3 md:p-6 text-center text-slate-400 text-xs">Belum ada data.</p>}
             {perDaerah.map(d => (
               <div key={`${d.jenis}-${d.nama}`} className="px-4 py-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
@@ -674,7 +675,7 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
             <School size={15} /> Komposisi Segmen
           </div>
           <div className="divide-y divide-slate-100">
-            {perSegmen.length === 0 && <p className="p-6 text-center text-slate-400 text-xs">Belum ada data.</p>}
+            {perSegmen.length === 0 && <p className="p-3 md:p-6 text-center text-slate-400 text-xs">Belum ada data.</p>}
             {perSegmen.map(([seg, pax]) => {
               const persen = ringkasan.pax > 0 ? (pax / ringkasan.pax) * 100 : 0;
               return (
@@ -721,7 +722,7 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
                     {/* Keadaan kosong yang menjelaskan sebabnya.
                         "Belum ada data" saja menyisakan pertanyaan
                         apakah memang tidak ada kunjungan, atau ada
-                        penjualan tiket yang kategorinya tak dikenali. */}
+                        penjualan tiket yang unit usahanya tak dikenali. */}
                     <div className="max-w-xl mx-auto text-center space-y-2">
                       <p className="text-sm font-bold text-slate-600">
                         Belum ada catatan kunjungan Tiket Masuk pada rentang ini.
@@ -758,7 +759,7 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
                           {kategoriTerjual.length > 0 && (
                             <div>
                               <p className="text-[10px] font-semibold text-slate-500 mb-1">
-                                Kategori yang terjual pada periode ini:
+                                Unit Usaha yang terjual pada periode ini:
                               </p>
                               <div className="flex flex-wrap justify-center gap-1">
                                 {kategoriTerjual.map(([nama, qty]) => (
@@ -768,8 +769,8 @@ export const VisitorData: React.FC<Props> = ({ currentUser }) => {
                                 ))}
                               </div>
                               <p className="text-[10px] text-slate-400 mt-1.5">
-                                Bila tiket sebenarnya terjual, sesuaikan nama kategorinya di
-                                Produk → Kategori, atau setel jenis layanan kunjungannya.
+                                Bila tiket sebenarnya terjual, sesuaikan nama unit usahanya di
+                                Produk → Unit Usaha, atau setel jenis layanan kunjungannya.
                               </p>
                             </div>
                           )}

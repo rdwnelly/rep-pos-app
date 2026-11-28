@@ -767,7 +767,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             t.items?.some(item => {
                 const catName = (item.categoryName && item.categoryName.trim())
                     ? item.categoryName.trim()
-                    : (categories.find(c => c.id === item.categoryId)?.name || 'Tanpa Kategori');
+                    : (categories.find(c => c.id === item.categoryId)?.name || 'Tanpa Unit Usaha');
                 return catName.toLowerCase() === txCategoryFilter.toLowerCase() || item.categoryId === txCategoryFilter;
             })
         );
@@ -867,13 +867,13 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             t.items?.forEach(item => {
                 const cat = (item.categoryName && item.categoryName.trim())
                     ? item.categoryName.trim()
-                    : (categories.find(c => c.id === item.categoryId)?.name || 'Tanpa Kategori');
+                    : (categories.find(c => c.id === item.categoryId)?.name || 'Tanpa Unit Usaha');
                 if (!catMapInTx[cat]) catMapInTx[cat] = [];
                 catMapInTx[cat].push(item);
             });
 
             if (!t.items || t.items.length === 0) {
-                const cat = 'Tanpa Kategori';
+                const cat = 'Tanpa Unit Usaha';
                 if (!catMapInTx[cat]) catMapInTx[cat] = [];
             }
 
@@ -1262,7 +1262,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     const handleAddCashFlow = async () => {
         const amount = parseFloat(cfAmount);
         if (!amount || !cfDesc || !cfCategory) { // Validate category
-            alert("Mohon lengkapi jumlah, kategori, dan keterangan.");
+            alert("Mohon lengkapi jumlah, akun, dan keterangan.");
             return;
         }
 
@@ -1398,13 +1398,13 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         let filename = 'export.csv';
 
         if (activeTab === 'history') {
-            headers = ['ID', 'Tanggal', 'Waktu', 'Faktur', 'Pelanggan', 'Kategori', 'Item', 'Keterangan', 'Kasir', 'Total', 'Dibayar', 'Piutang', 'Kembalian', 'Status', 'Metode'];
+            headers = ['ID', 'Tanggal', 'Waktu', 'Faktur', 'Pelanggan', 'Unit Usaha', 'Item', 'Keterangan', 'Kasir', 'Total', 'Dibayar', 'Piutang', 'Kembalian', 'Status', 'Metode'];
             rows = filteredTransactions.map(t => {
                 const d = new Date(t.date);
                 const remaining = t.totalAmount - t.amountPaid;
                 const piutang = remaining > 0 ? remaining : 0;
                 const kembalian = remaining < 0 ? Math.abs(remaining) : 0;
-                const catSummary = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Kategori') || [])).join(', ');
+                const catSummary = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Unit Usaha') || [])).join(', ');
                 const itemsSummary = t.items?.map(i => `${i.name} (${i.qty}x)`).join(', ') || '-';
                 let status = t.type === TransactionType.RETURN ? 'RETUR' : (t.paymentStatus === 'BELUM_LUNAS' ? 'BELUM LUNAS' : t.paymentStatus);
                 if (t.isReturned && t.type !== TransactionType.RETURN) {
@@ -1441,7 +1441,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             rows = payables.map(p => [p.id, formatDate(p.date), p.invoiceNumber || '-', p.supplierName, p.description, p.totalAmount, p.amountPaid, p.totalAmount - p.amountPaid, p.paymentStatus]);
             filename = 'laporan-utang-supplier.csv';
         } else if (activeTab === 'cashflow') {
-            headers = ['ID', 'Tanggal', 'Faktur Ref', 'Tipe', 'Kategori', 'Jumlah', 'Keterangan'];
+            headers = ['ID', 'Tanggal', 'Faktur Ref', 'Tipe', 'Akun', 'Jumlah', 'Keterangan'];
             rows = filteredCashFlows.map(c => {
                 let refInvoice = '-';
                 let description = c.description;
@@ -1486,7 +1486,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             filename = 'laporan-laba-rugi.csv';
         } else if (activeTab === 'manual_cash_report') {
             const manualFlows = filteredCashFlows.filter(cf => !cf.referenceId);
-            headers = ['Tanggal', 'Waktu', 'Kategori', 'Keterangan', 'Uang Masuk', 'Uang Keluar', 'Metode', 'Bank'];
+            headers = ['Tanggal', 'Waktu', 'Akun', 'Keterangan', 'Uang Masuk', 'Uang Keluar', 'Metode', 'Bank'];
             rows = manualFlows.map(c => {
                 const d = new Date(c.date);
                 return [
@@ -1516,7 +1516,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             sheetName = "Riwayat Transaksi";
             fileNamePrefix = "Laporan_Transaksi";
             data = filteredTransactions.map(t => {
-                const catSummary = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Kategori') || [])).join(', ');
+                const catSummary = Array.from(new Set(t.items?.map(i => i.categoryName || 'Tanpa Unit Usaha') || [])).join(', ');
                 const itemsSummary = t.items.map(i => `${i.name} (${i.qty}x)`).join(', ');
                 const remaining = t.totalAmount - t.amountPaid;
                 const piutang = remaining > 0 ? remaining : 0;
@@ -1532,7 +1532,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                     'Faktur': t.invoiceNumber || '-',
                     'Tipe': t.type === TransactionType.RETURN ? 'RETUR' : 'PENJUALAN',
                     'Pelanggan': t.customerName,
-                    'Kategori': catSummary,
+                    'Unit Usaha': catSummary,
                     'Item': itemsSummary,
                     'Total': t.totalAmount,
                     'Dibayar': t.amountPaid,
@@ -1655,7 +1655,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                     'No. Referensi': c.id,
                     'Faktur Ref': refInvoice,
                     'Tipe': c.type === CashFlowType.IN ? 'MASUK' : 'KELUAR',
-                    'Kategori': c.category,
+                    'Unit Usaha': c.category,
                     'Jumlah': c.amount,
                     'Keterangan': description,
                     'Metode': c.paymentMethod,
@@ -1685,7 +1685,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             data = manualFlows.map(c => ({
                 'Tanggal': new Date(c.date).toLocaleDateString('id-ID'),
                 'Waktu': new Date(c.date).toLocaleTimeString('id-ID'),
-                'Kategori': c.category,
+                'Unit Usaha': c.category,
                 'Keterangan': c.description,
                 'Uang Masuk': c.type === CashFlowType.IN ? c.amount : 0,
                 'Uang Keluar': c.type === CashFlowType.OUT ? c.amount : 0,
@@ -1757,7 +1757,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                     `;
                 }).join('');
 
-                content = `<thead><tr><th>ID</th><th>Tanggal & Waktu</th><th>Faktur</th><th>Pelanggan</th><th>Item Kategori</th><th>Subtotal Kategori</th><th>Total Nota</th><th>Metode</th><th>Status</th></tr></thead><tbody>${categoryBlocks}</tbody>`;
+                content = `<thead><tr><th>ID</th><th>Tanggal & Waktu</th><th>Faktur</th><th>Pelanggan</th><th>Item Unit Usaha</th><th>Subtotal Unit Usaha</th><th>Total Nota</th><th>Metode</th><th>Status</th></tr></thead><tbody>${categoryBlocks}</tbody>`;
             } else {
                 const rows = filteredTransactions.map(t => {
                     const remaining = t.totalAmount - t.amountPaid;
@@ -1893,11 +1893,11 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                 <div style="margin-bottom: 20px; font-size: 14px;">
                     <table style="width: auto; border: none;">
                         <tr style="border: none;">
-                            <td style="border: none; padding: 4px 10px 4px 0;"><strong>Total Masuk</strong></td>
+                            <td style="border: none; padding: 4px 10px 4px 0;"><strong>Total Uang Masuk</strong></td>
                             <td style="border: none; padding: 4px; color: green;">: ${formatIDR(totalIn)}</td>
                         </tr>
                         <tr style="border: none;">
-                            <td style="border: none; padding: 4px 10px 4px 0;"><strong>Total Keluar</strong></td>
+                            <td style="border: none; padding: 4px 10px 4px 0;"><strong>Total Uang Keluar</strong></td>
                             <td style="border: none; padding: 4px; color: red;">: ${formatIDR(totalOut)}</td>
                         </tr>
                         <tr style="border: none;">
@@ -1946,7 +1946,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
               </tr>
           `
             }).join('');
-            content = `<thead><tr><th>Tanggal & Waktu</th><th>Faktur Ref</th><th>Tipe</th><th>Kategori</th><th>Keterangan</th><th>Jumlah</th></tr></thead><tbody>${rows}</tbody>`;
+            content = `<thead><tr><th>Tanggal & Waktu</th><th>Faktur Ref</th><th>Tipe</th><th>Akun</th><th>Keterangan</th><th>Jumlah</th></tr></thead><tbody>${rows}</tbody>`;
         } else if (activeTab === 'profit_loss') {
             title = 'Laporan Laba Rugi';
             content = `
@@ -2001,7 +2001,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                 <thead>
                     <tr>
                         <th>Tanggal & Waktu</th>
-                        <th>Kategori</th>
+                        <th>Akun</th>
                         <th>Keterangan</th>
                         <th style="text-align:right;">Uang Masuk</th>
                         <th style="text-align:right;">Uang Keluar</th>
@@ -2239,7 +2239,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     const initiateAddCashFlow = () => {
         const amount = parseFloat(cfAmount);
         if (!amount || !cfDesc || !cfCategory) {
-            alert("Mohon lengkapi jumlah, kategori, dan keterangan.");
+            alert("Mohon lengkapi jumlah, akun, dan keterangan.");
             return;
         }
         if (cfPaymentMethod === PaymentMethod.TRANSFER && !cfBankId) {
@@ -2250,7 +2250,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
         setConfirmation({
             isOpen: true,
             title: 'Konfirmasi Catat Kas Manual',
-            message: `Cek kembali data kas manual:\n\nTipe: ${cfType === CashFlowType.IN ? 'Uang Masuk' : 'Uang Keluar'}\nKategori: ${cfCategory}\nNominal: ${formatIDR(amount)}\nKeterangan: ${cfDesc}\n\nSimpan catatan ini?`,
+            message: `Cek kembali data kas manual:\n\nTipe: ${cfType === CashFlowType.IN ? 'Uang Masuk' : 'Uang Keluar'}\nAkun: ${cfCategory}\nNominal: ${formatIDR(amount)}\nKeterangan: ${cfDesc}\n\nSimpan catatan ini?`,
             confirmLabel: 'Catat',
             cancelLabel: 'Batal',
             onConfirm: handleAddCashFlow,
@@ -2265,7 +2265,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     }, [filteredCashFlows]);
 
     return (
-        <div className="space-y-6 animate-fade-in min-h-[101vh]">
+        <div className="space-y-3 md:space-y-6 animate-fade-in min-h-[101vh]">
             {/* Modern Top Header & Action Controls */}
             <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap justify-between items-center gap-4 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
@@ -2315,14 +2315,14 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                 </div>
 
                 {/* Dashboard Summary Metric Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
                     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                         <div>
                             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Penjualan</p>
                             <h3 className="text-lg font-extrabold text-slate-900 mt-1">{formatIDR(filteredTransactions.reduce((s, t) => s + t.totalAmount, 0))}</h3>
                             <p className="text-[11px] text-slate-400 mt-0.5">{filteredTransactions.length} Transaksi</p>
                         </div>
-                        <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
+                        <div className="max-md:hidden p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
                             <Receipt size={22} />
                         </div>
                     </div>
@@ -2333,7 +2333,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                             <h3 className="text-lg font-extrabold text-rose-600 mt-1">{formatIDR(receivables.reduce((s, t) => s + (t.totalAmount - t.amountPaid), 0))}</h3>
                             <p className="text-[11px] text-slate-400 mt-0.5">{receivables.length} Tagihan Belum Lunas</p>
                         </div>
-                        <div className="p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
+                        <div className="max-md:hidden p-3 bg-rose-50 text-rose-600 rounded-xl shrink-0">
                             <UserCheck size={22} />
                         </div>
                     </div>
@@ -2344,7 +2344,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                             <h3 className="text-lg font-extrabold text-orange-600 mt-1">{formatIDR(payables.reduce((s, p) => s + (p.totalAmount - p.amountPaid), 0))}</h3>
                             <p className="text-[11px] text-slate-400 mt-0.5">{payables.length} Utang Pembelian</p>
                         </div>
-                        <div className="p-3 bg-orange-50 text-orange-600 rounded-xl shrink-0">
+                        <div className="max-md:hidden p-3 bg-orange-50 text-orange-600 rounded-xl shrink-0">
                             <Truck size={22} />
                         </div>
                     </div>
@@ -2353,7 +2353,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                         <div>
                             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Arus Kas (Net)</p>
                             <h3 className={`text-lg font-extrabold mt-1 ${netCashFlow >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatIDR(netCashFlow)}</h3>
-                            <p className="text-[11px] text-slate-400 mt-0.5">Pemasukan - Pengeluaran</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Uang Masuk − Uang Keluar</p>
                         </div>
                         <div className={`p-3 rounded-xl shrink-0 ${netCashFlow >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                             <DollarSign size={22} />
@@ -2412,7 +2412,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                 {activeTab === 'cashflow' && (
                     <div className="flex flex-wrap items-center gap-3 flex-1">
                         <div className="relative w-[180px] flex-shrink-0">
-                            <label htmlFor="categoryFilter" className="sr-only">Filter Kategori</label>
+                            <label htmlFor="categoryFilter" className="sr-only">Filter Akun</label>
                             <select
                                 id="categoryFilter"
                                 name="categoryFilter"
@@ -2420,7 +2420,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 value={categoryFilter}
                                 onChange={e => setCategoryFilter(e.target.value)}
                             >
-                                <option value="">Semua Kategori</option>
+                                <option value="">Semua Akun</option>
                                 {Array.from(new Set(cashFlows.map(cf => cf.category))).sort().map(cat => (
                                     <option key={cat} value={cat}>{cat}</option>
                                 ))}
@@ -2481,7 +2481,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 id="searchCashflow"
                                 name="searchCashflow"
                                 type="text"
-                                placeholder="Cari kategori atau keterangan..."
+                                placeholder="Cari akun atau keterangan..."
                                 className="w-full pl-9 pr-8 py-2 bg-white border border-slate-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-700"
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
@@ -2511,7 +2511,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                     value={categoryFilter}
                                     onChange={e => setCategoryFilter(e.target.value)}
                                 >
-                                    <option value="">Semua Kategori</option>
+                                    <option value="">Semua Akun</option>
                                     {Array.from(new Set(
                                         cashFlows
                                             .filter(cf => !cf.referenceId)
@@ -2538,7 +2538,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                     activeTab === 'history' ? 'Cari ID, pelanggan, kasir...' :
                                         activeTab === 'debt_customer' ? 'Cari nama pelanggan...' :
                                             activeTab === 'debt_supplier' ? 'Cari supplier atau keterangan...' :
-                                                'Cari kategori atau keterangan...'
+                                                'Cari akun atau keterangan...'
                                 }
                                 className="w-full pl-9 pr-8 py-2 bg-white border border-slate-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs text-slate-700"
                                 value={searchQuery}
@@ -2580,7 +2580,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                             <>
                                 {/* Category Filter for Transactions */}
                                 <div className="relative min-w-[170px]">
-                                    <label htmlFor="txCategoryFilter" className="sr-only">Filter Kategori Produk</label>
+                                    <label htmlFor="txCategoryFilter" className="sr-only">Filter Unit Usaha</label>
                                     <select
                                         id="txCategoryFilter"
                                         name="txCategoryFilter"
@@ -2588,7 +2588,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                         value={txCategoryFilter}
                                         onChange={e => setTxCategoryFilter(e.target.value)}
                                     >
-                                        <option value="">🏷️ Semua Kategori</option>
+                                        <option value="">🏷️ Semua Unit Usaha</option>
                                         {availableTxCategories.map(cat => (
                                             <option key={cat} value={cat}>{cat}</option>
                                         ))}
@@ -2635,9 +2635,9 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                         type="button"
                                         onClick={() => { setTxGroupMode('category'); setGroupByPaymentMethod(false); }}
                                         className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${txGroupMode === 'category' ? 'bg-amber-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                                        title="Kelompokkan Berdasarkan Kategori Produk"
+                                        title="Kelompokkan Berdasarkan Unit Usaha"
                                     >
-                                        <Tag size={13} /> Per Kategori
+                                        <Tag size={13} /> Per Unit Usaha
                                     </button>
                                     <button
                                         type="button"
@@ -2657,21 +2657,21 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             {/* --- TAB: PROFIT LOSS --- */}
             {
                 activeTab === 'profit_loss' && (
-                    <div className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <div className="space-y-3 md:space-y-6">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 md:gap-6">
+                            <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-slate-200">
                                 <h3 className="text-slate-500 font-medium mb-2">Pendapatan (Omzet)</h3>
-                                <p className="text-2xl font-bold text-slate-800">{formatIDR(plData.revenue)}</p>
+                                <p className="text-xl md:text-2xl font-bold text-slate-800">{formatIDR(plData.revenue)}</p>
                                 <p className="text-xs text-slate-400 mt-1">Total penjualan kotor</p>
                             </div>
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                            <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-slate-200">
                                 <h3 className="text-slate-500 font-medium mb-2">Laba Kotor</h3>
-                                <p className="text-2xl font-bold text-blue-600">{formatIDR(plData.grossProfit)}</p>
+                                <p className="text-xl md:text-2xl font-bold text-blue-600">{formatIDR(plData.grossProfit)}</p>
                                 <p className="text-xs text-slate-400 mt-1">Omzet - HPP</p>
                             </div>
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                            <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-slate-200">
                                 <h3 className="text-slate-500 font-medium mb-2">Laba Bersih</h3>
-                                <p className={`text-2xl font-bold ${plData.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatIDR(plData.netProfit)}</p>
+                                <p className={`text-xl md:text-2xl font-bold ${plData.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatIDR(plData.netProfit)}</p>
                                 <p className="text-xs text-slate-400 mt-1">Laba Kotor - Beban Operasional</p>
                             </div>
                         </div>
@@ -2680,7 +2680,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                             <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700">
                                 Detail Laba Rugi
                             </div>
-                            <div className="p-6">
+                            <div className="p-3 md:p-6">
                                 <div className="space-y-4 max-w-2xl mx-auto">
                                     <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                                         <span className="text-slate-600">Penjualan Kotor</span>
@@ -2722,7 +2722,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             {/* --- TAB: MANUAL CASH REPORT (ADMIN/SUPERADMIN ONLY) --- */}
             {
                 activeTab === 'manual_cash_report' && (
-                    <div className="space-y-6">
+                    <div className="space-y-3 md:space-y-6">
                         {(() => {
                             // Filter only manual entries (no referenceId)
                             // Use filteredCashFlows to respect date filter
@@ -2733,20 +2733,20 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
 
                             return (
                                 <>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                                            <h3 className="text-slate-500 font-medium mb-2">Total Kas Masuk (Manual)</h3>
-                                            <p className="text-2xl font-bold text-green-600">{formatIDR(totalIn)}</p>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 md:gap-6">
+                                        <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+                                            <h3 className="text-slate-500 font-medium mb-2">Total Uang Masuk (Manual)</h3>
+                                            <p className="text-xl md:text-2xl font-bold text-green-600">{formatIDR(totalIn)}</p>
                                             <p className="text-xs text-slate-400 mt-1">Dari pencatatan manual</p>
                                         </div>
-                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                                            <h3 className="text-slate-500 font-medium mb-2">Total Kas Keluar (Manual)</h3>
-                                            <p className="text-2xl font-bold text-red-600">{formatIDR(totalOut)}</p>
+                                        <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+                                            <h3 className="text-slate-500 font-medium mb-2">Total Uang Keluar (Manual)</h3>
+                                            <p className="text-xl md:text-2xl font-bold text-red-600">{formatIDR(totalOut)}</p>
                                             <p className="text-xs text-slate-400 mt-1">Dari pencatatan manual</p>
                                         </div>
-                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                                        <div className="bg-white p-3 md:p-6 rounded-2xl shadow-sm border border-slate-200">
                                             <h3 className="text-slate-500 font-medium mb-2">Selisih (Net)</h3>
-                                            <p className={`text-2xl font-bold ${net >= 0 ? 'text-primary' : 'text-red-600'}`}>{formatIDR(net)}</p>
+                                            <p className={`text-xl md:text-2xl font-bold ${net >= 0 ? 'text-primary' : 'text-red-600'}`}>{formatIDR(net)}</p>
                                             <p className="text-xs text-slate-400 mt-1">Masuk - Keluar</p>
                                         </div>
                                     </div>
@@ -2767,7 +2767,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                     <tr>
                                                         <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('date')}>Tanggal <SortIcon column="date" /></th>
                                                         <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('type')}>Tipe <SortIcon column="type" /></th>
-                                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('category')}>Kategori <SortIcon column="category" /></th>
+                                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('category')}>Unit Usaha <SortIcon column="category" /></th>
                                                         <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('description')}>Keterangan <SortIcon column="description" /></th>
                                                         <th className="p-4 font-medium text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('amount')}>Jumlah <SortIcon column="amount" /></th>
                                                         <th className="p-4 font-medium text-center">Aksi</th>
@@ -2880,7 +2880,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                     {txGroupMode === 'method' && <CreditCard className="text-amber-600" size={18} />}
                                     {txGroupMode === 'none' && <Receipt className="text-amber-600" size={18} />}
                                     Riwayat Transaksi Penjualan ({filteredTransactions.length})
-                                    {txGroupMode === 'category' && <span className="bg-amber-100 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-bold">Dikelompokkan per Kategori Produk</span>}
+                                    {txGroupMode === 'category' && <span className="bg-amber-100 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-bold">Dikelompokkan per Unit Usaha</span>}
                                     {txGroupMode === 'method' && <span className="bg-amber-100 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-bold">Dikelompokkan per Metode</span>}
                                 </span>
                                 <span className="text-amber-700 font-extrabold text-sm">
@@ -2907,11 +2907,11 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                             </th>
                                             <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('invoiceNumber')}>No Faktur & Ref <SortIcon column="invoiceNumber" /></th>
                                             <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('customerName')}>Pelanggan <SortIcon column="customerName" /></th>
-                                            {txGroupMode === 'category' && <th className="p-3.5 whitespace-nowrap">Item Kategori Ini</th>}
+                                            {txGroupMode === 'category' && <th className="p-3.5 whitespace-nowrap">Item Unit Usaha Ini</th>}
                                             <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentMethod')}>Metode <SortIcon column="paymentMethod" /></th>
                                             <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentNote')}>Keterangan <SortIcon column="paymentNote" /></th>
                                             <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('totalAmount')}>
-                                                {txGroupMode === 'category' ? 'Subtotal Kategori / Nota' : 'Total'} <SortIcon column="totalAmount" />
+                                                {txGroupMode === 'category' ? 'Subtotal Unit Usaha / Nota' : 'Total'} <SortIcon column="totalAmount" />
                                             </th>
                                             <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('discountAmount')}>Diskon <SortIcon column="discountAmount" /></th>
                                             <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentStatus')}>Status <SortIcon column="paymentStatus" /></th>
@@ -3260,7 +3260,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             {/* --- TAB: CUSTOMER DEBT (PIUTANG) --- */}
             {
                 activeTab === 'debt_customer' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6">
                         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                             <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 flex justify-between items-center">
                                 <span>Daftar BON &amp; Piutang Pelanggan ({debtorGroups.length} pelanggan &bull; {receivables.length} BON)</span>
@@ -3366,7 +3366,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 h-fit sticky top-6">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 md:p-5 h-fit sticky top-6">
                             <h3 className="font-bold text-base mb-3 text-slate-800">Detail & Pelunasan BON</h3>
                             {selectedDebt ? (
                                 <div className="space-y-3.5">
@@ -3401,7 +3401,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                     <div className="bg-rose-50 p-3 rounded-xl border border-rose-200 flex justify-between items-center">
                                         <div>
                                             <label className="text-[10px] text-rose-700 font-bold block uppercase tracking-wider">Sisa Piutang / Hutang</label>
-                                            <div className="text-2xl font-black text-rose-600">{formatIDR(selectedDebt.totalAmount - selectedDebt.amountPaid)}</div>
+                                            <div className="text-xl md:text-2xl font-black text-rose-600">{formatIDR(selectedDebt.totalAmount - selectedDebt.amountPaid)}</div>
                                         </div>
                                     </div>
 
@@ -3521,7 +3521,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                     </button>
                                 </div>
                             ) : (
-                                <p className="text-slate-400 text-xs text-center py-6">Pilih transaksi BON dari daftar di samping untuk melihat rincian barang dan memproses angsuran / pelunasan piutang.</p>
+                                <p className="text-slate-400 text-xs text-center py-3 md:py-6">Pilih transaksi BON dari daftar di samping untuk melihat rincian barang dan memproses angsuran / pelunasan piutang.</p>
                             )}
                         </div>
                     </div>
@@ -3531,7 +3531,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             {/* --- TAB: CASHFLOW --- */}
             {
                 activeTab === 'cashflow' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6">
                         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                             <div className="p-4 bg-slate-50 border-b border-slate-100">
                                 <div className="flex justify-between items-center">
@@ -3649,7 +3649,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 h-fit">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 md:p-6 h-fit">
                             <h3 className="font-bold text-lg mb-4 text-slate-800">Catat Kas Manual</h3>
                             <div className="space-y-4">
                                 <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
@@ -3668,7 +3668,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 />
 
                                 {/* Category Selection */}
-                                <label htmlFor="cfCategory" className="sr-only">Kategori</label>
+                                <label htmlFor="cfCategory" className="sr-only">Akun Biaya / Pendapatan</label>
                                 <select
                                     id="cfCategory"
                                     name="cfCategory"
@@ -3676,7 +3676,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                     value={cfCategory}
                                     onChange={e => setCfCategory(e.target.value)}
                                 >
-                                    <option value="">-- Pilih Kategori --</option>
+                                    <option value="">-- Pilih Akun --</option>
                                     {cfType === CashFlowType.IN ? (
                                         <>
                                             <option value="Pemasukan Lain">Pemasukan Lain</option>
@@ -3775,7 +3775,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 </h3>
                                 <button onClick={() => setDetailTransaction(null)}><X size={20} className="text-slate-400" /></button>
                             </div>
-                            <div className="p-6 max-h-[70vh] overflow-y-auto">
+                            <div className="p-3 md:p-6 max-h-[70vh] overflow-y-auto">
                                 {detailTransaction.is_manual_entry && (
                                     <div className="mb-4 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl text-xs space-y-1.5 text-amber-900 shadow-2xs">
                                         <div className="font-black text-amber-900 flex items-center gap-1.5 text-xs">
@@ -3792,7 +3792,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                         </div>
                                     </div>
                                 )}
-                                <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+                                <div className="grid grid-cols-2 gap-4 mb-3 md:mb-6 text-sm">
                                     <div>
                                         <span className="text-slate-500 block text-xs">Waktu Transaksi</span>
                                         <span className="font-medium text-slate-900">
@@ -3828,7 +3828,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 </div>
 
                                 <h4 className="font-bold text-sm text-slate-800 mb-2">Barang Dibeli</h4>
-                                <div className="border rounded-lg overflow-hidden mb-6">
+                                <div className="border rounded-lg overflow-hidden mb-3 md:mb-6">
                                     {detailTransaction.items.map((item, i) => (
                                         <div key={i} className="flex justify-between p-3 border-b last:border-0 text-sm">
                                             <div>
@@ -3852,7 +3852,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
 
                                 {/* Return History (If this is a Sale) */}
                                 {transactions.filter(t => t.type === TransactionType.RETURN && t.originalTransactionId === detailTransaction.id).length > 0 && (
-                                    <div className="mb-6">
+                                    <div className="mb-3 md:mb-6">
                                         <h4 className="font-bold text-sm text-slate-800 mb-2">Riwayat Retur</h4>
                                         <div className="bg-orange-50 rounded-lg p-3 space-y-2 text-sm border border-orange-100">
                                             {transactions
@@ -3885,7 +3885,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
 
                                 {/* Original Transaction Info (If this is a Return) */}
                                 {detailTransaction.type === TransactionType.RETURN && detailTransaction.originalTransactionId && (
-                                    <div className="mb-6">
+                                    <div className="mb-3 md:mb-6">
                                         <h4 className="font-bold text-sm text-slate-800 mb-2">Info Transaksi Induk</h4>
                                         <div className="bg-blue-50 rounded-lg p-3 text-sm border border-blue-100">
                                             {(() => {
@@ -4049,8 +4049,8 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 </h3>
                                 <button onClick={() => setDetailPurchase(null)}><X size={20} className="text-slate-400" /></button>
                             </div>
-                            <div className="p-6 max-h-[70vh] overflow-y-auto">
-                                <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+                            <div className="p-3 md:p-6 max-h-[70vh] overflow-y-auto">
+                                <div className="grid grid-cols-2 gap-4 mb-3 md:mb-6 text-sm">
                                     <div>
                                         <span className="text-slate-500 block text-xs">Waktu Pembelian</span>
                                         <span className="font-medium text-slate-900">
@@ -4086,12 +4086,12 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 </div>
 
                                 <h4 className="font-bold text-sm text-slate-800 mb-2">Keterangan Barang</h4>
-                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg mb-6 text-sm text-slate-700">
+                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg mb-3 md:mb-6 text-sm text-slate-700">
                                     {detailPurchase.description}
                                 </div>
 
                                 {detailPurchase.items && detailPurchase.items.length > 0 ? (
-                                    <div className="mb-6">
+                                    <div className="mb-3 md:mb-6">
                                         <h4 className="font-bold text-sm text-slate-800 mb-2">Rincian Barang Stok</h4>
                                         <div className="border rounded-lg overflow-hidden">
                                             {detailPurchase.items.map((item, i) => (
@@ -4110,7 +4110,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="flex justify-between font-bold text-slate-900 mb-6 border-b border-slate-200 pb-2">
+                                    <div className="flex justify-between font-bold text-slate-900 mb-3 md:mb-6 border-b border-slate-200 pb-2">
                                         <span>Total Pembelian</span>
                                         <span>{formatIDR(detailPurchase.totalAmount)}</span>
                                     </div>
@@ -4122,7 +4122,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                     p.description.includes(detailPurchase.id) ||
                                     p.description.includes(detailPurchase.id.substring(0, 6))
                                 )).length > 0 && (
-                                        <div className="mt-6">
+                                        <div className="mt-3 md:mt-6">
                                             <h4 className="font-bold text-sm text-slate-800 mb-2">Riwayat Retur ke Supplier</h4>
                                             <div className="bg-orange-50 rounded-lg p-3 space-y-2 text-sm border border-orange-100">
                                                 {purchases
@@ -4157,7 +4157,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
 
                                 {/* Original Purchase Info (If this is a Return) */}
                                 {detailPurchase.type === 'RETURN' && (
-                                    <div className="mt-6">
+                                    <div className="mt-3 md:mt-6">
                                         <h4 className="font-bold text-sm text-slate-800 mb-2">Info Pembelian Induk</h4>
                                         <div className="bg-blue-50 rounded-lg p-3 text-sm border border-blue-100">
                                             {(() => {
@@ -4202,7 +4202,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 )}
 
                                 {/* Payment History */}
-                                <h4 className="font-bold text-sm text-slate-800 mb-2 mt-6">Riwayat Pembayaran</h4>
+                                <h4 className="font-bold text-sm text-slate-800 mb-2 mt-3 md:mt-6">Riwayat Pembayaran</h4>
                                 <div className="bg-slate-50 rounded-lg p-3 space-y-2 text-sm">
                                     {detailPurchase.paymentHistory?.map((ph, i) => (
                                         <div key={i} className="flex justify-between border-b border-slate-200 last:border-0 pb-1">
@@ -4290,7 +4290,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 <h3 className="font-bold text-slate-800">Catat Pembelian Stok</h3>
                                 <button onClick={() => setIsPurchaseModalOpen(false)}><X size={20} className="text-slate-400" /></button>
                             </div>
-                            <div className="p-6 max-h-[70vh] overflow-y-auto">
+                            <div className="p-3 md:p-6 max-h-[70vh] overflow-y-auto">
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Supplier</label>
@@ -4563,7 +4563,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 <h3 className="font-bold text-slate-800">Retur Penjualan</h3>
                                 <button onClick={() => setIsReturnTxModalOpen(false)}><X size={20} className="text-slate-400" /></button>
                             </div>
-                            <div className="p-6 max-h-[70vh] overflow-y-auto">
+                            <div className="p-3 md:p-6 max-h-[70vh] overflow-y-auto">
                                 <p className="text-sm text-slate-600 mb-4">Pilih barang dan jumlah yang ingin diretur dari transaksi ini.</p>
                                 <div className="space-y-3">
                                     {returnTxItems.map((item, idx) => (
@@ -4607,7 +4607,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                     />
                                 </div>
                                 {/* Payment Method Selection */}
-                                <div className="mt-6 pt-4 border-t border-slate-100">
+                                <div className="mt-3 md:mt-6 pt-4 border-t border-slate-100">
                                     <label className="block text-sm font-medium text-slate-700 mb-2">Metode Pengembalian Dana</label>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -4645,7 +4645,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                         )}
                                     </div>
                                 </div>
-                                <div className="mt-6 p-4 bg-red-50 rounded-xl flex justify-between items-center">
+                                <div className="mt-3 md:mt-6 p-4 bg-red-50 rounded-xl flex justify-between items-center">
                                     <span className="text-red-800 font-medium">Total Refund</span>
                                     <span className="text-red-800 font-bold text-xl">
                                         {formatIDR(returnTxItems.reduce((sum, i) => sum + (i.qty * i.price), 0))}
@@ -4673,11 +4673,11 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 <h3 className="font-bold text-slate-800">Retur Pembelian (Ke Supplier)</h3>
                                 <button onClick={() => setIsReturnPurchaseModalOpen(false)}><X size={20} className="text-slate-400" /></button>
                             </div>
-                            <div className="p-6 max-h-[70vh] overflow-y-auto">
+                            <div className="p-3 md:p-6 max-h-[70vh] overflow-y-auto">
                                 <p className="text-sm text-slate-600 mb-4">Proses pengembalian barang atau dana dari supplier <b>{detailPurchase?.supplierName}</b>.</p>
 
                                 {/* Mode Selection */}
-                                <div className="flex gap-2 p-1 bg-slate-100 rounded-lg mb-6">
+                                <div className="flex gap-2 p-1 bg-slate-100 rounded-lg mb-3 md:mb-6">
                                     <button
                                         onClick={() => setReturnPurchaseMode('items')}
                                         className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${returnPurchaseMode === 'items' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
@@ -4757,7 +4757,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 </div>
 
                                 {/* Payment Method Selection */}
-                                <div className="mt-6 pt-4 border-t border-slate-100">
+                                <div className="mt-3 md:mt-6 pt-4 border-t border-slate-100">
                                     <label className="block text-sm font-medium text-slate-700 mb-2">Metode Pengembalian Dana</label>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -4796,7 +4796,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                     </div>
                                 </div>
 
-                                <div className="mt-6 p-4 bg-green-50 rounded-xl flex justify-between items-center">
+                                <div className="mt-3 md:mt-6 p-4 bg-green-50 rounded-xl flex justify-between items-center">
                                     <span className="text-green-800 font-medium">Total Refund (Masuk)</span>
                                     <span className="text-green-800 font-bold text-xl">
                                         {returnPurchaseMode === 'items'
