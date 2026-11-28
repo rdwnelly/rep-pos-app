@@ -3,6 +3,7 @@ import { LogOut, Menu, X, Wifi, WifiOff, CloudUpload, CloudOff } from 'lucide-re
 import { UserRole } from '../types';
 import { navItemsFor } from './navItems';
 import { BottomNav } from './BottomNav';
+import { LoadFailureBanner } from './LoadFailureBanner';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useSyncState } from '../hooks/useSyncState';
 import { clearSyncFailures } from '../services/syncStatus';
@@ -258,6 +259,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate
         {/* pb di HP memberi ruang setinggi bilah bawah + safe area iOS,
             supaya baris terakhir tabel dan tombol simpan tidak tertutup. */}
         <div className={`flex-1 w-full mx-auto flex flex-col min-w-0 ruang-bilah-bawah ${activePage === 'pos' ? 'p-0 max-w-full' : 'p-2.5 sm:p-4 md:p-8 max-w-7xl'}`}>
+          {/* Dipasang di shell, bukan di tiap layar: satu tempat berlaku
+              untuk ke-18 layar. Jaraknya dititipkan lewat className agar
+              saat tidak ada kegagalan benar-benar tidak ada elemen yang
+              tersisa — wadah kosong akan menggeser konten POS, yang
+              wadahnya sengaja tanpa padding. */}
+          <LoadFailureBanner className={activePage === 'pos' ? 'mx-2.5 mt-2.5' : ''} />
           {children}
         </div>
       </main>

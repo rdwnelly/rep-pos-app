@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { subscribeToChanges } from '../services/storage';
+import { recordLoadFailure, recordLoadSuccess } from '../services/loadStatus';
 import { auth } from '../src/lib/firebase';
 
 export function useData<T>(fetcher: () => Promise<T>, deps: any[] = [], relevantEntities?: string | string[]): T | undefined {
@@ -23,19 +24,30 @@ export function useData<T>(fetcher: () => Promise<T>, deps: any[] = [], relevant
         if (!authReady) return;
 
         let isMounted = true;
+        const entityKeys = relevantEntities
+            ? (Array.isArray(relevantEntities) ? relevantEntities : [relevantEntities])
+            : [];
 
         const fetchData = async () => {
             try {
                 const result = await fetcher();
                 if (isMounted) setData(result);
+                // Pemuatan yang berhasil menghapus catatan gagal sebelumnya,
+                // supaya gangguan jaringan sesaat tidak menyisakan peringatan
+                // basi di layar setelah datanya benar-benar masuk.
+                entityKeys.forEach(recordLoadSuccess);
             } catch (error: any) {
                 // Nama koleksinya disebutkan. Tanpa ini, kegagalan baca
                 // hanya muncul sebagai "Missing or insufficient
                 // permissions" tanpa petunjuk koleksi mana yang ditolak,
                 // dan satu layar bisa membaca selusin koleksi.
-                const label = relevantEntities
-                    ? (Array.isArray(relevantEntities) ? relevantEntities.join(', ') : relevantEntities)
-                    : 'tidak diketahui';
+                const label = entityKeys.length ? entityKeys.join(', ') : 'tidak diketahui';
+
+                // Dicatat agar muncul sebagai banner di layar. Sebelumnya
+                // kegagalan baca hanya ada di Console, sehingga layar kosong
+                // karena ditolak server tidak bisa dibedakan dari layar
+                // kosong karena datanya memang belum ada.
+                entityKeys.forEach((key) => recordLoadFailure(key, error));
                 const isPermission =
                     error?.code === 'permission-denied' ||
                     /insufficient permissions/i.test(String(error?.message ?? ''));
