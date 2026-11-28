@@ -85,4 +85,33 @@ if (pelanggaran.length) {
 }
 
 console.log('  ✓ tidak ada peran yang dibaca dari localStorage');
-console.log('  ✓ tidak ada .role yang diambil dari hasil parse localStorage\n');
+console.log('  ✓ tidak ada .role yang diambil dari hasil parse localStorage');
+
+/**
+ * Batas stok ditulis di dua tempat: konstanta di types.ts (untuk
+ * peringatan dini di layar) dan angka di firestore.rules (penegaknya).
+ * Kalau keduanya melenceng, layar akan mengizinkan sesuatu yang
+ * kemudian ditolak server tanpa penjelasan — jenis kebingungan yang
+ * paling sulit dilacak karena tidak ada yang tampak rusak.
+ */
+const sumberTypes = readFileSync(join(AKAR, 'types.ts'), 'utf8');
+const sumberRules = readFileSync(join(AKAR, 'firestore.rules'), 'utf8');
+
+const diTypes = sumberTypes.match(/BATAS_STOK_MAKSIMAL\s*=\s*(\d+)/);
+const diRules = [...sumberRules.matchAll(/get\('stock',\s*0\)\s*<=\s*(\d+)/g)].map((m) => m[1]);
+
+if (!diTypes) {
+  console.log('  ✗ BATAS_STOK_MAKSIMAL tidak ditemukan di types.ts');
+  process.exit(1);
+}
+if (diRules.length === 0) {
+  console.log('  ✗ batas stok tidak ditemukan di firestore.rules');
+  process.exit(1);
+}
+const beda = diRules.filter((n) => n !== diTypes[1]);
+if (beda.length) {
+  console.log(`  ✗ batas stok berbeda — types.ts=${diTypes[1]}, firestore.rules=${diRules.join(',')}`);
+  console.log('      Samakan keduanya, atau layar akan mengizinkan apa yang ditolak server.\n');
+  process.exit(1);
+}
+console.log(`  ✓ batas stok sama di types.ts dan firestore.rules (${diTypes[1]}), ${diRules.length} tempat\n`);

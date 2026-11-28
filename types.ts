@@ -95,6 +95,17 @@ export interface Supplier {
   image?: string;
 }
 
+/**
+ * Batas atas stok per jenis produk.
+ *
+ * Penegaknya adalah firestore.rules — nilai di sini hanya untuk memberi
+ * peringatan lebih awal di layar, supaya pengguna tahu sebelum
+ * simpanannya ditolak server. Kalau angka ini diubah, ubah juga
+ * stokTidakLebihSeratus() di firestore.rules; kalau tidak, layar akan
+ * mengizinkan sesuatu yang kemudian ditolak tanpa penjelasan.
+ */
+export const BATAS_STOK_MAKSIMAL = 100;
+
 export interface Product {
   id: string;
   name: string;

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { buildReportLetterhead, REPORT_LETTERHEAD_STYLES, REPORT_PRINT_SCRIPT, REPORT_LOGO_SRC } from '../utils/printHelpers';
+import { pesanTolakanStok } from '../utils/pesanTolakanStok';
 import { useData } from '../hooks/useData';
 import { StorageService } from '../services/storage';
 import { Product, StockAdjustment, User, Category, StoreSettings } from '../types';
@@ -318,7 +319,10 @@ export const RealStockCheck: React.FC<RealStockCheckProps> = ({ currentUser }) =
             alert(`✅ Berhasil menyimpan ${itemsToAdjust.length} penyesuaian stock opname pada ${dateFormatted} pukul ${timeFormatted} WIB!`);
         } catch (error: any) {
             console.error('Error saving bulk opname:', error);
-            alert(`Gagal menyimpan sebagian opname: ${error.message || 'Terjadi kesalahan'}`);
+            alert(
+                pesanTolakanStok(error)
+                ?? `Gagal menyimpan sebagian opname: ${error.message || 'Terjadi kesalahan'}`,
+            );
         } finally {
             setIsBulkSubmitting(false);
             setBulkProgress(null);

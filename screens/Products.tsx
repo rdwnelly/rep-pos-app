@@ -7,7 +7,7 @@ import { formatIDR, formatNumber, exportToCSV, generateSKU, compressImage, expor
 import { Edit2, Trash2, Plus, X, Download, Upload, Tag, Barcode, Image as ImageIcon, Search, Printer, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, FileSpreadsheet, Package, Sparkles, Check, AlertTriangle } from 'lucide-react';
 import { BentoGrid, StatTile } from '../components/Bento';
 import { HPPCalculatorModal } from '../components/HPPCalculatorModal';
-import { CategoryReportGroup, REPORT_GROUP_LABEL, VisitorServiceType, VISITOR_SERVICE_LABEL } from '../types';
+import { CategoryReportGroup, REPORT_GROUP_LABEL, VisitorServiceType, VISITOR_SERVICE_LABEL, BATAS_STOK_MAKSIMAL } from '../types';
 import { legacyGroupFromName, legacyVisitorServiceFromName } from '../utils/categoryMapping';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useDaftarBertahap } from '../hooks/useDaftarBertahap';
@@ -107,6 +107,29 @@ export const Products: React.FC = () => {
     if (formData.stock === undefined || formData.stock === null || isNaN(Number(formData.stock)) || Number(formData.stock) < 0) {
       alert("Stok awal wajib diisi dengan angka minimal 0!");
       return;
+    }
+
+    // Batas atas stok. Penegaknya firestore.rules; pemeriksaan di sini
+    // hanya supaya pengguna tahu sebelum simpanannya ditolak server.
+    //
+    // Produk yang stoknya sudah terlanjur di atas batas tetap boleh
+    // disimpan ASAL tidak dinaikkan — aturan di server pun begitu.
+    // Tanpa pengecualian ini, produk lama berstok 500 tidak akan bisa
+    // diubah namanya sekalipun.
+    {
+      const stokBaru = Number(formData.stock);
+      const stokLama = editingId ? Number(products.find(p => p.id === editingId)?.stock ?? 0) : 0;
+      if (stokBaru > BATAS_STOK_MAKSIMAL && stokBaru > stokLama) {
+        alert(
+          `Stok tidak boleh melebihi ${BATAS_STOK_MAKSIMAL} unit per jenis produk.\n\n`
+          + `Anda mengisi ${formatNumber(stokBaru)} unit.`
+          + (stokLama > BATAS_STOK_MAKSIMAL
+            ? `\n\nStok produk ini sekarang ${formatNumber(stokLama)} unit — di atas batas. `
+              + `Anda masih boleh menurunkannya, tapi tidak menaikkannya lagi.`
+            : ''),
+        );
+        return;
+      }
     }
 
     // 6. Validasi HPP (Harga Modal)
@@ -934,6 +957,7 @@ export const Products: React.FC = () => {
               <div className="col-span-2 md:col-span-1">
                 <label htmlFor="stock" className="block text-sm font-medium text-slate-700 mb-1">
                   Stok Awal <span className="text-rose-500 font-bold">*</span>
+                  <span className="ml-1 font-normal text-slate-400">(maks {BATAS_STOK_MAKSIMAL})</span>
                 </label>
                 <input id="stock" name="stock" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-primary outline-none" value={formData.stock ?? ''} onChange={e => handleNumericInput('stock', e.target.value)} />
               </div>

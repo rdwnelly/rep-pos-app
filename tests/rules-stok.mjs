@@ -31,6 +31,7 @@ const env = await initializeTestEnvironment({
 const sebagai = (uid, role) => env.authenticatedContext(uid, { role }).firestore();
 const kasir = () => sebagai('kasir1', 'CASHIER');
 const admin = () => sebagai('admin1', 'ADMIN');
+const gudang = () => sebagai('gudang1', 'GUDANG');
 
 let lolos = 0;
 const gagal = [];
@@ -112,6 +113,61 @@ await cek(
 await cek(
   'memperbaiki stok warisan langsung ke 0',
   updateDoc(doc(admin(), 'products/p4'), { stock: 0 }),
+  'boleh',
+);
+
+console.log('\nBatas atas: stok tidak boleh melebihi 100\n');
+
+await siapkanProduk('b1', { name: 'Gelang', price: 20000, hpp: 8000, stock: 90 });
+await cek(
+  'restok 90 -> 100 (tepat di batas)',
+  updateDoc(doc(admin(), 'products/b1'), { stock: increment(10) }),
+  'boleh',
+);
+await cek(
+  'restok 100 -> 101 (lewat satu)',
+  updateDoc(doc(admin(), 'products/b1'), { stock: increment(1) }),
+  'ditolak',
+);
+await cek(
+  'gudang menulis 500 langsung',
+  updateDoc(doc(gudang(), 'products/b1'), { stock: 500 }),
+  'ditolak',
+);
+await cek(
+  'produk baru dengan stok 150',
+  setDoc(doc(admin(), 'products/b2'), { name: 'Y', price: 1, hpp: 1, stock: 150 }),
+  'ditolak',
+);
+await cek(
+  'produk baru dengan stok 100',
+  setDoc(doc(admin(), 'products/b3'), { name: 'Z', price: 1, hpp: 1, stock: 100 }),
+  'boleh',
+);
+
+// Inilah bagian yang paling mudah salah. Kalau aturannya hanya
+// "<= 100", produk yang terlanjur di atas batas akan tertolak pada
+// SETIAP update — termasuk saat dijual — dan barangnya terkunci.
+await siapkanProduk('b4', { name: 'Warisan 500', price: 5000, hpp: 2000, stock: 500 });
+await cek(
+  'KASIR MENJUAL produk yang stoknya terlanjur 500',
+  updateDoc(doc(kasir(), 'products/b4'), { stock: increment(-1) }),
+  'boleh',
+);
+await cek(
+  'admin mengoreksi turun 500 -> 100',
+  updateDoc(doc(admin(), 'products/b4'), { stock: 100 }),
+  'boleh',
+);
+await siapkanProduk('b5', { name: 'Warisan 500 lagi', price: 5000, hpp: 2000, stock: 500 });
+await cek(
+  'menaikkan lagi produk yang sudah di atas batas',
+  updateDoc(doc(admin(), 'products/b5'), { stock: increment(1) }),
+  'ditolak',
+);
+await cek(
+  'mengubah harga produk yang stoknya di atas batas (stok tidak disentuh)',
+  updateDoc(doc(admin(), 'products/b5'), { price: 7000 }),
   'boleh',
 );
 

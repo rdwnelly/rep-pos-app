@@ -62,7 +62,8 @@ service cloud.firestore {
     match /products/{productId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && (isAdmin() || isWarehouse())
-                    && request.resource.data.get('stock', 0) >= 0;
+                    && request.resource.data.get('stock', 0) >= 0
+                    && request.resource.data.get('stock', 0) <= 100;
       allow delete: if isAuthenticated() && (isAdmin() || isWarehouse());
 
       /**
@@ -89,12 +90,38 @@ service cloud.firestore {
                || request.resource.data.get('stock', 0) >= resource.data.get('stock', 0);
       }
 
+      /**
+       * Stok tidak boleh MELEBIHI 100.
+       *
+       * Batas ini keputusan operasional, bukan batas teknis: persediaan
+       * di Rumah Etnik Papua memang tidak pernah melebihi 100 unit per
+       * jenis, dan angka di atas itu selama ini selalu berarti salah
+       * ketik saat menulis stok awal atau pembelian.
+       *
+       * Syarat keduanya menanggung beban yang sama seperti pada penjaga
+       * stok minus, dan ini bagian yang paling mudah salah: kalau hanya
+       * dicek "<= 100", setiap produk yang SEKARANG stoknya di atas 100
+       * akan tertolak pada SETIAP update — termasuk saat dijual. Barang
+       * itu terkunci dan tidak bisa dijual maupun dikoreksi, dan
+       * kasirnya hanya melihat transaksi gagal tanpa sebab yang jelas.
+       *
+       * Karena itu: menurunkan stok selalu diizinkan, termasuk dari 500
+       * ke 400. Produk yang kadung di atas 100 tetap bisa dijual dan
+       * akan turun sendiri ke bawah batas; yang ditolak hanya
+       * menaikkannya lagi.
+       */
+      function stokTidakLebihSeratus() {
+        return request.resource.data.get('stock', 0) <= 100
+               || request.resource.data.get('stock', 0) <= resource.data.get('stock', 0);
+      }
+
       // Admin/Gudang boleh mengubah data master apa pun.
       // Peran lain (kasir) HANYA boleh menyentuh field 'stock', karena
       // itulah satu-satunya yang perlu berubah saat transaksi berjalan.
       // Tanpa batasan ini kasir bisa mengubah price dan hpp lewat SDK.
       allow update: if isAuthenticated()
                     && stokTidakBerakhirMinus()
+                    && stokTidakLebihSeratus()
                     && (
                       isAdmin()
                       || isWarehouse()

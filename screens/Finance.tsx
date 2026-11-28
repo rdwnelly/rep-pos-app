@@ -10,6 +10,7 @@ import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
 import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet, Bluetooth, Receipt, UserCheck, Truck, DollarSign, PieChart, BookOpen, RefreshCw, Tag, Layers, CreditCard, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { SortIcon } from '../components/SortIcon';
+import { pesanTolakanStok } from '../utils/pesanTolakanStok';
 
 interface FinanceProps {
     currentUser: User | null;
@@ -419,7 +420,10 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             alert(message);
         } catch (error) {
             console.error('Error processing return:', error);
-            alert(`Gagal memproses retur: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            alert(
+                pesanTolakanStok(error, 'mengurangi')
+                ?? `Gagal memproses retur: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
         }
     };
 
@@ -1260,7 +1264,10 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             setPurchaseMode('items');
         } catch (error) {
             console.error("❌ Error saving purchase:", error);
-            alert(`❌ Gagal menyimpan pembelian!\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}\n\nSilakan cek console untuk detail.`);
+            alert(
+                pesanTolakanStok(error, 'menambah')
+                ?? `❌ Gagal menyimpan pembelian!\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}\n\nSilakan cek console untuk detail.`,
+            );
         }
     };
 
