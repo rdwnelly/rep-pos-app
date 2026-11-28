@@ -9,6 +9,7 @@ import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
 import { ArrowDownLeft, ArrowUpRight, Download, Plus, Printer, FileText, Filter, RotateCcw, X, Eye, ShoppingBag, Calendar, Clock, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, FileSpreadsheet, Bluetooth, Receipt, UserCheck, Truck, DollarSign, PieChart, BookOpen, RefreshCw, Tag, Layers, CreditCard, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
+import { SortIcon } from '../components/SortIcon';
 
 interface FinanceProps {
     currentUser: User | null;
@@ -64,17 +65,6 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     const [visibleCount, setVisibleCount] = useState(20);
     const loadMoreRef = useRef<HTMLDivElement>(null);
 
-    // Reset pagination and filters on tab change
-    useEffect(() => {
-        setVisibleCount(20);
-        setCategoryFilter('');
-        setPaymentMethodFilter('');
-        setStatusFilter('');
-        setTxPaymentMethodFilter('');
-        setTxCategoryFilter('');
-        setTxGroupMode('none');
-    }, [activeTab]);
-
     // Filter State
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
@@ -91,10 +81,34 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
     // Sort State
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-    // Reset sort when tab changes
-    useEffect(() => {
+    /**
+     * Semua penyaring, urutan, dan paginasi kembali ke awal saat tab
+     * berganti.
+     *
+     * Dulu ini dua useEffect terpisah yang diletakkan DI ATAS deklarasi
+     * state yang dipanggilnya — badan efeknya menyebut setCategoryFilter
+     * dan kawan-kawan puluhan baris sebelum keduanya ada. Itu jalan
+     * hanya karena efek berjalan setelah render; memindahkan satu baris
+     * saja bisa membuatnya meledak, dan eslint menandainya enam kali.
+     *
+     * Sekarang satu blok, diletakkan setelah semua state-nya ada, dan
+     * penyesuaiannya dilakukan saat render — pola yang dianjurkan React
+     * untuk menyesuaikan state ketika masukannya berubah. Tanpa commit
+     * perantara, jadi hasil tab lama tidak sempat terlihat sekejap
+     * dengan penyaring tab baru.
+     */
+    const [tabTerakhir, setTabTerakhir] = useState(activeTab);
+    if (tabTerakhir !== activeTab) {
+        setTabTerakhir(activeTab);
+        setVisibleCount(20);
+        setCategoryFilter('');
+        setPaymentMethodFilter('');
+        setStatusFilter('');
+        setTxPaymentMethodFilter('');
+        setTxCategoryFilter('');
+        setTxGroupMode('none');
         setSortConfig(null);
-    }, [activeTab]);
+    }
 
     const handleSort = (key: string) => {
         setSortConfig(current => {
@@ -103,13 +117,6 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
             }
             return { key, direction: 'asc' };
         });
-    };
-
-    const SortIcon = ({ column }: { column: string }) => {
-        if (sortConfig?.key !== column) return <ArrowUpDown size={14} className="ml-1 text-slate-400 inline" />;
-        return sortConfig.direction === 'asc'
-            ? <ArrowUp size={14} className="ml-1 text-primary inline" />
-            : <ArrowDown size={14} className="ml-1 text-primary inline" />;
     };
 
     // Helper for Jakarta Date
@@ -2765,11 +2772,11 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                             <table className="w-full text-left text-sm">
                                                 <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
                                                     <tr>
-                                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('date')}>Tanggal <SortIcon column="date" /></th>
-                                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('type')}>Tipe <SortIcon column="type" /></th>
-                                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('category')}>Unit Usaha <SortIcon column="category" /></th>
-                                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('description')}>Keterangan <SortIcon column="description" /></th>
-                                                        <th className="p-4 font-medium text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('amount')}>Jumlah <SortIcon column="amount" /></th>
+                                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('date')}>Tanggal <SortIcon column="date" sortConfig={sortConfig} /></th>
+                                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('type')}>Tipe <SortIcon column="type" sortConfig={sortConfig} /></th>
+                                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('category')}>Unit Usaha <SortIcon column="category" sortConfig={sortConfig} /></th>
+                                                        <th className="p-4 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('description')}>Keterangan <SortIcon column="description" sortConfig={sortConfig} /></th>
+                                                        <th className="p-4 font-medium text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('amount')}>Jumlah <SortIcon column="amount" sortConfig={sortConfig} /></th>
                                                         <th className="p-4 font-medium text-center">Aksi</th>
                                                     </tr>
                                                 </thead>
@@ -2896,7 +2903,7 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                 <table className="w-full text-left text-xs">
                                     <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
                                         <tr>
-                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('date')}>Tanggal <SortIcon column="date" /></th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('date')}>Tanggal <SortIcon column="date" sortConfig={sortConfig} /></th>
                                             <th className="p-3.5 bg-amber-50/60 border-b-2 border-amber-500/50 cursor-pointer" onClick={() => handleSort('date')}>
                                                 <div className="flex items-center gap-1.5 text-amber-900 font-extrabold">
                                                     Waktu / Jam
@@ -2905,16 +2912,16 @@ export const Finance: React.FC<FinanceProps> = ({ currentUser, defaultTab = 'his
                                                     </span>
                                                 </div>
                                             </th>
-                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('invoiceNumber')}>No Faktur & Ref <SortIcon column="invoiceNumber" /></th>
-                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('customerName')}>Pelanggan <SortIcon column="customerName" /></th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('invoiceNumber')}>No Faktur & Ref <SortIcon column="invoiceNumber" sortConfig={sortConfig} /></th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('customerName')}>Pelanggan <SortIcon column="customerName" sortConfig={sortConfig} /></th>
                                             {txGroupMode === 'category' && <th className="p-3.5 whitespace-nowrap">Item Unit Usaha Ini</th>}
-                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentMethod')}>Metode <SortIcon column="paymentMethod" /></th>
-                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentNote')}>Keterangan <SortIcon column="paymentNote" /></th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentMethod')}>Metode <SortIcon column="paymentMethod" sortConfig={sortConfig} /></th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentNote')}>Keterangan <SortIcon column="paymentNote" sortConfig={sortConfig} /></th>
                                             <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('totalAmount')}>
-                                                {txGroupMode === 'category' ? 'Subtotal Unit Usaha / Nota' : 'Total'} <SortIcon column="totalAmount" />
+                                                {txGroupMode === 'category' ? 'Subtotal Unit Usaha / Nota' : 'Total'} <SortIcon column="totalAmount" sortConfig={sortConfig} />
                                             </th>
-                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('discountAmount')}>Diskon <SortIcon column="discountAmount" /></th>
-                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentStatus')}>Status <SortIcon column="paymentStatus" /></th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('discountAmount')}>Diskon <SortIcon column="discountAmount" sortConfig={sortConfig} /></th>
+                                            <th className="p-3.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap" onClick={() => handleSort('paymentStatus')}>Status <SortIcon column="paymentStatus" sortConfig={sortConfig} /></th>
                                             <th className="p-3.5 text-center whitespace-nowrap">Aksi Cetak & Opsi</th>
                                         </tr>
                                     </thead>

@@ -8,6 +8,7 @@ import { generatePrintTransactionDetail, generatePrintInvoice, buildReportLetter
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
 import { Download, Search, Filter, RotateCcw, X, Eye, FileText, Printer, FileSpreadsheet, UserCheck, Calendar, Trash2, Bluetooth, RefreshCw, Tag, Layers, CreditCard } from 'lucide-react';
+import { useDaftarBertahap } from '../hooks/useDaftarBertahap';
 
 interface CustomerHistoryProps {
     currentUser: User | null;
@@ -32,13 +33,12 @@ export const CustomerHistory: React.FC<CustomerHistoryProps> = ({ currentUser })
     const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
 
     // Pagination State
-    const [visibleCount, setVisibleCount] = useState(20);
+    // Reset ke 20 saat penyaring berubah ditangani useDaftarBertahap,
+  // saat render — bukan lewat useEffect yang membuat daftar lama
+  // sempat terlihat sekejap sebelum melompat ke atas.
+  const [visibleCount, setVisibleCount] = useDaftarBertahap(20, [selectedCustomerId, selectedCategory, groupMode, startDate, endDate, searchQuery]);
     const loadMoreRef = useRef<HTMLDivElement>(null);
 
-    // Reset pagination on filter change
-    useEffect(() => {
-        setVisibleCount(20);
-    }, [selectedCustomerId, selectedCategory, groupMode, startDate, endDate, searchQuery]);
 
     // Load store settings
     useEffect(() => {

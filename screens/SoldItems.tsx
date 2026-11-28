@@ -5,6 +5,8 @@ import { StorageService } from '../services/storage';
 import { TransactionType, UserRole, User } from '../types';
 import { formatIDR, exportToCSV, exportToExcel } from '../utils';
 import { Download, Search, Filter, RotateCcw, X, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, ShoppingBag, Printer, Calendar, Folder, Layers } from 'lucide-react';
+import { useDaftarBertahap } from '../hooks/useDaftarBertahap';
+import { SortIcon } from '../components/SortIcon';
 
 interface SoldItemsProps {
     currentUser: User | null;
@@ -30,13 +32,12 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
 
     // Pagination State
-    const [visibleCount, setVisibleCount] = useState(50);
+    // Reset ke 50 saat penyaring berubah ditangani useDaftarBertahap,
+  // saat render — bukan lewat useEffect yang membuat daftar lama
+  // sempat terlihat sekejap sebelum melompat ke atas.
+  const [visibleCount, setVisibleCount] = useDaftarBertahap(50, [startDate, endDate, searchQuery, selectedCategory, sortConfig]);
     const loadMoreRef = useRef<HTMLDivElement>(null);
 
-    // Reset pagination on filter change
-    useEffect(() => {
-        setVisibleCount(50);
-    }, [startDate, endDate, searchQuery, selectedCategory, sortConfig]);
 
     // Helper for Jakarta Date
     const getJakartaDateStr = (dateStr: string) => {
@@ -455,13 +456,6 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
         }));
     };
 
-    const SortIcon = ({ column }: { column: string }) => {
-        if (sortConfig.key !== column) return <ArrowUpDown size={14} className="ml-1 text-slate-400" />;
-        return sortConfig.direction === 'asc'
-            ? <ArrowUp size={14} className="ml-1 text-primary" />
-            : <ArrowDown size={14} className="ml-1 text-primary" />;
-    };
-
     const handlePrint = () => {
         const printWindow = window.open('', '_blank');
         if (!printWindow) return;
@@ -835,34 +829,34 @@ export const SoldItems: React.FC<SoldItemsProps> = ({ currentUser }) => {
                         <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider">
                             <tr>
                                 <th className="p-3 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('date')}>
-                                    <div className="flex items-center">Tanggal <SortIcon column="date" /></div>
+                                    <div className="flex items-center">Tanggal <SortIcon column="date" sortConfig={sortConfig} /></div>
                                 </th>
                                 <th className="p-3 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('transactionId')}>
-                                    <div className="flex items-center">Faktur / ID <SortIcon column="transactionId" /></div>
+                                    <div className="flex items-center">Faktur / ID <SortIcon column="transactionId" sortConfig={sortConfig} /></div>
                                 </th>
                                 <th className="p-3 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('name')}>
-                                    <div className="flex items-center">Nama Barang <SortIcon column="name" /></div>
+                                    <div className="flex items-center">Nama Barang <SortIcon column="name" sortConfig={sortConfig} /></div>
                                 </th>
                                 <th className="p-3 font-medium text-center">Satuan</th>
                                 <th className="p-3 font-medium text-center cursor-pointer hover:bg-slate-100" onClick={() => handleSort('qty')}>
-                                    <div className="flex items-center justify-center">Qty <SortIcon column="qty" /></div>
+                                    <div className="flex items-center justify-center">Qty <SortIcon column="qty" sortConfig={sortConfig} /></div>
                                 </th>
                                 {currentUser?.role !== UserRole.CASHIER && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.OWNER && (
                                     <th className="p-3 font-medium text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('hpp')}>
-                                        <div className="flex items-center justify-end">HPP <SortIcon column="hpp" /></div>
+                                        <div className="flex items-center justify-end">HPP <SortIcon column="hpp" sortConfig={sortConfig} /></div>
                                     </th>
                                 )}
                                 <th className="p-3 font-medium text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('finalPrice')}>
-                                    <div className="flex items-center justify-end">Harga Jual <SortIcon column="finalPrice" /></div>
+                                    <div className="flex items-center justify-end">Harga Jual <SortIcon column="finalPrice" sortConfig={sortConfig} /></div>
                                 </th>
                                 <th className="p-3 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('categoryName')}>
-                                    <div className="flex items-center">Unit Usaha <SortIcon column="categoryName" /></div>
+                                    <div className="flex items-center">Unit Usaha <SortIcon column="categoryName" sortConfig={sortConfig} /></div>
                                 </th>
                                 <th className="p-3 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('customerName')}>
-                                    <div className="flex items-center">Pembeli <SortIcon column="customerName" /></div>
+                                    <div className="flex items-center">Pembeli <SortIcon column="customerName" sortConfig={sortConfig} /></div>
                                 </th>
                                 <th className="p-3 font-medium cursor-pointer hover:bg-slate-100" onClick={() => handleSort('cashierName')}>
-                                    <div className="flex items-center">Kasir <SortIcon column="cashierName" /></div>
+                                    <div className="flex items-center">Kasir <SortIcon column="cashierName" sortConfig={sortConfig} /></div>
                                 </th>
                                 <th className="p-3 font-medium text-center">Status</th>
                             </tr>

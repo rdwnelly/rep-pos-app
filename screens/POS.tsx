@@ -14,6 +14,7 @@ import { VisitorLogModal, VisitorPrefill } from '../components/VisitorLogModal';
 import { VisitorServiceType } from '../types';
 import { analyzeVisitorServices } from '../utils/visitorEstimate';
 import { useCurrentUser } from '../hooks/useCurrentUser';
+import { useDaftarBertahap } from '../hooks/useDaftarBertahap';
 
 const FlyingItem = ({ item, cartRect }: { item: any, cartRect?: DOMRect }) => {
   const [animate, setAnimate] = useState(false);
@@ -410,7 +411,10 @@ export const POS: React.FC = () => {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Pagination / Virtualization State
-  const [visibleCount, setVisibleCount] = useState(20);
+  // Reset ke 20 saat penyaring berubah ditangani useDaftarBertahap,
+  // saat render — bukan lewat useEffect yang membuat daftar lama
+  // sempat terlihat sekejap sebelum melompat ke atas.
+  const [visibleCount, setVisibleCount] = useDaftarBertahap(20, [search, selectedCategory]);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   // Mobile State
@@ -546,10 +550,6 @@ export const POS: React.FC = () => {
     return filteredProducts.slice(0, visibleCount);
   }, [filteredProducts, visibleCount]);
 
-  // Reset visible count when search or category changes
-  useEffect(() => {
-    setVisibleCount(20);
-  }, [search, selectedCategory]);
 
   // Infinite Scroll Observer
   useEffect(() => {

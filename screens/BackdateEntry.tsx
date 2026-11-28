@@ -19,6 +19,7 @@ import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
 import { generateESCPOSReceipt } from '../utils/escposEncoder';
 import { playBeep } from '../utils/soundEffect';
 import { PaymentQRCode } from '../components/ui/PaymentQRCode';
+import { useDaftarBertahap } from '../hooks/useDaftarBertahap';
 
 interface BackdateEntryProps {
   currentUser: { uid?: string; id?: string; email: string | null; role: string; name?: string; username?: string };
@@ -119,7 +120,10 @@ export const BackdateEntry: React.FC<BackdateEntryProps> = ({ currentUser }) => 
   const [showMobileCart, setShowMobileCart] = useState(false);
 
   // Pagination & Animations
-  const [visibleCount, setVisibleCount] = useState(20);
+  // Reset ke 20 saat penyaring berubah ditangani useDaftarBertahap,
+  // saat render — bukan lewat useEffect yang membuat daftar lama
+  // sempat terlihat sekejap sebelum melompat ke atas.
+  const [visibleCount, setVisibleCount] = useDaftarBertahap(20, [search, selectedCategory]);
   const [flyingItems, setFlyingItems] = useState<{ id: string; startX: number; startY: number; image?: string }[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const cartIconRef = useRef<HTMLDivElement>(null);
@@ -168,9 +172,6 @@ export const BackdateEntry: React.FC<BackdateEntryProps> = ({ currentUser }) => 
     return filteredProducts.slice(0, visibleCount);
   }, [filteredProducts, visibleCount]);
 
-  useEffect(() => {
-    setVisibleCount(20);
-  }, [search, selectedCategory]);
 
   // Infinite Scroll Observer
   useEffect(() => {

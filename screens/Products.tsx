@@ -10,6 +10,8 @@ import { HPPCalculatorModal } from '../components/HPPCalculatorModal';
 import { CategoryReportGroup, REPORT_GROUP_LABEL, VisitorServiceType, VISITOR_SERVICE_LABEL } from '../types';
 import { legacyGroupFromName, legacyVisitorServiceFromName } from '../utils/categoryMapping';
 import { useCurrentUser } from '../hooks/useCurrentUser';
+import { useDaftarBertahap } from '../hooks/useDaftarBertahap';
+import { SortIcon } from '../components/SortIcon';
 
 export const Products: React.FC = () => {
   // Peran dibaca dari AuthContext (custom claim), bukan dari salinan di
@@ -32,7 +34,10 @@ export const Products: React.FC = () => {
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   // Pagination State
-  const [visibleCount, setVisibleCount] = useState(20);
+  // Reset ke 20 saat penyaring berubah ditangani useDaftarBertahap,
+  // saat render — bukan lewat useEffect yang membuat daftar lama
+  // sempat terlihat sekejap sebelum melompat ke atas.
+  const [visibleCount, setVisibleCount] = useDaftarBertahap(20, [filterCategory, searchQuery, sortConfig]);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -279,13 +284,6 @@ export const Products: React.FC = () => {
       }
       return { key, direction: 'asc' };
     });
-  };
-
-  const SortIcon = ({ column }: { column: string }) => {
-    if (sortConfig?.key !== column) return <ArrowUpDown size={14} className="ml-1 text-slate-400 inline" />;
-    return sortConfig.direction === 'asc'
-      ? <ArrowUp size={14} className="ml-1 text-primary inline" />
-      : <ArrowDown size={14} className="ml-1 text-primary inline" />;
   };
 
   // --- IMPORT / EXPORT ---
@@ -573,10 +571,6 @@ export const Products: React.FC = () => {
     return filteredProducts.slice(0, visibleCount);
   }, [filteredProducts, visibleCount]);
 
-  // Reset visible count when filters change
-  useEffect(() => {
-    setVisibleCount(20);
-  }, [filterCategory, searchQuery, sortConfig]);
 
   // Infinite Scroll Observer
   useEffect(() => {
@@ -762,22 +756,22 @@ export const Products: React.FC = () => {
             <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
               <tr>
                 <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('name')}>
-                  Produk <SortIcon column="name" />
+                  Produk <SortIcon column="name" sortConfig={sortConfig} />
                 </th>
                 <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('sku')}>
-                  SKU / Barcode <SortIcon column="sku" />
+                  SKU / Barcode <SortIcon column="sku" sortConfig={sortConfig} />
                 </th>
                 <th className="p-3.5 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('stock')}>
-                  Stok <SortIcon column="stock" />
+                  Stok <SortIcon column="stock" sortConfig={sortConfig} />
                 </th>
                 <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('hpp')}>
-                  HPP (Modal) <SortIcon column="hpp" />
+                  HPP (Modal) <SortIcon column="hpp" sortConfig={sortConfig} />
                 </th>
                 <th className="p-3.5 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('unit')}>
-                  Satuan <SortIcon column="unit" />
+                  Satuan <SortIcon column="unit" sortConfig={sortConfig} />
                 </th>
                 <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('price')}>
-                  Harga Jual <SortIcon column="price" />
+                  Harga Jual <SortIcon column="price" sortConfig={sortConfig} />
                 </th>
                 <th className="p-3.5 text-center">Aksi</th>
               </tr>

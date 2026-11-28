@@ -6,6 +6,7 @@ import { Customer, Supplier, UserRole } from '../types';
 import { Plus, Edit2, Trash2, Phone, MapPin, Search, User, Truck, Download, Printer, Upload, X, FileSpreadsheet, Users, Mail, ArrowUpDown } from 'lucide-react';
 import { exportToCSV, generateUUID, compressImage, exportToExcel } from '../utils';
 import { useCurrentUser } from '../hooks/useCurrentUser';
+import { useDaftarBertahap } from '../hooks/useDaftarBertahap';
 
 export const People: React.FC = () => {
     // Peran dari AuthContext (custom claim), bukan salinan localStorage.
@@ -17,13 +18,12 @@ export const People: React.FC = () => {
     const [sortOrder, setSortOrder] = useState<'name_asc' | 'name_desc'>('name_asc');
 
     // Pagination State
-    const [visibleCount, setVisibleCount] = useState(20);
+    // Reset ke 20 saat penyaring berubah ditangani useDaftarBertahap,
+  // saat render — bukan lewat useEffect yang membuat daftar lama
+  // sempat terlihat sekejap sebelum melompat ke atas.
+  const [visibleCount, setVisibleCount] = useDaftarBertahap(20, [activeTab, search]);
     const loadMoreRef = useRef<HTMLDivElement>(null);
 
-    // Reset pagination on tab/search change
-    useEffect(() => {
-        setVisibleCount(20);
-    }, [activeTab, search]);
 
     // Modal
     const [isModalOpen, setIsModalOpen] = useState(false);
