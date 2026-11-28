@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useData } from "../../../hooks/useData";
+import { useCurrentUser } from "../../../hooks/useCurrentUser";
 import { StorageService, notifyListeners } from "../../../services/storage";
 import { syncBeritaAcaraExpensesToCashFlow } from "../../../services/beritaAcaraExpenseSync";
 import { CashFlowType, PaymentMethod, TransactionType } from "../../../types";
@@ -303,15 +304,7 @@ export default function BeritaAcaraPage() {
     // keluar yang dialirkan dari rincian pengeluaran di halaman ini —
     // aturan Firestore memakai userId itu untuk menentukan siapa yang
     // boleh mengoreksinya nanti.
-    const [currentUser] = useState(() => {
-        try {
-            const raw = typeof window !== 'undefined' ? localStorage.getItem('pos_current_user') : null;
-            return raw ? JSON.parse(raw) : null;
-        } catch (e) {
-            console.error('Gagal membaca data pengguna aktif:', e);
-            return null;
-        }
-    });
+    const currentUser = useCurrentUser();
 
     const [activeTab, setActiveTab] = useState("input");
     // Di HP, dokumen A4 dilipat secara bawaan. Elemennya TIDAK di-display:none

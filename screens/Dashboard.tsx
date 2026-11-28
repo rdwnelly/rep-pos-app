@@ -96,19 +96,9 @@ export const Dashboard: React.FC = () => {
   // AI & Interactive States
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<string>(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-
-  // Load user
-  useEffect(() => {
-    const userStr = localStorage.getItem('pos_current_user');
-    if (userStr) {
-      try {
-        setCurrentUser(JSON.parse(userStr));
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }, []);
+  // State currentUser beserta efek pengisinya dihapus: nilainya tidak
+  // pernah dibaca di mana pun pada layar ini, dan efek itu salah satu
+  // dari 23 set-state-in-effect yang tercatat eslint.
 
   // Refresh handler
   const handleRefresh = () => {

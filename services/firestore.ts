@@ -219,12 +219,14 @@ const saveEntityBulk = async <T extends { id?: string }>(
  *    keuangan, pemasukan tunai/non-tunai, piutang, pengeluaran, dan
  *    laba bersih tampil kosong bagi peran selain admin.
  *
- * 2. Keputusan izin tidak boleh bergantung pada localStorage. Peran
- *    dibaca dari `pos_current_user`, yang ditulis AuthContext pada
- *    onAuthStateChanged — sementara useData memulai fetch-nya pada
- *    event yang sama. Urutannya tidak dijamin, jadi query pertama bisa
- *    berjalan saat localStorage masih kosong lalu ditolak server, dan
- *    layarnya diam-diam tampil kosong.
+ * 2. Keputusan izin tidak boleh bergantung pada sisi klien sama
+ *    sekali. Peran dulu dibaca dari salinan di localStorage, yang
+ *    ditulis AuthContext pada onAuthStateChanged — sementara useData
+ *    memulai fetch-nya pada event yang sama. Urutannya tidak dijamin,
+ *    jadi query pertama bisa berjalan saat salinan itu masih kosong
+ *    lalu ditolak server, dan layarnya diam-diam tampil kosong.
+ *    Salinan itu kini sudah dihapus; yang menentukan izin tetap
+ *    firestore.rules lewat custom claim pada ID token.
  *
  * Yang tetap berlaku: field `date` wajib berformat kanonik
  * "YYYY-MM-DD HH:mm:ss" (lihat toCanonicalDate di utils.ts), karena

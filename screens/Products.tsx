@@ -9,8 +9,13 @@ import { BentoGrid, StatTile } from '../components/Bento';
 import { HPPCalculatorModal } from '../components/HPPCalculatorModal';
 import { CategoryReportGroup, REPORT_GROUP_LABEL, VisitorServiceType, VISITOR_SERVICE_LABEL } from '../types';
 import { legacyGroupFromName, legacyVisitorServiceFromName } from '../utils/categoryMapping';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 
 export const Products: React.FC = () => {
+  // Peran dibaca dari AuthContext (custom claim), bukan dari salinan di
+  // localStorage yang bisa diubah lewat DevTools dan belum tentu sudah
+  // terisi saat render pertama.
+  const penggunaAktif = useCurrentUser();
   const products = useData(() => StorageService.getProducts(), [], 'products') || [];
   const categories = useData(() => StorageService.getCategories(), [], 'categories') || [];
 
@@ -286,8 +291,9 @@ export const Products: React.FC = () => {
   // --- IMPORT / EXPORT ---
 
   const handleExport = () => {
-    const currentUser = JSON.parse(localStorage.getItem('pos_current_user') || '{}');
-    const showHPP = currentUser.role !== UserRole.CASHIER && currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.WAREHOUSE;
+    const showHPP = penggunaAktif.role !== UserRole.CASHIER
+      && penggunaAktif.role !== UserRole.ADMIN
+      && penggunaAktif.role !== UserRole.WAREHOUSE;
 
     const headers = ['ID', 'Nama Produk', 'SKU', 'Unit Usaha', 'Satuan', 'Stok'];
     if (showHPP) headers.push('HPP');
@@ -304,8 +310,9 @@ export const Products: React.FC = () => {
   };
 
   const handleExportExcel = () => {
-    const currentUser = JSON.parse(localStorage.getItem('pos_current_user') || '{}');
-    const showHPP = currentUser.role !== UserRole.CASHIER && currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.WAREHOUSE;
+    const showHPP = penggunaAktif.role !== UserRole.CASHIER
+      && penggunaAktif.role !== UserRole.ADMIN
+      && penggunaAktif.role !== UserRole.WAREHOUSE;
 
     const data = filteredProducts.map(p => {
       const row: any = {
@@ -346,8 +353,9 @@ export const Products: React.FC = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const currentUser = JSON.parse(localStorage.getItem('pos_current_user') || '{}');
-    const showHPP = currentUser.role !== UserRole.CASHIER && currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.WAREHOUSE;
+    const showHPP = penggunaAktif.role !== UserRole.CASHIER
+      && penggunaAktif.role !== UserRole.ADMIN
+      && penggunaAktif.role !== UserRole.WAREHOUSE;
 
     const rows = filteredProducts.map(p => `
       <tr>
@@ -610,7 +618,7 @@ export const Products: React.FC = () => {
           </button>
 
           {/* Hide Import CSV for Cashier and Warehouse */}
-          {['CASHIER', 'GUDANG'].indexOf((JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role) === -1 && (
+          {!['CASHIER', 'GUDANG'].includes(penggunaAktif.role) && (
             <label className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 transition-all flex text-xs font-medium shadow-sm cursor-pointer">
               <Upload size={15} /> Import CSV
               <input id="csvProductImport" name="csvProductImport" type="file" accept=".csv" className="hidden" onChange={handleImport} />
@@ -626,7 +634,7 @@ export const Products: React.FC = () => {
             <Download size={15} /> CSV
           </button>
           {/* Hide Add Button for Warehouse */}
-          {(JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role !== UserRole.WAREHOUSE && (
+          {penggunaAktif.role !== UserRole.WAREHOUSE && (
             <button onClick={() => { resetProductForm(); setIsProductModalOpen(true); }} className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md">
               <Plus size={16} /> Tambah Produk
             </button>
@@ -823,7 +831,7 @@ export const Products: React.FC = () => {
                     </td>
                     <td className="p-3.5 text-center whitespace-nowrap">
                       {/* Actions - Block for Warehouse */}
-                      {(JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role !== UserRole.WAREHOUSE && (
+                      {penggunaAktif.role !== UserRole.WAREHOUSE && (
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => handleEditProduct(p)} className="p-1.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors" title="Edit Produk">
                             <Edit2 size={15} />

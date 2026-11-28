@@ -5,8 +5,11 @@ import { StorageService } from '../services/storage';
 import { Customer, Supplier, UserRole } from '../types';
 import { Plus, Edit2, Trash2, Phone, MapPin, Search, User, Truck, Download, Printer, Upload, X, FileSpreadsheet, Users, Mail, ArrowUpDown } from 'lucide-react';
 import { exportToCSV, generateUUID, compressImage, exportToExcel } from '../utils';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 
 export const People: React.FC = () => {
+    // Peran dari AuthContext (custom claim), bukan salinan localStorage.
+    const penggunaAktif = useCurrentUser();
     const [activeTab, setActiveTab] = useState<'customers' | 'suppliers'>('customers');
     const customers = useData(() => StorageService.getCustomers(), [], 'customers') || [];
     const suppliers = useData(() => StorageService.getSuppliers(), [], 'suppliers') || [];
@@ -385,7 +388,7 @@ export const People: React.FC = () => {
 
                 <div className="flex flex-wrap gap-2 w-full md:w-auto">
                     {/* Hide Import CSV for Cashier and Admin */}
-                    {['CASHIER', 'ADMIN'].indexOf((JSON.parse(localStorage.getItem('pos_current_user') || '{}') as any).role) === -1 && (
+                    {!['CASHIER', 'ADMIN'].includes(penggunaAktif.role) && (
                         <label className="flex-1 md:flex-none items-center justify-center gap-1.5 bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 transition-all flex text-xs font-medium shadow-sm cursor-pointer">
                             <Upload size={15} /> Import CSV
                             <input id="csvImport" name="csvImport" type="file" accept=".csv" className="hidden" onChange={handleImport} />

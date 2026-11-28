@@ -13,6 +13,7 @@ import { PaymentQRCode } from '../components/ui/PaymentQRCode';
 import { VisitorLogModal, VisitorPrefill } from '../components/VisitorLogModal';
 import { VisitorServiceType } from '../types';
 import { analyzeVisitorServices } from '../utils/visitorEstimate';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 
 const FlyingItem = ({ item, cartRect }: { item: any, cartRect?: DOMRect }) => {
   const [animate, setAnimate] = useState(false);
@@ -400,8 +401,12 @@ export const POS: React.FC = () => {
     printViaBrowser(billTx, { isTemporarySlip: true });
   };
 
-  // Settings
-  const currentUser = JSON.parse(localStorage.getItem('pos_current_user') || '{}') as UserType; // Need to grab current user
+  // Kasir yang sedang login. Dibaca dari AuthContext, bukan dari salinan
+  // di localStorage: salinan itu ditulis pada onAuthStateChanged sementara
+  // layar sudah mulai merender pada event yang sama, jadi pembacaan
+  // pertama bisa mendapat objek kosong — dan cashierId pada transaksi
+  // pertama sesi itu sempat kosong.
+  const currentUser = useCurrentUser();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Pagination / Virtualization State

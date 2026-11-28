@@ -10,6 +10,7 @@ import { useBluetoothPrinter } from '../hooks/useBluetoothPrinter';
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, firebaseConfig } from '../src/lib/firebase';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 
 // Menetapkan custom claim 'role' lewat Admin SDK di server, supaya
 // Firestore Rules tidak perlu membaca dokumen users di setiap operasi.
@@ -173,8 +174,11 @@ const DeleteConfirmationModal: React.FC<DeleteModalProps> = ({
 };
 
 export const Settings: React.FC = () => {
-    // User State with useData
-    const currentUser = JSON.parse(localStorage.getItem('pos_current_user') || '{}') as User;
+    // Peran dari AuthContext (custom claim), bukan salinan localStorage
+    // yang bisa diubah lewat DevTools. Layar ini dirender setelah
+    // AuthProvider selesai memuat, jadi perannya sudah pasti pada render
+    // pertama — initialTab di bawah tidak akan salah tebak.
+    const currentUser = useCurrentUser();
     const isSuperAdmin = currentUser.role === UserRole.SUPERADMIN;
     const canManageStore = currentUser.role === UserRole.SUPERADMIN || currentUser.role === UserRole.OWNER || currentUser.role === UserRole.ADMIN;
     const initialTab = canManageStore ? 'store' : 'print';

@@ -18,6 +18,7 @@ import {
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { CashFlowType, PaymentMethod, TransactionType, StoreSettings, StockAdjustment, PaymentStatus, Transaction, CashFlow, BankAccount, Product, UserRole } from '../types';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 
 // WhatsApp Icon SVG
 const WhatsAppIcon = ({ size = 16 }: { size?: number }) => (
@@ -131,18 +132,11 @@ export const MonthlyReport: React.FC = () => {
         StorageService.getStoreSettings().then(setStoreSettings).catch(console.error);
     }, []);
 
-    // Current User Info
-    const [currentUser, setCurrentUser] = useState<any>(null);
-    useEffect(() => {
-        const userStr = typeof window !== 'undefined' ? localStorage.getItem('pos_current_user') : null;
-        if (userStr) {
-            try {
-                setCurrentUser(JSON.parse(userStr));
-            } catch (e) {
-                console.error(e);
-            }
-        }
-    }, []);
+    // Pengguna aktif dari AuthContext. Sebelumnya disalin dari
+    // localStorage lewat useEffect + setState — selain bisa dipalsukan,
+    // polanya membuat isLedgerManager di bawah bernilai false pada render
+    // pertama, sehingga kontrol milik admin sempat berkedip hilang.
+    const currentUser = useCurrentUser();
 
     // Period Mode: 'tutup_buku' (18 s/d 17) | 'calendar' (1 s/d Akhir Bulan)
     const [periodMode, setPeriodMode] = useState<'tutup_buku' | 'calendar'>('tutup_buku');

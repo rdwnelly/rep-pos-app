@@ -90,16 +90,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       };
 
       setUser(authUser);
-      localStorage.setItem(
-        "pos_current_user",
-        JSON.stringify({
-          id: firebaseUser.uid,
-          name: authUser.name || firebaseUser.email || "",
-          username: authUser.username || firebaseUser.email || "",
-          role: authUser.role,
-          image: authUser.image || "",
-        }),
-      );
+
+      // Salinan "pos_current_user" di localStorage sudah dihapus.
+      //
+      // Dulu layar-layar membaca peran dari sana untuk menyembunyikan
+      // tombol. Nilainya bisa diubah siapa pun lewat DevTools, dan —
+      // yang lebih mengganggu sehari-hari — ditulis pada event yang sama
+      // dengan saat layar mulai merender, sehingga pembacaan pertama
+      // kadang mendapat objek kosong. Semua layar kini memakai
+      // useCurrentUser(), yang membaca context ini langsung.
+      //
+      // removeItem di atas dan di (protected)/layout.tsx sengaja
+      // dipertahankan: itu yang membersihkan salinan lama pada perangkat
+      // yang sudah terlanjur menyimpannya.
       setLoading(false);
     });
 
